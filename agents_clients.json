@@ -1,0 +1,3443 @@
+[
+  {
+    "agent": "Нагима",
+    "name": "Krasich Beauty",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул. Московская 217",
+    "phone": "705249471",
+    "contact_name": "Эльнура",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Laletty ( London)",
+    "visit_day": "Пятница",
+    "point_type": "Салон депиляции",
+    "address": "ул.Аалы Токлмбаева,9Б",
+    "phone": "772680560",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Lime House",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "ул. Атая Огонбаева 222 /Гоголя",
+    "phone": "555907878",
+    "contact_name": "Эмиль",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Lisa hair",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул.Жукеева-Пудовкина,53",
+    "phone": "559290809",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "New Tone",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "Гоголя16",
+    "phone": "559511539",
+    "contact_name": "???",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Only nails",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "ул.Гоголя,112",
+    "phone": "555377778",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Pro clinic",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "ул.Юнусалиева,173/7",
+    "phone": "700823982",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Sabirov studio",
+    "visit_day": "Среда",
+    "point_type": "Мед клиника",
+    "address": "Аламедин 1,2",
+    "phone": "559900911",
+    "contact_name": "Алиса Игоревна",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Tahmina Style Гуля",
+    "visit_day": "Среда",
+    "point_type": "Салон красоты",
+    "address": "Аламедин 1,дом 60",
+    "phone": "700188444",
+    "contact_name": "Гуля",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Аламедин 1. дом38. кв 17",
+    "visit_day": "Среда",
+    "point_type": "другое",
+    "address": null,
+    "phone": "700039871",
+    "contact_name": "Елена",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Банный комплекс С легким паром ОсОО Бипласт",
+    "visit_day": "Понедельник",
+    "point_type": "Спа комплекс",
+    "address": "ул. Ибраимова, 117а",
+    "phone": "555113041",
+    "contact_name": "Оксана",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Барбершоп Континенталь",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "ул. Фрунзе 300/3",
+    "phone": "551124819",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Бизнес центр Каухар 3 этаж 33 каб",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "ул. Донецкая, Орто Сайский р-к",
+    "phone": "700674700",
+    "contact_name": "Ирина",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Бутик Mini miss ТРЦ Детский мир",
+    "visit_day": "Понедельник",
+    "point_type": "магазин",
+    "address": "пр.Чуй,147 2эт",
+    "phone": "707285009",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Бутик Сувенир",
+    "visit_day": "Понедельник",
+    "point_type": "другое",
+    "address": "Дордой Плаза",
+    "phone": "709005733",
+    "contact_name": "продавцы",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Имарат спорт энд Велнес",
+    "visit_day": "Понедельник",
+    "point_type": "другое",
+    "address": "ул. Фрунзе 300/3",
+    "phone": "555728006",
+    "contact_name": "Фаризат",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "ИП Убейдуллаев РХ",
+    "visit_day": "Понедельник",
+    "point_type": "Стоматология",
+    "address": "пр.Чуй,48",
+    "phone": "555965757",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Клиника Асмед",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул.Советская 3/2 /Джонтошева",
+    "phone": "704125365",
+    "contact_name": "Айтурган",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Клиника Ростислава Дмитриева",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "3 мкр ,22",
+    "phone": "702914322",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Клиника Эксперт",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул.Койбагарова,95",
+    "phone": "700005035",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Массажный салон Chill",
+    "visit_day": "Вторник",
+    "point_type": "Массажный салон",
+    "address": "ул.Киевская,218",
+    "phone": "509495555",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Медико Эстетический центр Профус",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул. Б. Батыра, 3/2",
+    "phone": "706500140",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Медицинский центр Систем СИСТЕМ ОЗЕЛ ТЫББИ ЙАТЫРЫ",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул.Юнусалиева,57",
+    "phone": "554903433",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Модный квартал",
+    "visit_day": "Среда",
+    "point_type": "Салон красоты",
+    "address": "Аламедин-1,60",
+    "phone": "708847417",
+    "contact_name": "Рита",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "МЦ Беспалова",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "пер.Топографический,1",
+    "phone": "555300569",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "МЦ Имей",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул.Жукеева-Пудовкина,12",
+    "phone": "701870089",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "МЦ Кроха 5 мкр Алиева И",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "5 мкр",
+    "phone": "554411833",
+    "contact_name": "Резан",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "МЦ Профус( Гоголя,77)",
+    "visit_day": "Понедельник",
+    "point_type": "Мед клиника",
+    "address": "ул.Гоголя,77/Токтогула",
+    "phone": "704500140",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "МЦ Репродукции",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул.Матросова,136",
+    "phone": "700011105",
+    "contact_name": "Азиза",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "МЦ Родильный дом",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул.Матросова,136",
+    "phone": "772160794",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "МЦ Санос (Глафира хоз.)",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "ул.Ибраимова,29а",
+    "phone": "709828418",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "МЦ Физиоцентр",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "4мкр д.26/1",
+    "phone": "504580004",
+    "contact_name": "Кульмира",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "ОсОО Дельта клиник КГ",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "Карасаева,68",
+    "phone": "553503031",
+    "contact_name": "Оксана",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Садик ABC",
+    "visit_day": "Вторник",
+    "point_type": "другое",
+    "address": "ул.Токтогула,45",
+    "phone": "708696915",
+    "contact_name": "Насирдин",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Aya beauty",
+    "visit_day": "Вторник",
+    "point_type": "Салон депиляции",
+    "address": "Токтогула 200",
+    "phone": "557123124",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Eline hair",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "Ибраимова 115/1 2'эт",
+    "phone": "700308814",
+    "contact_name": "Нуркыз",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон LaLetty 2",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "Бета сторес 2",
+    "phone": "772680560",
+    "contact_name": "Нуржан",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон LaLetty Азия Молл",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": null,
+    "phone": "772680560",
+    "contact_name": "Нуржан",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Laletty Евразия",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "ул.Советская/Киевская",
+    "phone": "772680560",
+    "contact_name": "Нуржан",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Mirais_Beauty",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "5 мкр, д.66",
+    "phone": "705888088",
+    "contact_name": "Айсулуу",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Sofiline",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "ул.Гоголя,28",
+    "phone": "550412264",
+    "contact_name": "Оксана",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Аделина Липс",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "ул.Гоголя,28 3эт 304 звонок",
+    "phone": "999407007",
+    "contact_name": "Алия",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Женские секреты Токтогула",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Турузбекова/Токтогула216",
+    "phone": "555110886",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Пери",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "5 мкр, д.57",
+    "phone": "557006974",
+    "contact_name": "Пери",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Стиль",
+    "visit_day": "Среда",
+    "point_type": "Салон красоты",
+    "address": "мкр. Аламедин 1, по Ауэзова,3в ТЦ Бабакан",
+    "phone": "508444777",
+    "contact_name": "Айнагуль",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Фея 4мкр",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "4мкр 47",
+    "phone": "555230717",
+    "contact_name": "Татьяна",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты 8 Hands",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "7 мкр. 52/1 ул.Юнусалиева,173",
+    "phone": "703122363",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты La belle",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Боконбаева,183/Турусбекова",
+    "phone": "5565007170",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Lokonzone",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "ул.Токтогула,62/1",
+    "phone": "709128923",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Алия",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "5 мкр, д.2",
+    "phone": "555402092",
+    "contact_name": "Светлана",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Идеал (4мкр)",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "4 мкр",
+    "phone": "555201045",
+    "contact_name": "Наталья",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Zi Beauty",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "7мкр д16а блок В",
+    "phone": "703699226",
+    "contact_name": "Самира",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Искушение(3мкр)",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "К. Маркса 3мкр. д,24",
+    "phone": "557578804",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Коко",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "юнусалиева 3/3 в здание лининг 3 этаж",
+    "phone": "708959595",
+    "contact_name": "Диана",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Твоя Мечта",
+    "visit_day": "Среда",
+    "point_type": "Салон красоты",
+    "address": "Ауэзова,2 ТЦ Бабакан 3эт",
+    "phone": "550745402",
+    "contact_name": "Катерина",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Фа эстетик",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "пр.Манаса,30",
+    "phone": "508119988",
+    "contact_name": "Оксана",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Элегия",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "ул. Донецкая/К. Маркса д.46",
+    "phone": "703574666",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Локон 4 мкр",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "4мкр дом 1",
+    "phone": "555201045",
+    "contact_name": "Наталья",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Сони Баранниковой",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "ул. Гоголя/Чуй",
+    "phone": "555428610",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон эпиляции Бархат ИП Ильина",
+    "visit_day": "Пятница",
+    "point_type": "Салон депиляции",
+    "address": "7мкр 52/3",
+    "phone": "500509770",
+    "contact_name": "Назгуль",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Секрет клиник",
+    "visit_day": "Понедельник",
+    "point_type": "Мед клиника",
+    "address": "Ибраимова 115",
+    "phone": "705170992",
+    "contact_name": "Альбина",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Скрябина 37",
+    "visit_day": "Четверг",
+    "point_type": "другое",
+    "address": null,
+    "phone": "558215050",
+    "contact_name": "Анастасия",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматологическая клиника Olio",
+    "visit_day": "Понедельник",
+    "point_type": "Стоматология",
+    "address": "ул.Ибраимова,103/1а БЦ Victoti 2эт блок С",
+    "phone": "707125125",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Kings clinic 2",
+    "visit_day": "Четверг",
+    "point_type": "Стоматология",
+    "address": "пер.Койташский,48 (Ахунбаева/Койбогарова)",
+    "phone": "701502502",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Ultra Dent",
+    "visit_day": "Четверг",
+    "point_type": "Стоматология",
+    "address": "ул.Ж.-Пудовкина,43",
+    "phone": "555770274",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Гигиея 7мкр",
+    "visit_day": "Пятница",
+    "point_type": "Стоматология",
+    "address": "7мкр д.52/1",
+    "phone": "550556878",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Дент Арекс(ОсОО Дентарекс)",
+    "visit_day": "Вторник",
+    "point_type": "Стоматология",
+    "address": "Боконбаева, 177",
+    "phone": "5550285368",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Меди Люкс",
+    "visit_day": "Четверг",
+    "point_type": "Стоматология",
+    "address": "ул.Медерова/Элебаева(Золотой дракон)",
+    "phone": "557051150",
+    "contact_name": "Гульнара",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Эллада",
+    "visit_day": "Четверг",
+    "point_type": "Стоматология",
+    "address": "ул.Чокморова,1",
+    "phone": "999381585",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Студия Баатыровой",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "7мкр 52/2",
+    "phone": "552551597",
+    "contact_name": "Бурулай",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Студия Сахарок ИП Коробейников А.И.",
+    "visit_day": "Среда",
+    "point_type": "Салон депиляции",
+    "address": "м-н Асанбай Куттубаева,31/1 (7788#)",
+    "phone": "555251705",
+    "contact_name": "Андрей",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Та самая студия",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "Гоголя 127",
+    "phone": "551281111",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Фото студия REC",
+    "visit_day": "Пятница",
+    "point_type": "другое",
+    "address": "7 мкр ДСК на2этаж на право",
+    "phone": "550206362",
+    "contact_name": "Анастасия",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "БЦ Ventana",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "Юнусалиева 68",
+    "phone": "0552 902 575",
+    "contact_name": "Зина",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Шарм Бьюти",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "Ибраимова 115",
+    "phone": "0552 115 815",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Валери",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "Токтогула К Акиева",
+    "phone": "0550 644 025",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Beauty Art ул.Гоголя,127",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "Гоголя 127",
+    "phone": "0555 346 212",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Персона (Зина Парикмахер)",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "Токтогула 236",
+    "phone": "0552 917 688",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Центр здоровья академика Раимжанова",
+    "visit_day": "Среда",
+    "point_type": "Мед клиника",
+    "address": "мкр Аламедин 1 1 /1",
+    "phone": "0550 807 057",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "VIVA Clinic Оспанова Н",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "7 мкр 8/18",
+    "phone": "0707 885 151",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Бомонд",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "7 мкр 8/38",
+    "phone": "0704 455 880",
+    "contact_name": "Мээрим",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Клиника Estelite",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "Юнусалиева 173/2",
+    "phone": "0473 782 418",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стомотология Айстом",
+    "visit_day": "Пятница",
+    "point_type": "Стоматология",
+    "address": "4 мкр",
+    "phone": "0555 076 861",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Косметология Царевна",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "7 мкр",
+    "phone": "0557 091 074",
+    "contact_name": "Наталья",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Обучающий центр Бьюти Мед",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "Ибраимова 113",
+    "phone": "0551 976 735",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Массажный салон Moon",
+    "visit_day": "Понедельник",
+    "point_type": "Спа комплекс",
+    "address": "Ибраимова 29",
+    "phone": "0504 180 192",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Клиника Чакмак Коз",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "Ахунбаева 48",
+    "phone": "0701 313 119",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Белеза",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "Московская 217",
+    "phone": "0555 910 882",
+    "contact_name": "Елена",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты I own Face",
+    "visit_day": "Пятница",
+    "point_type": "Массажный салон",
+    "address": "4 мкр 43",
+    "phone": "0556 759775",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "VIA Premium Clinic",
+    "visit_day": "Понедельник",
+    "point_type": "Мед клиника",
+    "address": "ул.Фрунзе 300/3",
+    "phone": "0505 771 171",
+    "contact_name": "админ",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Мадонна",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "Скрябина советская 5б",
+    "phone": "0707 195 609",
+    "contact_name": "Айдай",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стомотология Твоя улыбка",
+    "visit_day": "Пятница",
+    "point_type": "Стоматология",
+    "address": "4 мкр., 49",
+    "phone": "0555 707 505",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Магазин Ортомастер",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "ул. Суеркулова, 1/4",
+    "phone": "0501 086 122",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "I Lash KG",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "ул. Огонбаева, 222",
+    "phone": "0553 995 253",
+    "contact_name": "Анна",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Пери Казан Булак",
+    "visit_day": "Среда",
+    "point_type": "Салон красоты",
+    "address": "учкун мк Казан булак 11",
+    "phone": "0776 864 697",
+    "contact_name": "Кыял",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "3 мкр, Банур Медикал",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "3 мкр., ул. Суеркулова, 16/1",
+    "phone": "0700 901 688",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "ОС Тен Екатерина",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "ул. Юнусалиева, 173/6",
+    "phone": "0556 688 802",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Кабинет шугаринга (Колизей) 2 эт 215каб",
+    "visit_day": "Пятница",
+    "point_type": "депиляция",
+    "address": "3 ул. Суеркулова 28/2",
+    "phone": "0551 335 553",
+    "contact_name": "Сымбат",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Sofiline",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "ул. Гоголя, 28",
+    "phone": "0555 813 207",
+    "contact_name": "Салтанат",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "ОсОО Баня Байтур",
+    "visit_day": "Четверг",
+    "point_type": "СПА",
+    "address": "Скрябина / Ж Пудовкина",
+    "phone": "0707 585 223",
+    "contact_name": "Анара",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Студия Epilove (Саяра)",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "ул.Каралаева,40/4",
+    "phone": "0554 280 012",
+    "contact_name": "Саяра",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "ОсОО Клиника Эстет",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "3 мкр. дом 14/2",
+    "phone": "0552 044 055",
+    "contact_name": "Анастасия",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Evvi",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "7 мкр., 52/2",
+    "phone": "0553 107 711",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Adis",
+    "visit_day": "Среда",
+    "point_type": "Стоматология",
+    "address": "городок Энергетиков 10 1 этаж",
+    "phone": "0554 430 303",
+    "contact_name": "0.0",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Альба Дент",
+    "visit_day": "Понедельник",
+    "point_type": "Стоматология",
+    "address": "ул. Гоголя / ул. Фрунзе",
+    "phone": "0550 050 110",
+    "contact_name": "Эмиль",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Ирина",
+    "visit_day": "Среда",
+    "point_type": "Салон красоты",
+    "address": "Кольбаева 14/2",
+    "phone": "0553 733 711",
+    "contact_name": "Нигина",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Мастер Класс",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул. Московская, 54",
+    "phone": "0553 344 348",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "СПА салон Афродита",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул. Скрябина 41/Ж.Пудовкина",
+    "phone": "0400 569 877",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "ОсОО Флеминг Центр",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "Бокомбавева 207",
+    "phone": "0555 008 040",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Весна",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "5 мкр., дом 44",
+    "phone": "0704 814 555",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Мего Дент",
+    "visit_day": "Вторник",
+    "point_type": "Стоматология",
+    "address": "ул. Московская, 186",
+    "phone": "0557 608 481",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "ОсОО Элдик Фемели медисин клиник",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул. Молодой Гвардии 2/1",
+    "phone": "0776 632 079",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Ангелс Дента",
+    "visit_day": "Понедельник",
+    "point_type": "Стоматология",
+    "address": "ул Ибраимого 115/1",
+    "phone": "0559 975 115",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "МЦ репродукция здоровья Дар",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул. Тимирязева, 78",
+    "phone": "0501 120 488",
+    "contact_name": "Айсулуу",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Viva  Profi",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ek/ Турусбекова 9 3 этаж",
+    "phone": "0701 999 345",
+    "contact_name": "Эльмира",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Центр доктора Бубновского 2",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул. Медерова, 8/2",
+    "phone": "0702 018 373",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон красоты Дива эффект 7 мкр",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "7 мкр., 52/1",
+    "phone": "0705 955 495",
+    "contact_name": "Администратор",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Стоматология Доктор Манас",
+    "visit_day": "Пятница",
+    "point_type": "Стоматология",
+    "address": "ул. Каралаева 40/4",
+    "phone": "0995 777 959",
+    "contact_name": "Манас",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Aruu dental clinic",
+    "visit_day": "Понедельник",
+    "point_type": "стоматология",
+    "address": "ул. Жумабека 233, 1 этаж",
+    "phone": "0703 382 008",
+    "contact_name": "Айсулу",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Avanta Laser (Дерма Лазер)",
+    "visit_day": "Понедельник",
+    "point_type": "салон депиляции",
+    "address": "ул.Тоголок Молдо 7/2",
+    "phone": "0995 555 115",
+    "contact_name": "Неля",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Dr.Batraliev clinic ИП Батралиев Н.Ш",
+    "visit_day": "Вторник",
+    "point_type": "стоматология",
+    "address": "Кокандский переулок, 18/ медерова 1 этаж",
+    "phone": "0500 101 100",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Esma clinic",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "Бакаева 197/1",
+    "phone": "0559 773 148",
+    "contact_name": "Ольга",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Flex Gym",
+    "visit_day": "Вторник",
+    "point_type": "другое",
+    "address": "ТЦ Вефа 5эт",
+    "phone": "0559 255 002",
+    "contact_name": "Лиза",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Med City Саратовская,12",
+    "visit_day": "Среда",
+    "point_type": "медицинский центр",
+    "address": null,
+    "phone": "555494386",
+    "contact_name": "Юля",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Medcenter.kg ( МедCтар)",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "пер.Геологический.19",
+    "phone": "709231730",
+    "contact_name": "Жылдыз Эже",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Mirey clinic (Мирэй клиник)",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "пр.Чынгыз Айтматова,95/3",
+    "phone": "556400570",
+    "contact_name": "Элиза",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Ottimo clinic",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "пр.Чынгыза Айтматова 299/3",
+    "phone": "700906906",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Prof podologia ИП Захаров",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "ул.Тыныстанова,38",
+    "phone": "0700 906 906",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Skin Clinic JC Group(Скин Клиник)",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "Турусбекова 109 /3",
+    "phone": "0 555 565 040",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Азбука тела",
+    "visit_day": "Вторник",
+    "point_type": "массажный салон",
+    "address": "ул.Горького/Советская 6эт",
+    "phone": "0998 988 828",
+    "contact_name": "Чолпон",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Азбука тела Низ",
+    "visit_day": "Вторник",
+    "point_type": "массажный салон",
+    "address": "ул.Логвиненко,19",
+    "phone": "0998 988 828",
+    "contact_name": "Чолпон",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Алтынай толобекова",
+    "visit_day": "Среда",
+    "point_type": "салон красоты",
+    "address": "ул. Буденного 162",
+    "phone": "0706 766 097",
+    "contact_name": "Алтынай",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Аптека Луиза",
+    "visit_day": "Среда",
+    "point_type": "медицинский центр",
+    "address": "ул.Жибек-Жолу,179",
+    "phone": "0 553 407 083",
+    "contact_name": "Луиза",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "БЦ Fort",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "ул.абдымомунова,221",
+    "phone": "0 550 945 156",
+    "contact_name": "Елена",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Давыдов",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "Юго-Западный район 138/2 ( Бакаева138/5)",
+    "phone": "7 980 970-85-89",
+    "contact_name": "Анвар",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Дом красоты Бьюти Хаус",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "Логвиненко 28а пересекает Фрунзе",
+    "phone": "0556 818 818",
+    "contact_name": "Анна",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ДЦ Нейро-Арт",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "ул.Ахунбаева,190/1",
+    "phone": "0555 130 482",
+    "contact_name": "Светлана",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника CleverMed",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "Пр. Чынгыза Айтматова 299/5а",
+    "phone": "0 550 835 371",
+    "contact_name": "Светлана",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника dr.Digai (ИП Дигай)",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "ул.Тыныстанова,81",
+    "phone": "0705 921 774",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника Emilbecova",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "ул. Коенкозова 134, 2 этаж",
+    "phone": "0705 034 409",
+    "contact_name": "керемет",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника доктора Ратинова",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "7мкр д.49/6",
+    "phone": "0507 023 456",
+    "contact_name": "Айжан",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника доктора Ратинова Джал",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "Джал 29 дом 25",
+    "phone": "0507 023 456",
+    "contact_name": "Айжан",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника доктора Ратинова Калыка Акиева",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "ул. Калыка Акиева 110",
+    "phone": "0 704 455 410",
+    "contact_name": "Юлия",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника доктора Ратинова Пишпек",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "ул. Адышева, 20",
+    "phone": "0507 023 456",
+    "contact_name": "Айжан",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника доктора Ратинова Фатьянова ЮГ-2",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "ул. Фатьянова 51",
+    "phone": "0507 023 456",
+    "contact_name": "айжан",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника Иметкуловой",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "ул.Ахунбаева, 184",
+    "phone": "0 554 500 458",
+    "contact_name": "Айзада",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника Лайф",
+    "visit_day": "Пятница",
+    "point_type": "медицинский центр",
+    "address": "ул. Чортекова 204/1",
+    "phone": "0 554 500 458",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника Ратинова БЦ Victory",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "ул. Ибраимова, 103",
+    "phone": "0704 455 410",
+    "contact_name": "Юлия",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Клиника ЭкоБимед",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "ул.Ажибек Баатыра,10",
+    "phone": "0706 049 917",
+    "contact_name": "Айша",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Кондитерская фабрика Ширин",
+    "visit_day": "Пятница",
+    "point_type": "другое",
+    "address": "ул.Гагарина,74а",
+    "phone": "0702 371 111",
+    "contact_name": "Осман",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Лазер Клиник",
+    "visit_day": "Четверг",
+    "point_type": "салон депиляции",
+    "address": "ул.Бакаева,197",
+    "phone": "0551 635 555",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Лазмик",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "Чынгыз Айтматова 20",
+    "phone": "0708 708 495",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Лайф клиник ИП Цой Т.Р",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "ул. Байтик Баатыра,70 БЦSoho 2эт",
+    "phone": "0 707 110 997",
+    "contact_name": "астра",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Лечебный центр Рахмат",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "ул.Сухомлинова,28",
+    "phone": "0556 819 575",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ЛЦ Бонецкого",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "Молодая Гвардия,81",
+    "phone": "0705 707 708",
+    "contact_name": "рахат",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Магазин Микс",
+    "visit_day": "Четверг",
+    "point_type": "магазин",
+    "address": "ул. Айни 31 / Шота Руставели",
+    "phone": "0 700 202 805",
+    "contact_name": "Алина",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Мадам салон красоты",
+    "visit_day": "Вторник",
+    "point_type": "салон красоты",
+    "address": "ул.Л.Толстого/Тыныстанова",
+    "phone": "0 559 830 424",
+    "contact_name": "Анна",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Массаж кабинет Нора",
+    "visit_day": "Вторник",
+    "point_type": "массажный салон",
+    "address": "ул.Горького,102 3эт каб.7",
+    "phone": "0223 516 437",
+    "contact_name": "Назгуль",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Массажный кабинет (Кадыркулова Эльвира)",
+    "visit_day": "Понедельник",
+    "point_type": "массажный салон",
+    "address": "Молодая Гвардия 81, 2 эт.",
+    "phone": "0555 508 245",
+    "contact_name": "Эльвира",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Массажный салон Z massage",
+    "visit_day": "Вторник",
+    "point_type": "массажный салон",
+    "address": "ул.Байтик Баатыра,124",
+    "phone": "0999 003 025",
+    "contact_name": "Галина",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Массажный центр Остео эстетика",
+    "visit_day": "Понедельник",
+    "point_type": "массажный салон",
+    "address": "ул.Жумабека,232",
+    "phone": "0700 354 588",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Мед Сити",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "ул.Калык Акиева 111",
+    "phone": "0703 090 083",
+    "contact_name": "Бегимай",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Медцентр Медест",
+    "visit_day": "Пятница",
+    "point_type": "медицинский центр",
+    "address": "ул. Севастопольская 33/1 (Ч. Айтматова/ул. Ш.Руст",
+    "phone": "0557 992 035",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Мц Medartis ( ОсОО ДжСА)",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "ул. Панфилова, 92-92а",
+    "phone": "0772 320 519",
+    "contact_name": "Юлия",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "МЦ Аруустом",
+    "visit_day": "Понедельник",
+    "point_type": "стоматология",
+    "address": "ул.Жумабека,233",
+    "phone": "0703 382 008",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "МЦ Атлант",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "ул.Уметалиева,124",
+    "phone": "553 907 569",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "МЦ Интромед ОсОО Грандмед Диагностик",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "ул.Уметалиева,155",
+    "phone": "0 702 271 084",
+    "contact_name": "жазгуль",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "МЦ Русакова",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "улТемирязева,97/ Рыскулова",
+    "phone": "0555 909 356",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Мц Стронг 8каб.",
+    "visit_day": "Среда",
+    "point_type": "медицинский центр",
+    "address": "ул.Курманжан датка 304",
+    "phone": "0 555 191 205",
+    "contact_name": "Жаркын",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ННЦОМ и Д (ОсОО Фамеко)",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "ул.Ахунбаева,190",
+    "phone": "0505 706 060",
+    "contact_name": "салия",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО \"Клиника БММИ\"",
+    "visit_day": "Среда",
+    "point_type": "медицинский центр",
+    "address": "Шабдан Баатыра, 126",
+    "phone": "772670067",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО \"Офтальмологический Лазерный Центр\"",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "пр.Чингиза Айтматова,299/1",
+    "phone": "0 700 068 595",
+    "contact_name": "Роза еже",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО DSCA",
+    "visit_day": "Понедельник",
+    "point_type": "стоматология",
+    "address": "ул.Рыскулова,10",
+    "phone": "0703 889 218",
+    "contact_name": "назира эже",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО Анкалайф",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "ул. Горького,21",
+    "phone": "0 554 754 375",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО Артикон",
+    "visit_day": "Четверг",
+    "point_type": "стоматология",
+    "address": "ул.Ч.Айтматова,91",
+    "phone": "0558 323 233",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО Гемотест КГ",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "ул .Кулатова, 12 Б",
+    "phone": "0707 766 0446",
+    "contact_name": "Айжан",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО Завод имплантации Все на Четверых",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "ул.Б.Батыра,д,51 кв,14",
+    "phone": "0555 132 112",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО Инновэйн",
+    "visit_day": "Пятница",
+    "point_type": "медицинский центр",
+    "address": "ул.Шота Руставели,59",
+    "phone": "0990 232 448",
+    "contact_name": "Динара",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО Институт пластической хирургии и гинекологии",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "ул.Семетей,27/7",
+    "phone": "0555 404 981",
+    "contact_name": "Алёна",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО Интелмед",
+    "visit_day": "Среда",
+    "point_type": "медицинский центр",
+    "address": "ул. Панфилова, 22",
+    "phone": "0 500 996 796",
+    "contact_name": "Салтанат",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО Фарм Альянс( Разакова)",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": "ул.Раззакова,45",
+    "phone": "0 708 829 097",
+    "contact_name": "Галина",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ОсОО Юнит Реактив Фарма (Юрфа)",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "пр.Чингиза Айтматова,303 (ВДНХ СЭЗ)",
+    "phone": "0770 779 812",
+    "contact_name": "мерим",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Остео Клиник ул.Ж.Жолу,286/1 /Исанова",
+    "visit_day": "Понедельник",
+    "point_type": "медицинский центр",
+    "address": null,
+    "phone": "0778 777 808",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Профи доктор",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "пр.Мира,80",
+    "phone": "0 555 333 585",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Рай бьюти",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "Турусбекова 100",
+    "phone": "0509 809 060",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Аделина",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул. М. Гвардия /Фрунзе",
+    "phone": "0 703 397 481",
+    "contact_name": "Майрам",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Avocado",
+    "visit_day": "Вторник",
+    "point_type": "массажный салон",
+    "address": "Вефа 6 эт 602 каб",
+    "phone": "0553 212 509",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Elle Beauty",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "ул.Тыналиева,2/21",
+    "phone": "0702 020 037",
+    "contact_name": "Каухар",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Jama_hairs",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул. Исанова 71 2 этаж",
+    "phone": "559557878",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Keratin studio Чинара",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул.Калыка Акиева,123",
+    "phone": "0 702 929 800",
+    "contact_name": "Салтанат",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Meeray",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "ул.Ахунбаева,187",
+    "phone": "0 770 595 215",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Oh My Beauty",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул.Рыскулова,28/Шевченко",
+    "phone": "0700 575 249",
+    "contact_name": "Анара",
+    "contract_status": "неизвестно",
+    "note_from_import": "Также встречался как \"Oh My Beauty\" в таблице Альбины (дубль по телефону) — оставлен вариант Татьяны при импорте."
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Regina Hair",
+    "visit_day": null,
+    "point_type": "салон красоты",
+    "address": "ул. 3а/6 Анкара",
+    "phone": "0 707 838 531",
+    "contact_name": "Регина",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Aura",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "ул. Ахунбаева,128",
+    "phone": "0708 270 688",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Dolce Beauty",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул.Логвиненко,55/Фрунзе",
+    "phone": "0 770 950 626",
+    "contact_name": "Руслана",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Glam",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "пр.Манаса 61",
+    "phone": "0 705 251 102",
+    "contact_name": "сайкал",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Hair Айдай",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "ул. Бакаева 130/2каб 204 2 этаж",
+    "phone": "0501 310 362",
+    "contact_name": "Айдай",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Nuraika nur",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул. Фрунзе 587",
+    "phone": "0709 257 204",
+    "contact_name": "Айдай",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Ova beauty",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "ул.Бакаева,197/1",
+    "phone": "0704 558 823",
+    "contact_name": "нурзада",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Soul",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "ул. Ч. Айтматова 299/7а 1 этаж",
+    "phone": "0550 310 035",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Vip Style",
+    "visit_day": "Среда",
+    "point_type": "салон красоты",
+    "address": "Аламединский р-к",
+    "phone": "0 700 441 111",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Агар",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "ул.Ахунбаева,138",
+    "phone": "0700 240 855",
+    "contact_name": "Динара",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Белл",
+    "visit_day": "Вторник",
+    "point_type": "салон красоты",
+    "address": "ул. Советская, 118",
+    "phone": "0773 020 132",
+    "contact_name": "аруке",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Дильбар",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул.Фрунзе/Шевченко",
+    "phone": "0704 415 300",
+    "contact_name": "Динара",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Истанбул",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул.Киевская,133",
+    "phone": "7 702 209 5001",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Камила",
+    "visit_day": "Среда",
+    "point_type": "салон красоты",
+    "address": "пр.Чуй 117",
+    "phone": "0556 202 016",
+    "contact_name": "Елена",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Каприз",
+    "visit_day": "Вторник",
+    "point_type": "салон красоты",
+    "address": "ЮГ-2 /22",
+    "phone": "0777 209 651",
+    "contact_name": "жаннет",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Комильфо",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "пр.Мира,37",
+    "phone": "554541887",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Люкс",
+    "visit_day": "Среда",
+    "point_type": "салон красоты",
+    "address": "пр. Чуй, 113",
+    "phone": "0704 311 963",
+    "contact_name": "Бегай",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Мария",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул. Жибек жолу 549а / пер. Манаса",
+    "phone": "0556 009 726",
+    "contact_name": "Мария",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Нимфа",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "пр.Чуй 259/Турусбекова",
+    "phone": "0770 261 989",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты У подруг VIP Исанова",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул.Исанова,105/1",
+    "phone": "0 555 210 782",
+    "contact_name": "Алексей",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты ЦаЦа",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул.Киевская/Т.Молдо",
+    "phone": "0555 406 650",
+    "contact_name": "Елена",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Чио Чио",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "пр.Мира/Аэропортинская",
+    "phone": "0777 900 677",
+    "contact_name": "Сусанна",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон красоты Ырыс",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "Ахунбаева 142",
+    "phone": "773 701 947",
+    "contact_name": "апал",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон скульптурного массажа",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул. Фрунзе 402/ Исанова 2 этаж",
+    "phone": "772645340",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Ханум",
+    "visit_day": "Вторник",
+    "point_type": "салон красоты",
+    "address": "Юг2/22",
+    "phone": "550852900",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Чио Чио 2",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "м-н Улан",
+    "phone": "0777 900 677",
+    "contact_name": "Сусанна",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Эмили",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "пр. Чынгыза Айтматова 97/4",
+    "phone": "0999 822 877",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон/чач тарач( рядом аптека Неман)",
+    "visit_day": "Пятница",
+    "point_type": "салон красоты",
+    "address": "ул. Гагарина 189",
+    "phone": "0 702 405 070",
+    "contact_name": "Айгуля",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Спорт клуб JFS",
+    "visit_day": "Вторник",
+    "point_type": "другое",
+    "address": "ул.Каракульская,1/4",
+    "phone": "0 706 900 174",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стом.центр Dentos",
+    "visit_day": "Четверг",
+    "point_type": "стоматология",
+    "address": "ул.Ахунбава,106",
+    "phone": "0777 131 312",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стоматология Аврора (ИП Урманаева)",
+    "visit_day": "Среда",
+    "point_type": "стоматология",
+    "address": "пр. Чуй, 117",
+    "phone": "0 550 687 988",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стоматология Kairos Pro Кайрос Про",
+    "visit_day": "Понедельник",
+    "point_type": "стоматология",
+    "address": "ул. Рыскулова 79б",
+    "phone": "0556 863 688",
+    "contact_name": "Алтынай",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стоматология Mono",
+    "visit_day": "Пятница",
+    "point_type": "стоматология",
+    "address": "ул.Айни 97",
+    "phone": "0701 771 559",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стоматология Vertex Dental Clinic (ИП Мухтаров)",
+    "visit_day": "Четверг",
+    "point_type": "стоматология",
+    "address": "пр.Ч.Айтматова,299/3",
+    "phone": "0 558 021 750",
+    "contact_name": "Луиза",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стоматология Да",
+    "visit_day": "Четверг",
+    "point_type": "стоматология",
+    "address": "пр.Чингиза Айтматова,67",
+    "phone": "0555 329 958",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стоматология Неон",
+    "visit_day": "Четверг",
+    "point_type": "стоматология",
+    "address": "ул. Ч. Айтматова 51( 2 этаж)",
+    "phone": "0772 189 949",
+    "contact_name": "назира",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стоматология Облака Антонова А.В.",
+    "visit_day": "Четверг",
+    "point_type": "стоматология",
+    "address": "ул.Грибоедова,16",
+    "phone": "0 501 961 313",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стоматология Сакура",
+    "visit_day": "Четверг",
+    "point_type": "стоматология",
+    "address": "ул.Таланта Сагындыкова 3/1",
+    "phone": "0705 802 378",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стоматология Трио Виталь",
+    "visit_day": "Четверг",
+    "point_type": "стоматология",
+    "address": "ул.Мира, 41/Сухомлинова",
+    "phone": "0 553 328 314",
+    "contact_name": "Татьяна",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Стоматология Элла профи",
+    "visit_day": "Вторник",
+    "point_type": "стоматология",
+    "address": "ул.Карасаева,124",
+    "phone": "550 510 405",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Студия 35",
+    "visit_day": "Четверг",
+    "point_type": "салон красоты",
+    "address": "пр.Чынгыза Айтматова 35 ( возле салона у подруг)",
+    "phone": "0 700 916 123",
+    "contact_name": "Айка",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Студия красоты Myskincare",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "ул.Советская,70 7эт 702каб",
+    "phone": "0772 151 156",
+    "contact_name": "Анастасия",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Студия лазерной эпиляции Laser Expert",
+    "visit_day": "Вторник",
+    "point_type": "салон депиляции",
+    "address": "ул.Байтик Баатыра,70 6 этаж, 601",
+    "phone": "507 296 565",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Студия М.Давлетовой",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "ул.Московская,191",
+    "phone": "0700 010 202",
+    "contact_name": "Гузель",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Тимур стоматология",
+    "visit_day": "Четверг",
+    "point_type": "стоматология",
+    "address": "ул.Ахунбаева,144 за остановкой",
+    "phone": "0703 456 203",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "ул.Пожарского,11",
+    "visit_day": "Вторник",
+    "point_type": "другое",
+    "address": "ул.Пожарского,11 (частный сектор)",
+    "phone": "0 555 856 121",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Уникум мама 2",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "ул.Ажибек Баатыра 15а",
+    "phone": "0551 778 778",
+    "contact_name": "Саида",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Фитнес клуб Team Fit",
+    "visit_day": "Четверг",
+    "point_type": "другое",
+    "address": "ул.Шота Руставели,42а/Сухомлинова",
+    "phone": "0 556 686 888",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Флеболог Revion clinic",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "ул.Целинная,23",
+    "phone": "0700 703 073",
+    "contact_name": "Данияр",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Центр красоты Profi Touch",
+    "visit_day": "Понедельник",
+    "point_type": "салон красоты",
+    "address": "ул.Исанова,94",
+    "phone": "552 944 734",
+    "contact_name": "Мария",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Элит спа",
+    "visit_day": "Вторник",
+    "point_type": "Спа салон",
+    "address": "ул.Ашхабадская,28/Горького",
+    "phone": "0 555 559 929",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Эстетическая студия April",
+    "visit_day": "Четверг",
+    "point_type": "медицинский центр",
+    "address": "ул.Фурманова,23 1эт",
+    "phone": "0 509 445 505",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Ю клиник",
+    "visit_day": "Вторник",
+    "point_type": "медицинский центр",
+    "address": "Льва Толстого 8",
+    "phone": "554 590 011",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Nisa",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "ул.Кийизбаева,33",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Айгерим",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "пр.Чуй,34 Восток 5",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Гюзаль",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "Восток 5 д.2",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Лаурита",
+    "visit_day": "Понедельник",
+    "point_type": "Салон красоты",
+    "address": "Восток 5 д.24",
+    "phone": "777889965",
+    "contact_name": "Рита",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "BL clinic",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Сыдыкова,184",
+    "phone": "550101925",
+    "contact_name": "0550101925",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Germaine de Capuccini",
+    "visit_day": "Вторник",
+    "point_type": "Другое",
+    "address": "Панфилова 124",
+    "phone": "552477412",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "NB свободная зона",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Керимбекова,13",
+    "phone": "772534495",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "SPA салон Сиям массаж ул.Московская,154",
+    "visit_day": "Вторник",
+    "point_type": "Спа салон",
+    "address": "ул.Московская,154",
+    "phone": "555646111",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Барбершоп Blackrock",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "Панфилова 191",
+    "phone": "557999900",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "БЦ Альтаир",
+    "visit_day": "Вторник",
+    "point_type": null,
+    "address": "ул.Боконбаева,113",
+    "phone": "707310392",
+    "contact_name": "Айпери",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Золотое яблоко ИП Ильина",
+    "visit_day": "Вторник",
+    "point_type": "Салон депиляции",
+    "address": "ул.Исанова,25а",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Золотое яблоко ИП Шамырканова",
+    "visit_day": "Вторник",
+    "point_type": "Салон депиляции",
+    "address": "ул.Исанова,25а",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "К студио",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Токтогула,110 БЦ Премиум",
+    "phone": "708747979",
+    "contact_name": "0705946304",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Клиника Zirkon",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Чуйкова,132а",
+    "phone": "709711911",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Клиника Беллы Курбановой",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "Токтогула 169/пересекает Манаса",
+    "phone": "559955499",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Клиника Женева",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Токтогула,106",
+    "phone": "990478478",
+    "contact_name": "+7966408013",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Клиника Матеева",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Боконбаева,115",
+    "phone": "774728966",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Косметология Dr.Med.Cristina Schrammek",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Токтогула,165/Исанова",
+    "phone": "0990900200",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Лечебный плазмафарез Ferez",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Исанова,8",
+    "phone": "707463433",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Логвиненко студия",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "Чуйкова,136/3",
+    "phone": "705540409",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Магазин Constant Delight",
+    "visit_day": "Вторник",
+    "point_type": "Другое",
+    "address": "ул.Токтогула,167",
+    "phone": "507838783",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Массажный салон Asahi",
+    "visit_day": "Вторник",
+    "point_type": "Массажный салон",
+    "address": "ул.Керимбекова,13/1",
+    "phone": "772100761",
+    "contact_name": "0706537601",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Медицинский центр Кольпас",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул. Т.Молдо/Московская,139",
+    "phone": "706620022",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "МЦ Tomex",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул. Панфилова/Боконбаева",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "МЦ Магнус",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Логвиненко,20",
+    "phone": "550236006",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "ОсОО «Диво-Эффект»",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Раззакова,15",
+    "phone": "502924992",
+    "contact_name": "0500144621",
+    "contract_status": "да"
+  },
+  {
+    "agent": "Альбина",
+    "name": "ОсОО Диагностическая лаборатория Human",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Логвиненко 21/2",
+    "phone": "558551525",
+    "contact_name": null,
+    "contract_status": "да"
+  },
+  {
+    "agent": "Альбина",
+    "name": "ОсОО Тайна Стиля (Джесика)",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Исанова,8",
+    "phone": "700229585",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Level",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Орозбекова,3/Чуйкова",
+    "phone": "550700999",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Level 10",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Боконбаева,113",
+    "phone": "700828429",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Nail bar",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "Манаса, 47",
+    "phone": "502014222",
+    "contact_name": "Алина",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Novalaser Токтогула",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Токтогула,167",
+    "phone": "501377277",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Shi trendy",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Токтогула,112/1 БЦ Сфера, 7эт",
+    "phone": "707408494",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Атриум",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул. Токолок Молдо, 6а",
+    "phone": "707132503",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты 11/12 space",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул Токтогула 104/Раззакова",
+    "phone": "555920439",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Celine",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Чуйкова,132а",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Estetic",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул. Раззакова/Чуйкова,94а",
+    "phone": "0773457631",
+    "contact_name": "Юлия",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Vogue",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Исанова/Московкая",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Акинай Бьюти",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Панфилова,153/Боконбаева",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Березка",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул. Панфилова, 134/Боконбаева",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты У подруг Vip",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Т.Молдо,18",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Улыбка Стайл",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул. Логвиненко, 37",
+    "phone": "0500160374",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Фрешстайл",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул. Раззакова, 22",
+    "phone": "0550662222",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Стоматология Вита Дент +",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Токтогула/Орозбекова",
+    "phone": "0777000062",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Студия 1",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Орозбекова,1/Линейная",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Студия 115",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Боконбаева,115/Разакова",
+    "phone": "0555895511",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Студия Vivienne Lashes",
+    "visit_day": "Вторник",
+    "point_type": "Салон красоты",
+    "address": "ул.Исанова 79 306каб",
+    "phone": "0407691938",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "ЧЛХ Санлайт",
+    "visit_day": "Вторник",
+    "point_type": "Мед клиника",
+    "address": "ул.Тоголок Молдо ,1/13",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "БШ Tarak",
+    "visit_day": "Среда",
+    "point_type": "Салон красоты",
+    "address": "ул.Шоокум,88/1 Кок-Жар",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "ОсОО Клиника Лазмед",
+    "visit_day": "Среда",
+    "point_type": "Мед клиника",
+    "address": "ул. 7 апреля, 127/1",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Халима",
+    "visit_day": "Среда",
+    "point_type": "Салон красоты",
+    "address": "мкр. Кок-Жар, д.4",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "салон красоты Канышай",
+    "visit_day": "Среда",
+    "point_type": "Салон красоты",
+    "address": "мкр. Улан 2,д,2/10",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Стоматология Дантист",
+    "visit_day": "Среда",
+    "point_type": "Стоматология",
+    "address": "ул. 7апреля 3/2",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Almo beauty lab Томми Молл",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ТЦ Томми Молл",
+    "phone": "990442055",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Antiage clinic",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул.Токомбаева,23/3",
+    "phone": "555688688",
+    "contact_name": null,
+    "contract_status": "да"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Ascorp Barbershop",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул.Токтоналиева,104/6",
+    "phone": "990420330",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Azuu Dent",
+    "visit_day": "Четверг",
+    "point_type": "Стоматология",
+    "address": "Асанбай 8/1",
+    "phone": "704475575",
+    "contact_name": "админ",
+    "contract_status": "да"
+  },
+  {
+    "agent": "Альбина",
+    "name": "NEO Clinic Токомбаева 23/1",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул. Токомбаева 23/1",
+    "phone": "?уточнить",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Барбершоп Mr.Mark",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул. Куттубаева,15/1",
+    "phone": "7 981 848-73-68",
+    "contact_name": "Марк",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "БШ Ascorp",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "12 мкр 13/2",
+    "phone": "?",
+    "contact_name": null,
+    "contract_status": "да"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Вита Дент на Дуйшеева",
+    "visit_day": "Четверг",
+    "point_type": "Стоматология",
+    "address": "ул.Арстанбека Дуйшеева6/3",
+    "phone": null,
+    "contact_name": "?",
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Клиника пластической хирургии DM Clinic",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "м-н Асанбай 15а",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Клиника Рефреш",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "Токомбаева 21/3 г",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Коворкинг центр Collab",
+    "visit_day": "Четверг",
+    "point_type": "Другое",
+    "address": "ул.Токомбаева,9б",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Леди Волос",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "г.Бишкек,12 мкр. дом 20/5",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "МЦ Эдельвейс",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "мкр. Асанбай, д.8/2",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Остео Клиник Токонбаева 23/4",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "Токонбаева 23/4",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Педиатрическая служба",
+    "visit_day": "Четверг",
+    "point_type": "Мед клиника",
+    "address": "ул.Токомбаева,9а",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "С/к Wall street 2",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "м-н Асанбай,10",
+    "phone": "0500919219",
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Blash_Beauty",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул.Токомбаева,21/3",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Novalaser Сухэ-Батора",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул. Сухэ-Батора,5/5 2эт",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Алтын Кайчи 6мкр",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "6мкр д,30",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Eclat",
+    "visit_day": "Четверг",
+    "point_type": null,
+    "address": "ул.Токомбаева,9",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Melikova312",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул.Токомбаева,21/3г",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Suluu",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "6 мкр, д.31",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Vogue 2",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул.Аалы Токомбаева,21/5е",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Zina Hair",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул.Юнусалиева,68",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Аннет",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "6-й м-н,23",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Дарина",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "6мкр 6дом",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Женские Секреты",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул. Токомбаева,23/1",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Ксюша",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "м-н Асанбай,51",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Семейный клуб Las mamas",
+    "visit_day": "Четверг",
+    "point_type": "Другое",
+    "address": "11-й мкр,25/1",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Спортивный комплекс Deluxe 11",
+    "visit_day": "Четверг",
+    "point_type": "Другое",
+    "address": "11 мкр дом 23/1",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Стоматология (Асанбай) ЭМАР",
+    "visit_day": "Четверг",
+    "point_type": "Стоматология",
+    "address": "мкр.Асанбай,17/1 по старой дороге",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Стоматология Millenium",
+    "visit_day": "Четверг",
+    "point_type": "Стоматология",
+    "address": "ул.Токомбаева,21/1г",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Студия 115 Токомбаева,25 2эт",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "Токомбаева,25",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Студия красоты Gloss",
+    "visit_day": "Четверг",
+    "point_type": "Салон красоты",
+    "address": "ул.Токомбаева,23/1",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Чакра Спа Jannat",
+    "visit_day": "Четверг",
+    "point_type": "Спа салон",
+    "address": "ул.Аалы Токомбаева,21/2",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Belle Dental Clinic",
+    "visit_day": "Пятница",
+    "point_type": "Стоматология",
+    "address": "м-н Джал 29, д.17",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "SPA Garden Оморов Э.А.",
+    "visit_day": "Пятница",
+    "point_type": "Спа салон",
+    "address": "ул.Айылчиева,63",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "SPA центр Sumbule",
+    "visit_day": "Пятница",
+    "point_type": "Спа салон",
+    "address": "ул.Жайыл Баатыра,54",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Баня Онтарио",
+    "visit_day": "Пятница",
+    "point_type": "Спа салон",
+    "address": "мкр Джал,90/1",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Ди бьюти",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "ул.Тыналиева,3/5",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Алина",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "м-н Джал 29 дом 19",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "салон Mood",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "Абсамата Масалиева 79",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон Грация",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "ул. Жаыйл Баатыра 77",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Жасмин (Чолпон)",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "ул.Тыналиева 92",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Клеопатра",
+    "visit_day": "Пятница",
+    "point_type": "Салон красоты",
+    "address": "м-н Джал,92",
+    "phone": null,
+    "contact_name": null,
+    "contract_status": "неизвестно"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Центр доктора Бубновского",
+    "visit_day": "Пятница",
+    "point_type": "Мед клиника",
+    "address": "мкр. Джал, д.15/32",
+    "phone": "0550 081 373",
+    "contact_name": "Админ Бибигуль эже",
+    "contract_status": "неизвестно"
+  }
+]

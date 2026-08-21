@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Задачник для торговых агентов</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div id="login-screen" class="screen">
+  <div class="login-box">
+    <h1>CRM</h1>
+    <p class="muted">Вход в систему</p>
+    <form id="login-form">
+      <label>Email</label>
+      <input type="email" id="login-email" required autocomplete="username">
+      <label>Пароль</label>
+      <input type="password" id="login-password" required autocomplete="current-password">
+      <button type="submit">Войти</button>
+      <p id="login-error" class="error"></p>
+    </form>
+  </div>
+</div>
+
+<div id="app-screen" class="screen" style="display:none">
+  <header class="topbar">
+    <div class="brand">Задачник · Косметика</div>
+    <nav class="tabs">
+      <button data-view="dashboard" class="tab active">Дашборд</button>
+      <button data-view="clients" class="tab">Клиенты</button>
+      <button data-view="tasks" class="tab">Задачи</button>
+      <button data-view="team" class="tab" id="team-tab" style="display:none">Команда</button>
+    </nav>
+    <div class="user-box">
+      <span id="user-name"></span>
+      <button id="logout-btn">Выйти</button>
+    </div>
+  </header>
+
+  <main id="content"></main>
+</div>
+
+<div id="modal-root"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+[
+  {
+    "clients": [
+      {
+        "agent": "Татьяна",
+        "name": "Азбука тела Низ",
+        "phone": "0998 988 828",
+        "address": "ул.Логвиненко,19"
+      },
+      {
+        "agent": "Альбина",
+        "name": "Азбука тела Низ",
+        "phone": null,
+        "address": "ул.Логвиненко,19"
+      }
+    ],
+    "matched_by": "name"
+  },
+  {
+    "clients": [
+      {
+        "agent": "Татьяна",
+        "name": "Салон Oh My Beauty",
+        "phone": "0700 575 249",
+        "address": "ул.Рыскулова,28/Шевченко"
+      },
+      {
+        "agent": "Альбина",
+        "name": "Oh My Beauty",
+        "phone": "700575249",
+        "address": "ул.Аалы Токомбаева,23/3"
+      }
+    ],
+    "matched_by": "phone"
+  }
+]

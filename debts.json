@@ -1,0 +1,485 @@
+[
+  {
+    "client_name": "Кант Акталина (ИП Расулова Ж.Ж.)",
+    "agent": "Батаева регион",
+    "debt_amount": 220306.0,
+    "is_overdue": false,
+    "payment_date": "30.08.2026"
+  },
+  {
+    "client_name": "ИП Нурметова З.М. Профшоп 3мкр",
+    "agent": "Не найден",
+    "debt_amount": 87180.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Ортосай Салима",
+    "agent": "Жанара (магазины)",
+    "debt_amount": 79703.0,
+    "is_overdue": false,
+    "payment_date": "13,08,"
+  },
+  {
+    "client_name": "Тизас Маринина И",
+    "agent": "Батаева регион",
+    "debt_amount": 77943.0,
+    "is_overdue": false,
+    "payment_date": "21.08.2026"
+  },
+  {
+    "client_name": "Профшоп 1000мел Ниязова",
+    "agent": "Не найден",
+    "debt_amount": 72376.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Профшоп (Сабиралиева) Уметалиева,81",
+    "agent": "Не найден",
+    "debt_amount": 60448.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Фен ЖЖ ИП Колходжаева",
+    "agent": "Жанара (магазины)",
+    "debt_amount": 49034.0,
+    "is_overdue": false,
+    "payment_date": "ост 39034 сом  до 18,08"
+  },
+  {
+    "client_name": "Магазин Оптовые цены Ахунбаева Конокбаева",
+    "agent": "Жанара (магазины)",
+    "debt_amount": 45954.0,
+    "is_overdue": true,
+    "payment_date": "14,08"
+  },
+  {
+    "client_name": "ЧП Колходжаев",
+    "agent": "Жанара (магазины)",
+    "debt_amount": 45508.0,
+    "is_overdue": true,
+    "payment_date": "14,08"
+  },
+  {
+    "client_name": "Каракол  ИП Веселовская",
+    "agent": "Не найден",
+    "debt_amount": 41291.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "ОсОО \"Орион Хотелс\"",
+    "agent": "Не найден",
+    "debt_amount": 40095.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Магазин Оптовые Цены Дуйшеева (ИП Токтосунова)",
+    "agent": "Жанара (магазины)",
+    "debt_amount": 37892.0,
+    "is_overdue": true,
+    "payment_date": "14,08"
+  },
+  {
+    "client_name": "Диля Кызыл Кия",
+    "agent": "Жанара (магазины)",
+    "debt_amount": 37465.0,
+    "is_overdue": true,
+    "payment_date": "13,08"
+  },
+  {
+    "client_name": "ОсОО Гемотест КГ",
+    "agent": "Татьяна",
+    "debt_amount": 36100.0,
+    "is_overdue": true,
+    "payment_date": "02.08.2026"
+  },
+  {
+    "client_name": "ИП Жусупова А.А. (севен Токмак)",
+    "agent": "Батаева регион",
+    "debt_amount": 32256.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "PM Market (ОсОО ПМ Маркет)",
+    "agent": "Анастасия",
+    "debt_amount": 31530.0,
+    "is_overdue": false,
+    "payment_date": "11.08.2026"
+  },
+  {
+    "client_name": "Novotel Bishkek ИнтеграХотел Инвесмент",
+    "agent": "Не найден",
+    "debt_amount": 17950.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Салон Элим (Роза)",
+    "agent": "Батаева регион",
+    "debt_amount": 16390.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Стоматологическая клиника Olio",
+    "agent": "Нагима",
+    "debt_amount": 14820.0,
+    "is_overdue": false,
+    "payment_date": "13.08.2026"
+  },
+  {
+    "client_name": "Студия Тазагула (ИП Сыдыкова)",
+    "agent": "Жанара (магазины)",
+    "debt_amount": 14160.0,
+    "is_overdue": true,
+    "payment_date": "13,08"
+  },
+  {
+    "client_name": "Клиника доктора Ратинова Фатьянова ЮГ-2",
+    "agent": "Татьяна",
+    "debt_amount": 12320.0,
+    "is_overdue": false,
+    "payment_date": "12.08.2026"
+  },
+  {
+    "client_name": "Салон красоты Vogue",
+    "agent": "Альбина",
+    "debt_amount": 12245.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Mirey clinic (Мирэй клиник)",
+    "agent": "Татьяна",
+    "debt_amount": 8920.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "ОсОО Клиника Лазмед",
+    "agent": "Альбина",
+    "debt_amount": 8322.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Магазин Ак-Куу",
+    "agent": "Жанара (магазины)",
+    "debt_amount": 7926.0,
+    "is_overdue": true,
+    "payment_date": "14,08"
+  },
+  {
+    "client_name": "Кутман Ак эмир (ИП Рахманбердиев)",
+    "agent": "Анастасия",
+    "debt_amount": 7902.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Азбука тела Низ",
+    "agent": "Татьяна",
+    "debt_amount": 7595.0,
+    "is_overdue": false,
+    "payment_date": "12.08.2026"
+  },
+  {
+    "client_name": "салон Фарида Беловодск",
+    "agent": "Батаева регион",
+    "debt_amount": 7385.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Сыдыкова Гульназ Подологический центр",
+    "agent": "Анастасия",
+    "debt_amount": 6740.0,
+    "is_overdue": false,
+    "payment_date": "12.08.2026"
+  },
+  {
+    "client_name": "МЦ Авицены Г.Кара-Балта",
+    "agent": "Батаева регион",
+    "debt_amount": 6350.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Мц Medartis (ОсОО ДжСА)",
+    "agent": "Татьяна",
+    "debt_amount": 6300.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Каракол Татьяна",
+    "agent": "Батаева регион",
+    "debt_amount": 6202.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Медицинский центр  Систем СИСТЕМ ОЗЕЛ ТЫББИ ЙАТЫРЫ",
+    "agent": "Нагима",
+    "debt_amount": 6140.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "бьюти стайл Кара Балта Айгуль",
+    "agent": "Батаева регион",
+    "debt_amount": 6120.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Азбука тела",
+    "agent": "Татьяна",
+    "debt_amount": 5960.0,
+    "is_overdue": false,
+    "payment_date": "12.08.2026"
+  },
+  {
+    "client_name": "Салон красоты Элдана Бел Дильбара",
+    "agent": "Батаева регион",
+    "debt_amount": 5732.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Салон Mirais_Beauty",
+    "agent": "Нагима",
+    "debt_amount": 5568.0,
+    "is_overdue": false,
+    "payment_date": "12.08.2026"
+  },
+  {
+    "client_name": "Салон красоты Гюзаль",
+    "agent": "Альбина",
+    "debt_amount": 5100.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Салон Ай Би Кара-Балта",
+    "agent": "Батаева регион",
+    "debt_amount": 4880.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Салон красоты Дива Токмак",
+    "agent": "Батаева регион",
+    "debt_amount": 4605.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "NB свободная зона",
+    "agent": "Анастасия",
+    "debt_amount": 4557.0,
+    "is_overdue": false,
+    "payment_date": "10.08.2026"
+  },
+  {
+    "client_name": "Магазин SR cosmetics",
+    "agent": "Батаева регион",
+    "debt_amount": 4392.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Салон красоты Volosbar",
+    "agent": "Не найден",
+    "debt_amount": 4300.0,
+    "is_overdue": false,
+    "payment_date": "11.08.2026"
+  },
+  {
+    "client_name": "Больница Токмак",
+    "agent": "Батаева регион",
+    "debt_amount": 4136.0,
+    "is_overdue": false,
+    "payment_date": "18.08.2026"
+  },
+  {
+    "client_name": "МЦ Дордой-Офтальмик Сервис",
+    "agent": "Анастасия",
+    "debt_amount": 3106.0,
+    "is_overdue": true,
+    "payment_date": "30.07.2026"
+  },
+  {
+    "client_name": "магазин Ланком кант  мээрим торговый центр",
+    "agent": "Не найден",
+    "debt_amount": 3840.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Клиника пласт.хирург Сагынбаевой ИП Буланбекова",
+    "agent": "Анастасия",
+    "debt_amount": 3440.0,
+    "is_overdue": false,
+    "payment_date": "13.08.2026"
+  },
+  {
+    "client_name": "Салон Оксана Бьюти Жазгуля",
+    "agent": "Анастасия",
+    "debt_amount": 3400.0,
+    "is_overdue": false,
+    "payment_date": "11.08.2026"
+  },
+  {
+    "client_name": "Спа салон Афродита",
+    "agent": "Нагима",
+    "debt_amount": 3310.0,
+    "is_overdue": false,
+    "payment_date": "13.08.2026"
+  },
+  {
+    "client_name": "Салон Толкун",
+    "agent": "Батаева регион",
+    "debt_amount": 3195.0,
+    "is_overdue": false,
+    "payment_date": "16.08"
+  },
+  {
+    "client_name": "Салон Shugaring beauty",
+    "agent": "Анастасия",
+    "debt_amount": 3156.0,
+    "is_overdue": false,
+    "payment_date": "12.08.2026"
+  },
+  {
+    "client_name": "Бьюти стайл Кара Балта",
+    "agent": "Батаева регион",
+    "debt_amount": 3135.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Стоматология Kings clinic 2",
+    "agent": "Нагима",
+    "debt_amount": 2580.0,
+    "is_overdue": false,
+    "payment_date": "12.08.2026"
+  },
+  {
+    "client_name": "Салон Avocado",
+    "agent": "Татьяна",
+    "debt_amount": 2330.0,
+    "is_overdue": false,
+    "payment_date": "11.08.2026"
+  },
+  {
+    "client_name": "Стоматология Диадент г.Токмок",
+    "agent": "Не найден",
+    "debt_amount": 2240.0,
+    "is_overdue": false,
+    "payment_date": "18.08.2026"
+  },
+  {
+    "client_name": "Салон Весна Бел Асель",
+    "agent": "Батаева регион",
+    "debt_amount": 2200.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "МЦ Лекарь",
+    "agent": "Не найден",
+    "debt_amount": 2075.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Частное лицо",
+    "agent": "Анастасия, Батаева регион, Жанара (магазины)",
+    "debt_amount": 2070.0,
+    "is_overdue": false,
+    "payment_date": "11.08.2026"
+  },
+  {
+    "client_name": "ОсОО Инновэйн",
+    "agent": "Татьяна",
+    "debt_amount": 2020.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Стоматологическая клиника Denta Tech",
+    "agent": "Анастасия",
+    "debt_amount": 1620.0,
+    "is_overdue": false,
+    "payment_date": "13.08.2026"
+  },
+  {
+    "client_name": "МЦ Невромед Токмак",
+    "agent": "Не найден",
+    "debt_amount": 1400.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Новопавловка Фрунзе 138 Лайк Ю",
+    "agent": "Батаева регион",
+    "debt_amount": 1380.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "салон Каприз кара балта",
+    "agent": "Батаева регион",
+    "debt_amount": 1281.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "Клиника доктора Сарова",
+    "agent": "Батаева регион",
+    "debt_amount": 1240.0,
+    "is_overdue": false,
+    "payment_date": "13.08.2026"
+  },
+  {
+    "client_name": "бьюти Стайл Кара Балта Акмарал",
+    "agent": "Батаева регион",
+    "debt_amount": 1140.0,
+    "is_overdue": false,
+    "payment_date": "16.08.2026"
+  },
+  {
+    "client_name": "ЧП Наврузова",
+    "agent": "Батаева регион",
+    "debt_amount": 900.0,
+    "is_overdue": false,
+    "payment_date": "13.08.2026"
+  },
+  {
+    "client_name": "Салон красоты Лаурита",
+    "agent": "Альбина",
+    "debt_amount": 230.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Салон частное лицо ЖК Малина",
+    "agent": "Не найден",
+    "debt_amount": 137.0,
+    "is_overdue": false,
+    "payment_date": "Нет данных"
+  },
+  {
+    "client_name": "Джалал  Абад опт Махаббат",
+    "agent": "Жанара (магазины)",
+    "debt_amount": 1.0,
+    "is_overdue": false,
+    "payment_date": "ост 5400 сом до 14.08"
+  }
+]

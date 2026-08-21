@@ -1,0 +1,14 @@
+{
+  "name": "cosmetics-crm-tasks",
+  "version": "2.0.0",
+  "description": "Задачник по клиентам для торговых агентов дистрибьютора косметики: карточки контрагентов, задачи-визиты (воронка), регулярный ассортимент, вложения. Работает без npm install — только встроенные модули Node.js.",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {}
+}
