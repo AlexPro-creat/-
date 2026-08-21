@@ -9,8 +9,12 @@ const TASK_STAGES = [
   { key: 'in_progress', label: 'В работе' },
   { key: 'done', label: 'Выполнена' },
   { key: 'not_done', label: 'Не выполнена' },
-  { key: 'failed', label: 'Провал' }
+  { key: 'waiting', label: 'Лист ожидания' },
+  { key: 'failed', label: 'Прогрев' }
 ];
+
+const TASK_TAGS = ['Kapous', 'EPICA', 'Чистовье', 'Палитра', 'новый клиент'];
+const ACTIVE_STAGES = ['new', 'in_progress', 'waiting'];
 
 const PAYMENT_METHODS = ['Наличные', 'Безналичные', 'QR'];
 const CONTRACT_STATUSES = ['да', 'нет', 'неизвестно'];
@@ -61,7 +65,7 @@ function readBody(req) {
 
 function publicUser(u) {
   if (!u) return null;
-  return { id: u.id, name: u.name, email: u.email, role: u.role };
+  return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl || null };
 }
 
 function norm(s) {
@@ -92,6 +96,14 @@ function requireAdmin(handler) {
 
 function isStaff(user) {
   return user.role === 'admin' || user.role === 'supervisor';
+}
+
+// Удаление (клиентов, задач) разрешено только администратору и супервайзеру — не агентам
+function requireStaff(handler) {
+  return requireAuth(async (req, res, params) => {
+    if (!isStaff(req.user)) return sendJson(res, 403, { error: 'Удаление доступно только администратору и супервайзеру' });
+    return handler(req, res, params);
+  });
 }
 
 function findDuplicateClient(name, address, phone) {
@@ -127,7 +139,8 @@ function register(router) {
       user: publicUser(req.user),
       stages: TASK_STAGES,
       paymentMethods: PAYMENT_METHODS,
-      contractStatuses: CONTRACT_STATUSES
+      contractStatuses: CONTRACT_STATUSES,
+      taskTags: TASK_TAGS
     });
   }));
 
@@ -162,6 +175,29 @@ function register(router) {
     if (Number(params.id) === req.user.id) return sendJson(res, 400, { error: 'Нельзя удалить самого себя' });
     const ok = db.remove('users', params.id);
     sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'Не найдено' });
+  }));
+
+  // Аватар сотрудника — для быстрого визуального распознавания в списках/канбане
+  router.post('/api/users/:id/avatar', requireAdmin(async (req, res, params) => {
+    const user = db.find('users', params.id);
+    if (!user) return sendJson(res, 404, { error: 'Не найдено' });
+    let parsed;
+    try {
+      parsed = await parseMultipart(req, 5 * 1024 * 1024);
+    } catch (e) {
+      return sendJson(res, 400, { error: e.message });
+    }
+    const file = parsed.files[0];
+    if (!file || !/^image\//.test(file.mimeType)) {
+      return sendJson(res, 400, { error: 'Нужен файл изображения' });
+    }
+    const avatarsDir = path.join(UPLOADS_DIR, 'avatars');
+    fs.mkdirSync(avatarsDir, { recursive: true });
+    const ext = (file.mimeType.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
+    const storedName = `user${user.id}_${Date.now()}.${ext}`;
+    fs.writeFileSync(path.join(avatarsDir, storedName), file.data);
+    const updated = db.update('users', user.id, { avatarUrl: `/uploads/avatars/${storedName}` });
+    sendJson(res, 200, { user: publicUser(updated) });
   }));
 
   // ---- Клиенты (контрагенты) ----
@@ -244,7 +280,7 @@ function register(router) {
     sendJson(res, 200, { client: db.update('clients', params.id, { pendingApproval: false }) });
   }));
 
-  router.delete('/api/clients/:id', requireAdmin(async (req, res, params) => {
+  router.delete('/api/clients/:id', requireStaff(async (req, res, params) => {
     const ok = db.remove('clients', params.id);
     sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'Не найдено' });
   }));
@@ -278,12 +314,14 @@ function register(router) {
       return sendJson(res, 403, { error: 'Это не ваш клиент' });
     }
     const assigneeId = isStaff(req.user) && body.assigneeId ? Number(body.assigneeId) : (req.user.role === 'agent' ? req.user.id : client.ownerId);
+    const tags = Array.isArray(body.tags) ? body.tags.filter((t) => TASK_TAGS.includes(t)) : [];
     const task = db.insert('tasks', {
       clientId: Number(body.clientId),
       title: body.title || `Посетить: ${client.name}`,
       description: body.description || '',
       dueDate: body.dueDate || '',
       stage: 'new',
+      tags,
       comment: '',
       attachments: [],
       assigneeId,
@@ -306,6 +344,9 @@ function register(router) {
     ['title', 'description', 'dueDate', 'comment'].forEach((f) => {
       if (body[f] !== undefined) patch[f] = body[f];
     });
+    if (body.tags !== undefined) {
+      patch.tags = Array.isArray(body.tags) ? body.tags.filter((t) => TASK_TAGS.includes(t)) : [];
+    }
     if (body.stage !== undefined && TASK_STAGES.some((s) => s.key === body.stage)) patch.stage = body.stage;
     if (isStaff(req.user)) {
       if (body.assigneeId !== undefined) patch.assigneeId = Number(body.assigneeId);
@@ -314,12 +355,9 @@ function register(router) {
     sendJson(res, 200, { task: db.update('tasks', params.id, patch) });
   }));
 
-  router.delete('/api/tasks/:id', requireAuth(async (req, res, params) => {
+  router.delete('/api/tasks/:id', requireStaff(async (req, res, params) => {
     const task = db.find('tasks', params.id);
     if (!task) return sendJson(res, 404, { error: 'Не найдено' });
-    if (!isStaff(req.user) && task.assigneeId !== req.user.id) {
-      return sendJson(res, 403, { error: 'Недостаточно прав' });
-    }
     (task.attachments || []).forEach((a) => {
       try { fs.unlinkSync(path.join(UPLOADS_DIR, String(task.id), a.storedName)); } catch (e) {}
     });
@@ -389,8 +427,8 @@ function register(router) {
     const clients = scoped(db.all('clients'), req.user, 'ownerId');
     const tasks = scoped(db.all('tasks'), req.user, 'assigneeId');
     const today = new Date().toISOString().slice(0, 10);
-    const overdueTasks = tasks.filter((t) => ['new', 'in_progress'].includes(t.stage) && t.dueDate && t.dueDate < today);
-    const todayTasks = tasks.filter((t) => ['new', 'in_progress'].includes(t.stage) && t.dueDate === today);
+    const overdueTasks = tasks.filter((t) => ACTIVE_STAGES.includes(t.stage) && t.dueDate && t.dueDate < today);
+    const todayTasks = tasks.filter((t) => ACTIVE_STAGES.includes(t.stage) && t.dueDate === today);
     const atRiskClients = clients.filter((c) => (c.regularAssortment || []).some((p) => p.atRisk));
     const pendingApproval = clients.filter((c) => c.pendingApproval).length;
     const totalDebt = clients.reduce((s, c) => s + (c.debtAmount || 0), 0);
@@ -399,6 +437,9 @@ function register(router) {
       key: s.key, label: s.label, count: tasks.filter((t) => t.stage === s.key).length
     }));
 
+    const todayClientIds = new Set(todayTasks.map((t) => t.clientId));
+    const todayClientsWithDebt = clients.filter((c) => todayClientIds.has(c.id) && c.debtAmount > 0);
+
     const payload = {
       clientsCount: clients.length,
       todayTasksCount: todayTasks.length,
@@ -406,7 +447,10 @@ function register(router) {
       atRiskClientsCount: atRiskClients.length,
       pendingApprovalCount: pendingApproval,
       totalDebt,
-      byStage
+      byStage,
+      todayTasks,
+      overdueTasks,
+      todayClientsWithDebt
     };
 
     if (isStaff(req.user)) {
@@ -422,7 +466,7 @@ function register(router) {
           done,
           notDone: aTasks.filter((t) => t.stage === 'not_done').length,
           failed: aTasks.filter((t) => t.stage === 'failed').length,
-          open: aTasks.filter((t) => ['new', 'in_progress'].includes(t.stage)).length,
+          open: aTasks.filter((t) => ACTIVE_STAGES.includes(t.stage)).length,
           completionRate: closed ? Math.round((done / closed) * 100) : null
         };
       });
@@ -432,4 +476,4 @@ function register(router) {
   }));
 }
 
-module.exports = { register, TASK_STAGES, PAYMENT_METHODS, CONTRACT_STATUSES, sendJson, UPLOADS_DIR };
+module.exports = { register, TASK_STAGES, TASK_TAGS, PAYMENT_METHODS, CONTRACT_STATUSES, sendJson, UPLOADS_DIR };
