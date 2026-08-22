@@ -127,6 +127,22 @@ button {
 .tab.active { background: rgba(155, 107, 242, 0.18); color: var(--text); }
 .tab:hover { background: var(--surface-2); }
 
+.nav-badge {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
 .user-box { display: flex; align-items: center; gap: 10px; white-space: nowrap; color: var(--text); }
 
 #logout-btn { background: var(--surface-2); padding: 7px 12px; color: var(--text); border: 1px solid var(--border); }
@@ -222,6 +238,18 @@ tr:last-child td { border-bottom: none; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
 .table-wrap table { border: none; border-radius: 0; }
 
+/* Закреплённая первая колонка (Название) — не уезжает при горизонтальном скролле */
+.sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.25);
+}
+
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { color: var(--text); }
+
 .badge {
   display: inline-block;
   padding: 3px 9px;
@@ -291,6 +319,14 @@ tr:last-child td { border-bottom: none; }
 
 .kanban-mini { grid-template-columns: repeat(6, minmax(150px, 1fr)); }
 
+.mini-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.report-check { color: var(--success); font-size: 12px; font-weight: 600; white-space: nowrap; }
+
 .kanban-col { background: var(--surface-2); border-radius: var(--radius); padding: 10px; min-width: 200px; }
 .kanban-col h3 { font-size: 13px; margin: 4px 6px 10px; color: var(--muted); }
 .kanban-col .col-sum { font-weight: 400; color: var(--muted); }
@@ -306,6 +342,7 @@ tr:last-child td { border-bottom: none; }
 }
 
 .deal-card:hover { border-color: var(--primary); }
+.deal-card .bulk-check { float: right; width: auto; margin-left: 6px; }
 .deal-card .deal-title { font-weight: 600; margin-bottom: 4px; color: var(--text); }
 .deal-card .deal-amount { color: var(--gold); font-weight: 600; }
 .deal-card .deal-client { color: var(--muted); font-size: 12px; }
@@ -376,6 +413,41 @@ tr:last-child td { border-bottom: none; }
   margin: 10px 0;
 }
 
+/* ---- Ссылки: позвонить / карта ---- */
+.tel-link, .maps-link { color: var(--primary); text-decoration: none; font-weight: 600; }
+.tel-link:hover, .maps-link:hover { text-decoration: underline; color: var(--gold); }
+
+.stale-visit { color: var(--warning); font-weight: 600; }
+.row-closed { opacity: 0.5; }
+
+/* ---- Заметки/звонки ---- */
+.note-form { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 10px; }
+.note-form textarea { flex: 1; }
+.note-form button { white-space: nowrap; }
+
+/* ---- "Мой день" ---- */
+.myday-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.myday-name { font-weight: 700; font-size: 16px; margin-bottom: 6px; color: var(--text); }
+.myday-row { font-size: 14px; margin-bottom: 4px; }
+.myday-card .btn-secondary { margin-top: 8px; }
+
+/* ---- Печать маршрута ---- */
+.print-only { display: none; }
+@media print {
+  body * { visibility: hidden; }
+  #print-route, #print-route * { visibility: visible; }
+  #print-route { display: block; position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
+  #print-route h1 { font-size: 18px; }
+  #print-route h2 { font-size: 15px; margin-top: 16px; }
+  #print-route h3 { font-size: 13px; margin: 8px 0 4px; }
+}
+
 /* ---- Регулярный ассортимент / история визитов ---- */
 
 .assort-btn {
@@ -389,6 +461,7 @@ tr:last-child td { border-bottom: none; }
   font-size: 14px;
 }
 .assort-btn:hover { filter: brightness(1.08); }
+.assort-btn-test { background: linear-gradient(135deg, var(--gold), var(--gold-dark)); color: #1a1626; }
 
 .assort-panel { margin-top: 14px; border-top: 2px dashed var(--border); padding-top: 14px; }
 .assort-panel h3 { margin: 0 0 8px; font-size: 14px; color: var(--text); }
@@ -494,6 +567,13 @@ tr:last-child td { border-bottom: none; }
 
 .cal-more { font-size: 11px; color: var(--muted); }
 
+/* Индикатор-точка для мобильной версии — вместо списка задач, который не помещается */
+.cal-day-dot-wrap { display: none; align-items: center; justify-content: center; gap: 3px; margin-top: 2px; }
+.cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.cal-dot-green { background: var(--success); }
+.cal-dot-red { background: var(--danger); }
+.cal-dot-count { font-size: 10px; color: var(--muted); }
+
 .cal-week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
 .cal-week-col { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px; min-height: 200px; }
 .cal-week-head { font-size: 12px; color: var(--muted); margin-bottom: 8px; text-align: center; text-transform: uppercase; letter-spacing: .02em; }
@@ -516,5 +596,6 @@ tr:last-child td { border-bottom: none; }
   .cal-month-grid { grid-template-columns: repeat(7, minmax(36px, 1fr)); }
   .cal-day-cell { min-height: 46px; padding: 3px; }
   .cal-day-tasks { display: none; }
-  .filter-bar select { min-width: 130px; }
+  .cal-day-dot-wrap { display: flex; }
+  .filter-bar select, .filter-bar input[type="text"] { min-width: 130px; }
 }

@@ -10,12 +10,21 @@ const state = {
   tasks: [],
   users: [],
   view: 'dashboard',
-  clientFilters: { visitDay: '', pointType: '', onlyRegular: false, onlyDebt: false },
+  stats: null,
+  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, showClosed: false, search: '' },
+  clientSort: { key: null, dir: -1 },
   taskTagFilter: new Set(),
-  calendar: { mode: 'month', date: new Date() }
+  calendar: { mode: 'month', date: new Date() },
+  clientBulkMode: false,
+  clientBulkSelected: new Set(),
+  taskBulkMode: false,
+  taskBulkSelected: new Set()
 };
 
-const ACTIVE_STAGES = ['new', 'in_progress', 'waiting'];
+// Единственный "активный" (ещё не завершённый) этап — раньше их было три
+// (new/in_progress/waiting), теперь "Новая задача" и "Лист ожидания" убраны
+// с доски (см. api.js), остался только "В работе".
+const ACTIVE_STAGES = ['in_progress'];
 
 // ---------- Утилита запросов к API ----------
 
@@ -104,15 +113,34 @@ function switchView(view) {
 // ---------- Загрузка данных ----------
 
 async function loadAll() {
-  const [clientsRes, tasksRes, usersRes] = await Promise.all([
+  const [clientsRes, tasksRes, usersRes, statsRes] = await Promise.all([
     api('GET', '/api/clients'),
     api('GET', '/api/tasks'),
-    api('GET', '/api/users')
+    api('GET', '/api/users'),
+    api('GET', '/api/stats')
   ]);
   state.clients = clientsRes.clients;
   state.tasks = tasksRes.tasks;
   state.stages = tasksRes.stages;
   state.users = usersRes.users;
+  state.stats = statsRes;
+  updateNavBadges();
+}
+
+function updateNavBadges() {
+  const tasksBadge = document.getElementById('badge-tasks');
+  const clientsBadge = document.getElementById('badge-clients');
+  const s = state.stats;
+  if (tasksBadge) {
+    const n = s ? s.overdueTasksCount : 0;
+    tasksBadge.textContent = n || '';
+    tasksBadge.style.display = n ? 'inline-flex' : 'none';
+  }
+  if (clientsBadge) {
+    const n = s && isStaff() ? (s.pendingApprovalCount || 0) + (s.pendingClosureCount || 0) : 0;
+    clientsBadge.textContent = n || '';
+    clientsBadge.style.display = n ? 'inline-flex' : 'none';
+  }
 }
 
 async function boot() {
@@ -132,8 +160,10 @@ async function boot() {
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('user-name').textContent = `${state.user.name} (${roleLabel(state.user.role)})`;
   document.getElementById('team-tab').style.display = isAdmin() ? '' : 'none';
+  document.getElementById('myday-tab').style.display = state.user.role === 'agent' ? '' : 'none';
   await loadAll();
   render();
+  setupNotifications();
 }
 
 // ---------- Рендер по вкладкам ----------
@@ -145,7 +175,21 @@ function render() {
   if (state.view === 'clients') return renderClients(content);
   if (state.view === 'tasks') return renderTasks(content);
   if (state.view === 'calendar') return renderCalendar(content);
+  if (state.view === 'myday') return renderMyDay(content);
   if (state.view === 'team') return renderTeam(content);
+}
+
+// ---------- Ссылки: позвонить / открыть карту ----------
+
+function telLink(phone, label) {
+  if (!phone) return escapeHtml(label !== undefined ? label : '—');
+  const digits = phone.replace(/[^\d+]/g, '');
+  return `<a class="tel-link" href="tel:${digits}" onclick="event.stopPropagation()">${escapeHtml(label !== undefined ? label : phone)}</a>`;
+}
+
+function mapsLink(address) {
+  if (!address) return '';
+  return `<a class="maps-link" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}" onclick="event.stopPropagation()">📍 Карта</a>`;
 }
 
 // ---------- Аватар сотрудника ----------
@@ -179,12 +223,14 @@ async function renderDashboard(content) {
         <div class="stat-card"><div class="num">${stats.overdueTasksCount}</div><div class="label">Просроченных задач</div></div>
         <div class="stat-card"><div class="num">${stats.atRiskClientsCount}</div><div class="label">Клиентов с риском «отвала» товара</div></div>
         <div class="stat-card"><div class="num">${fmtMoney(stats.totalDebt)}</div><div class="label">Общий долг</div></div>
-        ${isAdmin() ? `<div class="stat-card"><div class="num">${stats.pendingApprovalCount}</div><div class="label">Новых точек на согласовании</div></div>` : ''}
+        ${isStaff() && stats.teamTotals ? `<div class="stat-card"><div class="num">${stats.teamTotals.totalTasks}</div><div class="label">Всего задач по команде (в работе: ${stats.teamTotals.open})</div></div>` : ''}
+        ${isStaff() ? `<div class="stat-card"><div class="num">${stats.pendingApprovalCount}</div><div class="label">Новых точек на согласовании</div></div>` : ''}
+        ${isStaff() && stats.pendingClosureCount ? `<div class="stat-card"><div class="num">${stats.pendingClosureCount}</div><div class="label">Заявок на закрытие точки</div></div>` : ''}
       </div>
 
       <div class="panel">
         <h2>Клиенты на сегодня</h2>
-        <div class="kanban kanban-mini" id="today-kanban"></div>
+        <div class="mini-card-grid" id="today-kanban"></div>
       </div>
 
       <div class="panel">
@@ -232,7 +278,7 @@ async function renderDashboard(content) {
         <h2>Выполнение по агентам</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Агент</th><th>Всего задач</th><th>В работе</th><th>Выполнено</th><th>Не выполнено</th><th>Прогрев</th><th>% выполнения</th></tr></thead>
+            <thead><tr><th>Агент</th><th>Всего задач</th><th>В работе</th><th>Выполнено</th><th>Не выполнено</th><th>% выполнения</th><th>Долг клиентов</th></tr></thead>
             <tbody>
               ${stats.byAgent.map((a) => `
                 <tr>
@@ -241,40 +287,63 @@ async function renderDashboard(content) {
                   <td>${a.open}</td>
                   <td>${a.done}</td>
                   <td>${a.notDone}</td>
-                  <td>${a.failed}</td>
                   <td>${a.completionRate === null ? '—' : a.completionRate + '%'}</td>
+                  <td>${fmtMoney(a.totalDebt)}</td>
+                </tr>
+              `).join('')}
+              <tr>
+                <td><strong>Итого по команде</strong></td>
+                <td><strong>${stats.teamTotals.totalTasks}</strong></td>
+                <td><strong>${stats.teamTotals.open}</strong></td>
+                <td><strong>${stats.teamTotals.done}</strong></td>
+                <td><strong>${stats.teamTotals.notDone}</strong></td>
+                <td>—</td>
+                <td><strong>${fmtMoney(stats.byAgent.reduce((s, a) => s + (a.totalDebt || 0), 0))}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>` : ''}
+
+      ${stats.noTaskThisWeek ? `
+      <div class="panel">
+        <h2>Клиенты без задачи на этой неделе <span class="col-sum">· ${stats.noTaskThisWeek.length}</span></h2>
+        ${stats.noTaskThisWeek.length ? `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Клиент</th><th>День визита</th><th>Ответственный</th></tr></thead>
+            <tbody>
+              ${stats.noTaskThisWeek.slice(0, 30).map((c) => `
+                <tr>
+                  <td>${escapeHtml(c.name)}</td>
+                  <td>${escapeHtml(c.visitDay)}</td>
+                  <td>${agentTag(c.ownerId)}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
         </div>
+        ${stats.noTaskThisWeek.length > 30 ? `<div class="muted" style="margin-top:6px;font-size:12px">Показаны первые 30 из ${stats.noTaskThisWeek.length}.</div>` : ''}
+        ` : '<div class="empty-state">На всех клиентов с днём визита на этой неделе задачи уже созданы.</div>'}
       </div>` : ''}
     </div>
   `));
 
   const todayKanban = document.getElementById('today-kanban');
-  state.stages.forEach((stage) => {
-    const inStage = stats.todayTasks.filter((t) => t.stage === stage.key);
-    const col = el(`
-      <div class="kanban-col" data-stage="${stage.key}">
-        <h3>${stage.label} <span class="col-sum">· ${inStage.length}</span></h3>
-        <div class="col-body"></div>
+  if (!stats.todayTasks.length) {
+    todayKanban.appendChild(el('<div class="empty-state">На сегодня задач нет.</div>'));
+  }
+  stats.todayTasks.forEach((t) => {
+    const client = clientById(t.clientId);
+    const card = el(`
+      <div class="deal-card deal-card-mini">
+        <div class="deal-title">${escapeHtml(client ? client.name : t.title)}</div>
+        <div class="deal-client">${agentTag(t.assigneeId)}</div>
+        ${t.report ? '<span class="report-check" title="Отчёт заполнен">✓ отчёт</span>' : ''}
       </div>
     `);
-    const colBody = col.querySelector('.col-body');
-    if (!inStage.length) colBody.appendChild(el('<div class="muted" style="padding:6px 4px;font-size:12px">Пусто</div>'));
-    inStage.forEach((t) => {
-      const client = clientById(t.clientId);
-      const card = el(`
-        <div class="deal-card deal-card-mini">
-          <div class="deal-title">${escapeHtml(client ? client.name : t.title)}</div>
-          <div class="deal-client">${agentTag(t.assigneeId)}</div>
-        </div>
-      `);
-      card.addEventListener('click', () => openTaskModal(t));
-      colBody.appendChild(card);
-    });
-    todayKanban.appendChild(col);
+    card.addEventListener('click', () => openTaskModal(t));
+    todayKanban.appendChild(card);
   });
 }
 
@@ -282,27 +351,83 @@ async function renderDashboard(content) {
 
 const VISIT_DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
+function riskCount(c) { return (c.regularAssortment || []).filter((p) => p.atRisk).length; }
+
 function filteredClients() {
   const f = state.clientFilters;
-  return state.clients.filter((c) => {
+  let list = state.clients.filter((c) => {
+    if (c.closed && !(isStaff() && f.showClosed)) return false;
     if (f.visitDay && c.visitDay !== f.visitDay) return false;
     if (f.pointType && (c.pointType || '') !== f.pointType) return false;
+    if (f.paymentMethod && (c.paymentMethod || '') !== f.paymentMethod) return false;
     if (f.onlyRegular && !(c.regularAssortment || []).length) return false;
     if (f.onlyDebt && !(c.debtAmount > 0)) return false;
+    if (f.onlyShortfall && !riskCount(c)) return false;
+    if (f.search) {
+      const q = f.search.trim().toLowerCase();
+      const hay = `${c.name} ${c.phone || ''} ${c.contactName || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
     return true;
   });
+  const { key, dir } = state.clientSort;
+  if (key) {
+    list = list.slice().sort((a, b) => {
+      const av = key === 'debt' ? (a.debtAmount || 0) : riskCount(a);
+      const bv = key === 'debt' ? (b.debtAmount || 0) : riskCount(b);
+      return (av - bv) * dir;
+    });
+  }
+  return list;
+}
+
+function sortArrow(key) {
+  if (state.clientSort.key !== key) return '';
+  return state.clientSort.dir === 1 ? ' ▲' : ' ▼';
+}
+
+function daysOverdueText(c) {
+  if (!c.debtOverdue || !c.debtAmount) return '';
+  const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec((c.debtAsOf || '').trim());
+  if (!m) return '';
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  if (isNaN(d.getTime())) return '';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  return days > 0 ? `просрочено ${days} дн.` : '';
+}
+
+function exportClientsCsv(list) {
+  const headers = ['Название', 'Долг', 'Ассортимент риск', 'Тип точки', 'Телефон', 'Контактное лицо', 'День визита', 'Ответственный'];
+  const rows = list.map((c) => [c.name, c.debtAmount || 0, riskCount(c), c.pointType || '', c.phone || '', c.contactName || '', c.visitDay || '', userName(c.ownerId)]);
+  const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `клиенты-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function renderClients(content) {
   const pointTypes = Array.from(new Set(state.clients.map((c) => c.pointType).filter(Boolean))).sort();
   const f = state.clientFilters;
+  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.showClosed || f.search;
+  const bulk = state.clientBulkMode;
   content.appendChild(el(`
     <div>
       <div class="toolbar">
         <h2 style="margin:0">Клиенты</h2>
-        <button class="btn-primary" id="add-client-btn">+ Новый клиент</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${state.user.role === 'supervisor' ? '<button type="button" class="btn-secondary" id="export-csv-btn">Экспорт в CSV</button>' : ''}
+          ${isStaff() ? `<button type="button" class="btn-secondary ${bulk ? 'active' : ''}" id="bulk-mode-btn">${bulk ? 'Отменить выбор' : 'Выбрать несколько'}</button>` : ''}
+          <button class="btn-primary" id="add-client-btn">+ Новый клиент</button>
+        </div>
       </div>
       <div class="filter-bar">
+        <input type="text" id="filter-search" placeholder="Поиск: название, телефон, контакт..." value="${escapeAttr(f.search)}" style="max-width:220px">
         <select id="filter-visitDay">
           <option value="">День недели: все</option>
           ${VISIT_DAYS.map((d) => `<option value="${d}" ${f.visitDay === d ? 'selected' : ''}>${d}</option>`).join('')}
@@ -311,83 +436,249 @@ function renderClients(content) {
           <option value="">Тип точки: все</option>
           ${pointTypes.map((p) => `<option value="${escapeAttr(p)}" ${f.pointType === p ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
         </select>
+        <select id="filter-paymentMethod">
+          <option value="">Способ оплаты: все</option>
+          ${state.paymentMethods.map((p) => `<option value="${p}" ${f.paymentMethod === p ? 'selected' : ''}>${p}</option>`).join('')}
+        </select>
         <label class="filter-check"><input type="checkbox" id="filter-onlyRegular" ${f.onlyRegular ? 'checked' : ''}> Постоянный клиент</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyDebt" ${f.onlyDebt ? 'checked' : ''}> Есть задолженность</label>
-        ${(f.visitDay || f.pointType || f.onlyRegular || f.onlyDebt) ? '<button type="button" class="link-btn" id="filter-reset">Сбросить</button>' : ''}
+        <label class="filter-check"><input type="checkbox" id="filter-onlyShortfall" ${f.onlyShortfall ? 'checked' : ''}> Не добрал</label>
+        ${isStaff() ? `<label class="filter-check"><input type="checkbox" id="filter-showClosed" ${f.showClosed ? 'checked' : ''}> Показать закрытые</label>` : ''}
+        ${filtersActive ? '<button type="button" class="link-btn" id="filter-reset">Сбросить</button>' : ''}
       </div>
+      ${bulk ? `<div class="filter-bar" id="bulk-bar">
+        <span class="muted" style="font-size:13px">Выбрано: <span id="bulk-count">0</span></span>
+        <select id="bulk-owner-select">
+          <option value="">Переназначить агенту...</option>
+          ${state.users.filter((u) => u.role === 'agent').map((u) => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('')}
+        </select>
+        <button type="button" class="btn-secondary" id="bulk-reassign-btn">Применить</button>
+      </div>` : ''}
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Название</th><th>Тип точки</th><th>День визита</th><th>Контактное лицо</th><th>Ответственный</th><th>Долг</th><th>Ассортимент</th><th></th></tr></thead>
+          <thead><tr>
+            ${bulk ? '<th></th>' : ''}
+            <th class="sticky-col">Название</th>
+            <th class="sortable" data-sort="debt">Долг${sortArrow('debt')}</th>
+            <th class="sortable" data-sort="risk">Ассортимент риск${sortArrow('risk')}</th>
+            <th></th>
+            <th>Тип точки</th>
+            <th>Номер телефона</th>
+            <th>Контактное лицо</th>
+          </tr></thead>
           <tbody id="clients-tbody"></tbody>
         </table>
       </div>
     </div>
   `));
   document.getElementById('add-client-btn').addEventListener('click', () => openClientModal());
+  const exportBtn = document.getElementById('export-csv-btn');
+  if (exportBtn) exportBtn.addEventListener('click', () => exportClientsCsv(filteredClients()));
+  const bulkModeBtn = document.getElementById('bulk-mode-btn');
+  if (bulkModeBtn) bulkModeBtn.addEventListener('click', () => { state.clientBulkMode = !state.clientBulkMode; state.clientBulkSelected = new Set(); render(); });
 
+  document.getElementById('filter-search').addEventListener('input', (e) => { state.clientFilters.search = e.target.value; render(); });
   document.getElementById('filter-visitDay').addEventListener('change', (e) => { state.clientFilters.visitDay = e.target.value; render(); });
   document.getElementById('filter-pointType').addEventListener('change', (e) => { state.clientFilters.pointType = e.target.value; render(); });
+  document.getElementById('filter-paymentMethod').addEventListener('change', (e) => { state.clientFilters.paymentMethod = e.target.value; render(); });
   document.getElementById('filter-onlyRegular').addEventListener('change', (e) => { state.clientFilters.onlyRegular = e.target.checked; render(); });
   document.getElementById('filter-onlyDebt').addEventListener('change', (e) => { state.clientFilters.onlyDebt = e.target.checked; render(); });
+  document.getElementById('filter-onlyShortfall').addEventListener('change', (e) => { state.clientFilters.onlyShortfall = e.target.checked; render(); });
+  const showClosedCb = document.getElementById('filter-showClosed');
+  if (showClosedCb) showClosedCb.addEventListener('change', (e) => { state.clientFilters.showClosed = e.target.checked; render(); });
   const resetBtn = document.getElementById('filter-reset');
-  if (resetBtn) resetBtn.addEventListener('click', () => { state.clientFilters = { visitDay: '', pointType: '', onlyRegular: false, onlyDebt: false }; render(); });
+  if (resetBtn) resetBtn.addEventListener('click', () => {
+    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, showClosed: false, search: '' };
+    render();
+  });
+  content.querySelectorAll('th.sortable').forEach((th) => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.sort;
+      if (state.clientSort.key === k) state.clientSort.dir *= -1;
+      else { state.clientSort.key = k; state.clientSort.dir = -1; }
+      render();
+    });
+  });
+  const bulkReassignBtn = document.getElementById('bulk-reassign-btn');
+  if (bulkReassignBtn) bulkReassignBtn.addEventListener('click', async () => {
+    const ownerId = document.getElementById('bulk-owner-select').value;
+    if (!ownerId) return alert('Выберите агента');
+    if (!state.clientBulkSelected.size) return alert('Не выбрано ни одного клиента');
+    await api('POST', '/api/clients/bulk-reassign', { ids: Array.from(state.clientBulkSelected), ownerId });
+    state.clientBulkMode = false;
+    state.clientBulkSelected = new Set();
+    await loadAll();
+    render();
+  });
 
   const tbody = document.getElementById('clients-tbody');
   const list = filteredClients();
   if (!list.length) {
-    tbody.appendChild(el(`<tr><td colspan="8"><div class="empty-state">${state.clients.length ? 'Ничего не найдено по выбранным фильтрам.' : 'Пока нет клиентов. Добавьте первого.'}</div></td></tr>`));
+    tbody.appendChild(el(`<tr><td colspan="${bulk ? 8 : 7}"><div class="empty-state">${state.clients.length ? 'Ничего не найдено по выбранным фильтрам.' : 'Пока нет клиентов. Добавьте первого.'}</div></td></tr>`));
     return;
   }
   list.forEach((c) => {
-    const atRisk = (c.regularAssortment || []).some((p) => p.atRisk);
+    const risk = riskCount(c);
+    const overdueDays = daysOverdueText(c);
     const row = el(`
-      <tr>
-        <td>
+      <tr class="${c.closed ? 'row-closed' : ''}">
+        ${bulk ? `<td><input type="checkbox" class="bulk-check" data-id="${c.id}" ${state.clientBulkSelected.has(c.id) ? 'checked' : ''}></td>` : ''}
+        <td class="sticky-col">
           <strong>${escapeHtml(c.name)}</strong>
+          ${c.closed ? '<span class="badge badge-offroute">закрыта</span>' : ''}
+          ${c.closureRequested ? '<span class="badge badge-pending">на закрытие</span>' : ''}
           ${c.pendingApproval ? '<span class="badge badge-pending">на согласовании</span>' : ''}
           ${c.isOffRoute ? '<span class="badge badge-offroute">вне маршрута</span>' : ''}
         </td>
-        <td>${escapeHtml(c.pointType || '—')}</td>
-        <td>${escapeHtml(c.visitDay || '—')}</td>
-        <td>${escapeHtml(c.contactName || '—')}</td>
-        <td>${agentTag(c.ownerId)}</td>
-        <td>${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
-        <td>${(c.regularAssortment || []).length} ${atRisk ? '<span class="badge badge-overdue">риск</span>' : ''}</td>
+        <td>${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${overdueDays}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
+        <td>${risk ? `<span class="badge badge-overdue">${risk} риск</span>` : '—'}</td>
         <td><button class="link-btn open-client">Открыть</button></td>
+        <td>${escapeHtml(c.pointType || '—')}</td>
+        <td>${telLink(c.phone)}</td>
+        <td>${escapeHtml(c.contactName || '—')}</td>
       </tr>
     `);
     row.querySelector('.open-client').addEventListener('click', () => openClientModal(c));
+    const cb = row.querySelector('.bulk-check');
+    if (cb) cb.addEventListener('change', () => {
+      if (cb.checked) state.clientBulkSelected.add(c.id); else state.clientBulkSelected.delete(c.id);
+      const countEl = document.getElementById('bulk-count');
+      if (countEl) countEl.textContent = state.clientBulkSelected.size;
+    });
     tbody.appendChild(row);
   });
 }
 
 function fieldRow(label, value, locked) {
-  return `<div class="field"><span class="k">${label}${locked ? ' <span class="lock" title="Редактирует только администратор">🔒</span>' : ''}</span><span class="v">${value}</span></div>`;
+  return `<div class="field"><span class="k">${label}${locked ? ' <span class="lock" title="Редактирует только администратор или супервайзер">🔒</span>' : ''}</span><span class="v">${value}</span></div>`;
+}
+
+// ---------- "Давно не был" — последний визит по клиенту ----------
+
+function clientTasksSorted(clientId) {
+  return state.tasks.filter((t) => t.clientId === clientId).slice().sort((a, b) => (b.dueDate || '').localeCompare(a.dueDate || ''));
+}
+
+function lastVisitInfo(client) {
+  const tasks = clientTasksSorted(client.id);
+  if (!tasks.length) return { html: 'визитов ещё не было', stale: !!client.visitDay };
+  const last = tasks[0];
+  const days = Math.floor((Date.now() - new Date(last.dueDate).getTime()) / 86400000);
+  const stale = days > 21;
+  return { html: `${fmtDate(last.dueDate)} (${days} дн. назад)`, stale };
+}
+
+// ---------- Заметки/звонки по клиенту ----------
+
+function notesListHtml(notes) {
+  return (notes || []).length ? notes.map((n) => `
+    <div class="history-row" data-note="${n.id}">
+      <div class="muted">${fmtDateTime(n.createdAt)} · ${escapeHtml(userName(n.authorId))} ${isStaff() ? `<button type="button" class="icon-btn del-note" data-id="${n.id}">✕</button>` : ''}</div>
+      <div>${escapeHtml(n.text)}</div>
+    </div>
+  `).join('') : '<div class="muted">Заметок пока нет.</div>';
+}
+
+function renderContactNotes(client) {
+  return `
+    <div class="assort-panel">
+      <h3>Заметки / звонки</h3>
+      <form id="note-form" class="note-form">
+        <textarea name="text" placeholder="Например: звонил(а), не ответил" style="min-height:44px"></textarea>
+        <button type="submit" class="btn-secondary">Добавить</button>
+      </form>
+      <div id="notes-list">${notesListHtml(client.contactNotes)}</div>
+    </div>
+  `;
+}
+
+function wireContactNotes(clientId) {
+  const form = document.getElementById('note-form');
+  if (form) form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = form.querySelector('textarea[name=text]').value.trim();
+    if (!text) return;
+    const res = await api('POST', `/api/clients/${clientId}/notes`, { text });
+    const client = clientById(clientId);
+    if (client) client.contactNotes = res.client.contactNotes;
+    document.getElementById('notes-list').innerHTML = notesListHtml(res.client.contactNotes);
+    form.reset();
+    wireContactNoteDeletes(clientId);
+  });
+  wireContactNoteDeletes(clientId);
+}
+
+function wireContactNoteDeletes(clientId) {
+  document.querySelectorAll('.del-note').forEach((btn) => {
+    btn.onclick = async () => {
+      const res = await api('DELETE', `/api/clients/${clientId}/notes/${btn.dataset.id}`);
+      const client = clientById(clientId);
+      if (client) client.contactNotes = res.client.contactNotes;
+      document.querySelector(`[data-note="${btn.dataset.id}"]`).remove();
+    };
+  });
+}
+
+// ---------- "Точка закрыта" ----------
+
+function renderClosureBlock(client) {
+  if (client.closed) {
+    return `<p class="note-pending">Точка закрыта${isStaff() ? '' : ''}</p>${isStaff() ? '<button type="button" class="btn-secondary" id="reopen-client">Открыть заново</button>' : ''}`;
+  }
+  if (client.closureRequested) {
+    if (isStaff()) {
+      return `<p class="note-pending">Точку предлагают закрыть (${escapeHtml(userName(client.closureRequestedBy))}) — подтвердить?</p>
+        <button type="button" class="btn-secondary" id="confirm-closure">Подтвердить закрытие</button>
+        <button type="button" class="btn-secondary" id="reject-closure">Отклонить</button>`;
+    }
+    return `<p class="note-pending">Заявка на закрытие точки отправлена — ждём подтверждения.</p>`;
+  }
+  return `<button type="button" class="btn-secondary" id="request-closure">Точка закрыта</button>`;
+}
+
+function wireClosureBlock(clientId) {
+  const reload = async () => { await loadAll(); closeModal(); render(); };
+  const reqBtn = document.getElementById('request-closure');
+  if (reqBtn) reqBtn.addEventListener('click', async () => {
+    if (!confirm('Отправить заявку на закрытие точки?')) return;
+    await api('POST', `/api/clients/${clientId}/request-closure`);
+    await reload();
+  });
+  const confirmBtn = document.getElementById('confirm-closure');
+  if (confirmBtn) confirmBtn.addEventListener('click', async () => { await api('POST', `/api/clients/${clientId}/confirm-closure`); await reload(); });
+  const rejectBtn = document.getElementById('reject-closure');
+  if (rejectBtn) rejectBtn.addEventListener('click', async () => { await api('POST', `/api/clients/${clientId}/reject-closure`); await reload(); });
+  const reopenBtn = document.getElementById('reopen-client');
+  if (reopenBtn) reopenBtn.addEventListener('click', async () => { await api('POST', `/api/clients/${clientId}/reopen`); await reload(); });
 }
 
 async function openClientModal(client) {
   const isEdit = !!client;
   const isOwner = isEdit && client.ownerId === state.user.id;
-  const canEditCore = isAdmin();
+  const canEditCore = isStaff();
 
   const ownerOptions = state.users.filter((u) => u.role === 'agent' || u.role === undefined);
 
+  const lastVisit = isEdit ? lastVisitInfo(client) : null;
+
   let bodyHtml;
   if (isEdit && !canEditCore) {
-    // Просмотр для агента/супервайзера: карточка + доступное редактирование заметок
+    // Просмотр для агента: карточка + доступное редактирование заметок
     bodyHtml = `
       <h2>${escapeHtml(client.name)}</h2>
       ${client.pendingApproval ? '<p class="note-pending">Точка на согласовании у администратора</p>' : ''}
+      ${renderClosureBlock(client)}
       <div class="panel-inline">
         ${fieldRow('Тип точки', escapeHtml(client.pointType || '—'), true)}
-        ${fieldRow('Адрес', escapeHtml(client.address || '—'), true)}
-        ${fieldRow('Телефон', escapeHtml(client.phone || '—'), true)}
+        ${fieldRow('Адрес', `${escapeHtml(client.address || '—')} ${mapsLink(client.address)}`, true)}
+        ${fieldRow('Телефон', telLink(client.phone), true)}
         ${fieldRow('Контактное лицо', escapeHtml(client.contactName || '—'), true)}
         ${fieldRow('День визита', escapeHtml(client.visitDay || '—'), true)}
         ${fieldRow('Работает по договору', escapeHtml(client.contractStatus), true)}
         ${fieldRow('Способ оплаты', escapeHtml(client.paymentMethod || 'не указан'), true)}
         ${fieldRow('Ответственный', escapeHtml(userName(client.ownerId)), true)}
         ${fieldRow('Задолженность', client.debtAmount ? fmtMoney(client.debtAmount) + (client.debtOverdue ? ' (просрочка)' : '') : 'нет', true)}
+        ${fieldRow('Последний визит', `<span class="${lastVisit.stale ? 'stale-visit' : ''}">${lastVisit.html}</span>`, true)}
       </div>
       <form id="client-form">
         <label>Заметки</label>
@@ -398,6 +689,8 @@ async function openClientModal(client) {
         </div>
       </form>
       ${renderAssortmentSection(client)}
+      ${renderTestAssortmentSection(client)}
+      ${renderContactNotes(client)}
       <div id="history-section" class="assort-panel"><h3>История визитов</h3><div class="muted">Загрузка…</div></div>
     `;
   } else {
@@ -415,10 +708,10 @@ async function openClientModal(client) {
             </select>
           </div>
         </div>
-        <label>Адрес</label>
+        <label>Адрес ${client && client.address ? mapsLink(client.address) : ''}</label>
         <input name="address" value="${client ? escapeAttr(client.address) : ''}">
         <div class="field-row">
-          <div><label>Телефон</label><input name="phone" value="${client ? escapeAttr(client.phone) : ''}"></div>
+          <div><label>Телефон ${client && client.phone ? telLink(client.phone, '📞') : ''}</label><input name="phone" value="${client ? escapeAttr(client.phone) : ''}"></div>
           <div><label>Контактное лицо</label><input name="contactName" value="${client ? escapeAttr(client.contactName) : ''}"></div>
         </div>
         <div class="field-row">
@@ -434,20 +727,24 @@ async function openClientModal(client) {
             </select>
           </div>
         </div>
-        ${isAdmin() ? `<label>Ответственный агент</label>
+        ${isStaff() ? `<label>Ответственный агент</label>
           <select name="ownerId">
             ${ownerOptions.map((u) => `<option value="${u.id}" ${client && client.ownerId === u.id ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
           </select>` : ''}
         <label>Заметки</label>
         <textarea name="notes">${client ? escapeHtml(client.notes || '') : ''}</textarea>
+        ${isEdit ? `<div class="muted" style="font-size:13px;margin-top:6px">Последний визит: <span class="${lastVisit.stale ? 'stale-visit' : ''}">${lastVisit.html}</span></div>` : ''}
         <div class="modal-actions">
           ${isEdit && isStaff() ? '<button type="button" class="btn-secondary" id="delete-client">Удалить</button>' : ''}
-          ${isEdit && client.pendingApproval && isAdmin() ? '<button type="button" class="btn-secondary" id="approve-client">Одобрить точку</button>' : ''}
+          ${isEdit && client.pendingApproval && isStaff() ? '<button type="button" class="btn-secondary" id="approve-client">Одобрить точку</button>' : ''}
           <button type="button" class="btn-secondary" id="cancel-modal">Отмена</button>
           <button type="submit" class="btn-primary">Сохранить</button>
         </div>
       </form>
+      ${isEdit ? renderClosureBlock(client) : ''}
       ${isEdit ? renderAssortmentSection(client) : ''}
+      ${isEdit ? renderTestAssortmentSection(client) : ''}
+      ${isEdit ? renderContactNotes(client) : ''}
       ${isEdit ? '<div id="history-section" class="assort-panel"><h3>История визитов</h3><div class="muted">Загрузка…</div></div>' : ''}
     `;
   }
@@ -492,6 +789,8 @@ async function openClientModal(client) {
 
   if (isEdit) {
     wireAssortmentToggle(client.id);
+    wireContactNotes(client.id);
+    wireClosureBlock(client.id);
     loadClientHistory(client.id);
   }
 }
@@ -522,16 +821,33 @@ function renderAssortmentSection(client) {
   `;
 }
 
+// Тестовый ассортимент — товары, купленные хотя бы раз, но не дотянувшие до
+// регулярного (разовые/пробные покупки). Отдельный список от регулярного ассортимента.
+function renderTestAssortmentSection(client) {
+  const items = client.testAssortment || [];
+  if (!items.length) return '';
+  return `
+    <button type="button" class="assort-btn assort-btn-test" id="test-assort-toggle-${client.id}">🧪 Тестовый ассортимент (${items.length})</button>
+    <div class="assort-panel" id="test-assort-panel-${client.id}" style="display:none">
+      ${items.map(assortRow).join('')}
+    </div>
+  `;
+}
+
 // Скрипты, вставленные через innerHTML/template, браузер не выполняет —
-// поэтому переключатель ассортимента навешивается явным addEventListener
-// после того, как модалка реально попала в DOM (см. вызовы в openClientModal).
-function wireAssortmentToggle(clientId) {
-  const btn = document.getElementById(`assort-toggle-${clientId}`);
-  const panel = document.getElementById(`assort-panel-${clientId}`);
+// поэтому переключатели ассортимента навешиваются явным addEventListener
+// после того, как модалка реально попала в DOM (см. вызовы в openClientModal/openTaskModal).
+function wireToggle(btnId, panelId) {
+  const btn = document.getElementById(btnId);
+  const panel = document.getElementById(panelId);
   if (!btn || !panel) return;
   btn.addEventListener('click', () => {
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   });
+}
+function wireAssortmentToggle(clientId) {
+  wireToggle(`assort-toggle-${clientId}`, `assort-panel-${clientId}`);
+  wireToggle(`test-assort-toggle-${clientId}`, `test-assort-panel-${clientId}`);
 }
 
 async function loadClientHistory(clientId) {
@@ -567,18 +883,41 @@ function taskTagBadges(t) {
 }
 
 function renderTasks(content) {
+  const bulk = state.taskBulkMode;
   content.appendChild(el(`
     <div>
-      <div class="toolbar"><h2 style="margin:0">Задачи по клиентам</h2><button class="btn-primary" id="add-task-btn">+ Новая задача</button></div>
+      <div class="toolbar">
+        <h2 style="margin:0">Задачи по клиентам</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${isStaff() ? `<button type="button" class="btn-secondary ${bulk ? 'active' : ''}" id="task-bulk-mode-btn">${bulk ? 'Отменить выбор' : 'Выбрать несколько'}</button>` : ''}
+          <button class="btn-primary" id="add-task-btn">+ Новая задача</button>
+        </div>
+      </div>
       <div class="filter-bar">
         <span class="muted" style="font-size:13px">Фильтр по тегам:</span>
         ${state.taskTags.map((tag) => `<button type="button" class="tag-filter-btn ${state.taskTagFilter.has(tag) ? 'active' : ''}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}
         ${state.taskTagFilter.size ? '<button type="button" class="link-btn" id="tag-filter-reset">Сбросить</button>' : ''}
       </div>
+      ${bulk ? `<div class="filter-bar">
+        <span class="muted" style="font-size:13px">Выбрано: <span id="task-bulk-count">0</span></span>
+        <button type="button" class="btn-secondary" id="task-bulk-delete-btn">Удалить выбранные</button>
+      </div>` : ''}
       <div class="kanban" id="kanban"></div>
     </div>
   `));
   document.getElementById('add-task-btn').addEventListener('click', () => openTaskModal());
+  const taskBulkModeBtn = document.getElementById('task-bulk-mode-btn');
+  if (taskBulkModeBtn) taskBulkModeBtn.addEventListener('click', () => { state.taskBulkMode = !state.taskBulkMode; state.taskBulkSelected = new Set(); render(); });
+  const taskBulkDeleteBtn = document.getElementById('task-bulk-delete-btn');
+  if (taskBulkDeleteBtn) taskBulkDeleteBtn.addEventListener('click', async () => {
+    if (!state.taskBulkSelected.size) return alert('Не выбрано ни одной задачи');
+    if (!confirm(`Удалить ${state.taskBulkSelected.size} задач(и)?`)) return;
+    await api('POST', '/api/tasks/bulk-delete', { ids: Array.from(state.taskBulkSelected) });
+    state.taskBulkMode = false;
+    state.taskBulkSelected = new Set();
+    await loadAll();
+    render();
+  });
 
   content.querySelectorAll('.tag-filter-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -610,15 +949,22 @@ function renderTasks(content) {
       const overdue = t.dueDate && t.dueDate < today && ACTIVE_STAGES.includes(t.stage);
       const card = el(`
         <div class="deal-card" draggable="true" data-id="${t.id}">
+          ${bulk ? `<input type="checkbox" class="bulk-check task-bulk-check" data-id="${t.id}" ${state.taskBulkSelected.has(t.id) ? 'checked' : ''} onclick="event.stopPropagation()">` : ''}
           <div class="deal-title">${escapeHtml(t.title)}</div>
           <div class="deal-client">${client ? escapeHtml(client.name) : '—'}</div>
-          <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''}</div>
+          <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''} ${t.report ? '<span class="report-check" title="Отчёт заполнен">✓ отчёт</span>' : ''}</div>
           ${taskTagBadges(t) ? `<div class="card-tags">${taskTagBadges(t)}</div>` : ''}
           ${(t.attachments || []).length ? `<div class="muted">📎 ${t.attachments.length}</div>` : ''}
         </div>
       `);
-      card.addEventListener('click', () => openTaskModal(t));
+      card.addEventListener('click', () => { if (!bulk) openTaskModal(t); });
       card.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', t.id));
+      const cb = card.querySelector('.task-bulk-check');
+      if (cb) cb.addEventListener('change', () => {
+        if (cb.checked) state.taskBulkSelected.add(t.id); else state.taskBulkSelected.delete(t.id);
+        const countEl = document.getElementById('task-bulk-count');
+        if (countEl) countEl.textContent = state.taskBulkSelected.size;
+      });
       colBody.appendChild(card);
     });
     col.addEventListener('dragover', (e) => e.preventDefault());
@@ -646,8 +992,15 @@ function openTaskModal(task) {
 
   const myClients = state.user.role === 'agent' ? state.clients.filter((c) => c.ownerId === state.user.id) : state.clients;
 
+  // Дату можно менять свободно, пока она не проставлена; после установки —
+  // только администратор/супервайзер (у агента поле блокируется).
+  const dateLocked = isEdit && !isStaff() && !!task.dueDate;
+  const taskClient = isEdit ? clientById(task.clientId) : null;
+  const hasAssortment = taskClient && ((taskClient.regularAssortment || []).length || (taskClient.testAssortment || []).length);
+
   const body = `
     <h2>${isEdit ? 'Задача' : 'Новая задача'}</h2>
+    ${isEdit && isStaff() ? `<div class="muted" style="font-size:12px;margin-bottom:8px">Создано: ${fmtDateTime(task.createdAt)} · ${escapeHtml(userName(task.createdBy))}</div>` : ''}
     <form id="task-form">
       <label>Клиент *</label>
       <select name="clientId" required ${isEdit ? 'disabled' : ''}>
@@ -658,7 +1011,9 @@ function openTaskModal(task) {
       <label>Описание</label>
       <textarea name="description">${task ? escapeHtml(task.description || '') : ''}</textarea>
       <div class="field-row">
-        <div><label>Срок</label><input name="dueDate" type="date" value="${task ? task.dueDate : ''}"></div>
+        <div><label>Срок *${dateLocked ? ' <span class="lock" title="Обратитесь к супервайзеру">🔒</span>' : ''}</label>
+          <input name="dueDate" type="date" required value="${task ? task.dueDate : ''}" ${dateLocked ? 'disabled title="Обратитесь к супервайзеру"' : ''}>
+        </div>
         ${isEdit ? `<div><label>Этап</label><select name="stage">${state.stages.map((s) => `<option value="${s.key}" ${task.stage === s.key ? 'selected' : ''}>${s.label}</option>`).join('')}</select></div>` : ''}
       </div>
       ${assigneeBlock}
@@ -667,12 +1022,14 @@ function openTaskModal(task) {
         ${state.taskTags.map((tag) => `<label class="tag-check"><input type="checkbox" name="tags" value="${escapeAttr(tag)}" ${task && (task.tags || []).includes(tag) ? 'checked' : ''}> ${escapeHtml(tag)}</label>`).join('')}
       </div>
       ${isEdit ? `<label>Комментарий по визиту</label><textarea name="comment">${escapeHtml(task.comment || '')}</textarea>` : ''}
+      ${isEdit ? `<label>Отчёт по задаче ${task.stage === 'done' ? '*' : ''}</label><textarea name="report" placeholder="Без отчёта нельзя перевести в «Выполнена»">${escapeHtml(task.report || '')}</textarea>` : ''}
       <div class="modal-actions">
         ${isEdit && isStaff() ? '<button type="button" class="btn-secondary" id="delete-task">Удалить</button>' : ''}
         <button type="button" class="btn-secondary" id="cancel-modal">Отмена</button>
         <button type="submit" class="btn-primary">Сохранить</button>
       </div>
     </form>
+    ${isEdit && hasAssortment ? `<div class="assort-panel"><h3>Ассортимент клиента: ${escapeHtml(taskClient.name)}</h3>${renderAssortmentSection(taskClient)}${renderTestAssortmentSection(taskClient)}</div>` : ''}
     ${isEdit ? renderAttachmentsSection(task) : ''}
   `;
   openModal(body, async (form) => {
@@ -693,6 +1050,7 @@ function openTaskModal(task) {
     closeModal();
     render();
   });
+  if (isEdit && hasAssortment) wireAssortmentToggle(taskClient.id);
   if (isEdit) wireAttachments(task);
 }
 
@@ -711,7 +1069,7 @@ function renderAttachmentsSection(task) {
     <div class="assort-panel">
       <h3>Вложения (фото / аудио)</h3>
       <div id="attach-list">${renderAttachListHtml(task.attachments)}</div>
-      <input type="file" id="attach-input" accept="image/*,audio/*" style="margin-top:8px">
+      <input type="file" id="attach-input" accept="image/*,audio/*" multiple style="margin-top:8px">
     </div>
   `;
 }
@@ -721,7 +1079,7 @@ function wireAttachments(task) {
   if (input) input.addEventListener('change', async () => {
     if (!input.files.length) return;
     const fd = new FormData();
-    fd.append('file', input.files[0]);
+    Array.from(input.files).forEach((file) => fd.append('file', file));
     try {
       const res = await apiUpload(`/api/tasks/${task.id}/attachments`, fd);
       task.attachments = res.task.attachments;
@@ -752,7 +1110,10 @@ function renderTeam(content) {
     <div>
       <div class="toolbar">
         <h2 style="margin:0">Команда</h2>
-        <button class="btn-primary" id="add-user-btn">+ Сотрудник</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn-secondary" href="/api/backup" style="text-decoration:none;display:inline-block">Скачать резервную копию</a>
+          <button class="btn-primary" id="add-user-btn">+ Сотрудник</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table>
@@ -870,12 +1231,17 @@ function renderCalendar(content) {
           <button type="button" class="btn-secondary" id="cal-prev">←</button>
           <button type="button" class="btn-secondary" id="cal-today">Сегодня</button>
           <button type="button" class="btn-secondary" id="cal-next">→</button>
+          ${state.user.role === 'supervisor' ? '<button type="button" class="btn-secondary" id="cal-print">Печать маршрута (неделя)</button>' : ''}
         </div>
       </div>
       <div id="cal-title" class="cal-title"></div>
       <div id="cal-body"></div>
+      <div id="print-route" class="print-only"></div>
     </div>
   `));
+
+  const printBtn = document.getElementById('cal-print');
+  if (printBtn) printBtn.addEventListener('click', () => { renderPrintRoute(); window.print(); });
 
   ['month', 'week', 'day'].forEach((m) => {
     const btn = document.getElementById(`cal-mode-${m}`);
@@ -905,6 +1271,12 @@ function renderCalMonth() {
     const key = toDateKey(d);
     const dayTasks = tasksOnDate(key);
     const inMonth = d.getMonth() === m;
+    // Мобильная версия: вместо списка карточек (не помещается) — точка-индикатор.
+    // Все задачи в ячейке имеют один и тот же срок (= дата ячейки), поэтому
+    // цвет общий на ячейку: зелёная — срок ещё не прошёл, красная — просрочено.
+    // Показывается только если есть незавершённые задачи (этап "В работе").
+    const incomplete = dayTasks.filter((t) => ACTIVE_STAGES.includes(t.stage));
+    const dotClass = incomplete.length ? (key < todayKey ? 'cal-dot-red' : 'cal-dot-green') : '';
     const cell = el(`
       <div class="cal-day-cell ${inMonth ? '' : 'cal-day-outside'} ${key === todayKey ? 'cal-day-today' : ''}">
         <div class="cal-day-num">${d.getDate()}</div>
@@ -912,6 +1284,7 @@ function renderCalMonth() {
           ${dayTasks.slice(0, 3).map((t) => { const c = clientById(t.clientId); return `<div class="cal-chip">${escapeHtml(c ? c.name : t.title)}</div>`; }).join('')}
           ${dayTasks.length > 3 ? `<div class="cal-more">+${dayTasks.length - 3}</div>` : ''}
         </div>
+        ${incomplete.length ? `<div class="cal-day-dot-wrap"><span class="cal-dot ${dotClass}"></span><span class="cal-dot-count">${incomplete.length}</span></div>` : ''}
       </div>
     `);
     cell.addEventListener('click', () => { state.calendar.date = d; state.calendar.mode = 'day'; render(); });
@@ -971,6 +1344,121 @@ function renderCalDay() {
     list.appendChild(row);
   });
   body.appendChild(list);
+}
+
+// ---------- "Мой день" — упрощённый вид для агента в дороге ----------
+
+function renderMyDay(content) {
+  const stats = state.stats;
+  const tasks = stats ? stats.todayTasks : [];
+  content.appendChild(el(`
+    <div>
+      <h2 style="margin:0 0 14px">Мой день — ${fmtDateLong(new Date())}</h2>
+      <div id="myday-list"></div>
+    </div>
+  `));
+  const list = document.getElementById('myday-list');
+  if (!tasks.length) {
+    list.appendChild(el('<div class="empty-state">На сегодня задач нет.</div>'));
+    return;
+  }
+  tasks.forEach((t) => {
+    const client = clientById(t.clientId);
+    const card = el(`
+      <div class="myday-card">
+        <div class="myday-name">${escapeHtml(client ? client.name : t.title)}</div>
+        ${client ? `<div class="myday-row">${escapeHtml(client.address || 'адрес не указан')} ${mapsLink(client.address)}</div>` : ''}
+        ${client && client.phone ? `<div class="myday-row">${telLink(client.phone, '📞 ' + client.phone)}</div>` : ''}
+        <div class="myday-row muted">${escapeHtml(stageLabel(t.stage))}${t.report ? ' · ✓ отчёт' : ''}</div>
+        <button type="button" class="btn-secondary myday-open">Открыть задачу</button>
+      </div>
+    `);
+    card.querySelector('.myday-open').addEventListener('click', () => openTaskModal(t));
+    list.appendChild(card);
+  });
+}
+
+// ---------- Уведомления (Notification API + Service Worker) ----------
+
+let notifiedTaskIds = null;
+function loadNotifiedIds() {
+  if (notifiedTaskIds) return notifiedTaskIds;
+  try {
+    const raw = localStorage.getItem('notifiedTasks_' + new Date().toISOString().slice(0, 10));
+    notifiedTaskIds = new Set(raw ? JSON.parse(raw) : []);
+  } catch (e) { notifiedTaskIds = new Set(); }
+  return notifiedTaskIds;
+}
+function saveNotifiedIds() {
+  try { localStorage.setItem('notifiedTasks_' + new Date().toISOString().slice(0, 10), JSON.stringify(Array.from(notifiedTaskIds || []))); } catch (e) {}
+}
+
+async function checkAndNotify() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!state.stats) return;
+  const seen = loadNotifiedIds();
+  const toNotify = [...(state.stats.todayTasks || []), ...(state.stats.overdueTasks || [])].filter((t) => !seen.has(t.id));
+  if (!toNotify.length) return;
+  let reg = null;
+  try { reg = await navigator.serviceWorker.getRegistration(); } catch (e) {}
+  toNotify.forEach((t) => {
+    const client = clientById(t.clientId);
+    const overdue = (state.stats.overdueTasks || []).some((o) => o.id === t.id);
+    const title = overdue ? 'Просроченная задача' : 'Задача на сегодня';
+    const bodyText = client ? client.name : t.title;
+    try {
+      if (reg && reg.showNotification) reg.showNotification(title, { body: bodyText, tag: 'task-' + t.id });
+      else new Notification(title, { body: bodyText });
+    } catch (e) {}
+    seen.add(t.id);
+  });
+  saveNotifiedIds();
+}
+
+function setupNotifications() {
+  if (!('Notification' in window)) return;
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().then(() => checkAndNotify());
+  } else if (Notification.permission === 'granted') {
+    checkAndNotify();
+  }
+  // Работает и когда вкладка свёрнута в фон (таймер будет реже срабатывать,
+  // но не остановится, пока страница открыта в браузере).
+  setInterval(async () => {
+    try { await loadAll(); checkAndNotify(); } catch (e) {}
+  }, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkAndNotify();
+  });
+}
+
+// Печать маршрута на неделю (только супервайзер) — простой список по агентам/дням.
+function renderPrintRoute() {
+  const box = document.getElementById('print-route');
+  if (!box) return;
+  const start = startOfWeek(state.calendar.date);
+  const days = [];
+  for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(d); }
+  const agents = state.users.filter((u) => u.role === 'agent');
+  let html = `<h1>Маршрут на неделю: ${fmtDateShort(days[0])} – ${fmtDateShort(days[6])}</h1>`;
+  agents.forEach((agent) => {
+    html += `<h2>${escapeHtml(agent.name)}</h2>`;
+    days.forEach((d) => {
+      const key = toDateKey(d);
+      const dayTasks = tasksOnDate(key).filter((t) => t.assigneeId === agent.id);
+      if (!dayTasks.length) return;
+      html += `<h3>${WEEKDAY_LABELS[(d.getDay() + 6) % 7]} ${fmtDateShort(d)}</h3><ul>`;
+      dayTasks.forEach((t) => {
+        const c = clientById(t.clientId);
+        html += `<li>${escapeHtml(c ? c.name : t.title)}${c && c.address ? ' — ' + escapeHtml(c.address) : ''}${c && c.phone ? ' — ' + escapeHtml(c.phone) : ''}</li>`;
+      });
+      html += '</ul>';
+    });
+  });
+  box.innerHTML = html;
 }
 
 // ---------- Модальные окна ----------

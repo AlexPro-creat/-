@@ -88,6 +88,11 @@ if (importResult.clientsCreated || importResult.clientsUpdated) {
   console.log(`Импорт данных: новых контрагентов — ${importResult.clientsCreated}, обновлено (ассортимент/долг) — ${importResult.clientsUpdated}.`);
 }
 
+// Миграция старых данных под новую схему (см. api.js) — безопасно запускать
+// при каждом старте, после первого раза она ничего не делает.
+api.migrateLegacyTaskStages();
+api.migrateClientDefaults();
+
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url);
   const pathname = decodeURIComponent(parsed.pathname);

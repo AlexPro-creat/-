@@ -85,6 +85,18 @@ function computeAssortment(rawItems) {
   }));
 }
 
+// "Тестовый ассортимент" — товары, которые клиент покупал хотя бы раз, но не
+// дотянувшие до регулярного ассортимента (< 4 из 7 месяцев) — разовые/пробные позиции.
+function computeTestAssortment(rawItems) {
+  if (!rawItems || !rawItems.length) return [];
+  return rawItems.map((it) => ({
+    product: it.product,
+    monthsCount: it.months_count,
+    lastMonth: it.last_month,
+    avgQty: it.avg_qty
+  }));
+}
+
 function runImport() {
   db.ensureLoaded();
 
@@ -95,6 +107,7 @@ function runImport() {
 
   const contractors = loadJson('agents_clients.json') || [];
   const assortmentMap = loadJson('regular_assortment.json') || {};
+  const testAssortmentMap = loadJson('test_assortment.json') || {};
   const debts = loadJson('debts.json') || [];
 
   const debtByName = {};
@@ -103,6 +116,9 @@ function runImport() {
   const assortmentByName = {};
   Object.keys(assortmentMap).forEach((k) => { assortmentByName[norm(k)] = assortmentMap[k]; });
 
+  const testAssortmentByName = {};
+  Object.keys(testAssortmentMap).forEach((k) => { testAssortmentByName[norm(k)] = testAssortmentMap[k]; });
+
   let clientsCreated = 0;
   let clientsUpdated = 0;
   const now = new Date().toISOString();
@@ -110,6 +126,7 @@ function runImport() {
   contractors.forEach((c) => {
     const key = norm(c.name);
     const assortmentRaw = assortmentByName[key];
+    const testAssortmentRaw = testAssortmentByName[key];
     const debt = debtByName[key];
     const owner = agentsByName[norm(c.agent)] || adminUser;
 
@@ -117,6 +134,7 @@ function runImport() {
 
     const computedFields = {
       regularAssortment: computeAssortment(assortmentRaw),
+      testAssortment: computeTestAssortment(testAssortmentRaw),
       debtAmount: debt ? debt.debt_amount : 0,
       debtOverdue: debt ? !!debt.is_overdue : false,
       debtAsOf: debt ? (debt.payment_date || null) : null
