@@ -10,10 +10,11 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 function emptyState() {
   return {
-    counters: { users: 0, clients: 0, tasks: 0 },
+    counters: { users: 0, clients: 0, tasks: 0, supervisorMeetings: 0 },
     users: [],
     clients: [],
     tasks: [],
+    supervisorMeetings: [],
     sessions: {}
   };
 }

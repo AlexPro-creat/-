@@ -87,6 +87,9 @@ if (importResult.usersCreated) {
 if (importResult.clientsCreated || importResult.clientsUpdated) {
   console.log(`Импорт данных: новых контрагентов — ${importResult.clientsCreated}, обновлено (ассортимент/долг) — ${importResult.clientsUpdated}.`);
 }
+if (importResult.extraAgentsAdded) {
+  console.log(`Добавлено новых торговых агентов: ${importResult.extraAgentsAdded} (Батаева/Жанара/Анастасия).`);
+}
 
 // Миграция старых данных под новую схему (см. api.js) — безопасно запускать
 // при каждом старте, после первого раза она ничего не делает.

@@ -4,6 +4,7 @@ const db = require('./db');
 const auth = require('./auth');
 const { parseMultipart } = require('./multipart');
 const { buildZip } = require('./miniZip');
+const googleSheets = require('./googleSheets');
 
 // Этапы доски задач. "Новая задача" убрана — задача сразу создаётся в "В работе".
 // "Лист ожидания" и "Прогрев" больше не этапы доски, а теги задачи (см. TASK_TAGS) —
@@ -18,6 +19,17 @@ const TASK_STAGES = [
 ];
 
 const STAFF_ONLY_STAGES = ['archive'];
+
+// Воронка активной продажи (звонок → встреча → сделка/провал) — отдельный тип
+// задачи (taskType: 'sale'), со своим набором этапов, независимым от обычных
+// визитных задач (taskType: 'visit', тип по умолчанию для всех старых задач).
+const SALE_STAGES = [
+  { key: 'call', label: 'Звонок' },
+  { key: 'meeting', label: 'Встреча' },
+  { key: 'deal', label: 'Сделка' },
+  { key: 'fail', label: 'Провал' }
+];
+const SALE_FINAL_STAGES = ['deal', 'fail']; // требуют аудио+пояснение встречи перед переходом
 const VISIT_DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 // JS: getDay() воскресенье=0, понедельник=1 ... суббота=6
 const VISIT_DAY_INDEX = { 'Понедельник': 1, 'Вторник': 2, 'Среда': 3, 'Четверг': 4, 'Пятница': 5, 'Суббота': 6 };
@@ -36,6 +48,11 @@ function nextDateForWeekday(weekdayName) {
 
 const TASK_TAGS = ['Kapous', 'EPICA', 'Чистовье', 'Палитра', 'новый клиент', 'Лист ожидания', 'Прогрев'];
 const ACTIVE_STAGES = ['in_progress'];
+const SALE_ACTIVE_STAGES = ['call', 'meeting'];
+// Общий помощник: активна ли задача (не закрыта), независимо от её типа (визит/продажа).
+function isActiveStage(task) {
+  return task.taskType === 'sale' ? SALE_ACTIVE_STAGES.includes(task.stage) : ACTIVE_STAGES.includes(task.stage);
+}
 
 // Разовая идемпотентная миграция старых данных при обновлении сервера:
 //  - этап "new" ("Новая задача") убран — такие задачи удаляются (по факту это
@@ -59,6 +76,9 @@ function migrateLegacyTaskStages() {
       patch.tags = tags;
     }
     if (t.report === undefined) patch.report = '';
+    if (t.taskType === undefined) patch.taskType = 'visit';
+    if (t.dateChangeRequest === undefined) patch.dateChangeRequest = null;
+    if (t.explanation === undefined) patch.explanation = '';
     if (Object.keys(patch).length) db.update('tasks', t.id, patch);
   });
 }
@@ -73,6 +93,15 @@ function migrateClientDefaults() {
     if (c.closureRequested === undefined) patch.closureRequested = false;
     if (c.closureRequestedBy === undefined) patch.closureRequestedBy = null;
     if (c.contactNotes === undefined) patch.contactNotes = [];
+    if (c.masters === undefined) patch.masters = [];
+    if (c.inn === undefined) patch.inn = '';
+    if (c.socialContact === undefined) patch.socialContact = '';
+    if (c.bestCallTime === undefined) patch.bestCallTime = '';
+    if (c.decisionMakerName === undefined) patch.decisionMakerName = '';
+    if (c.specialRequests === undefined) patch.specialRequests = '';
+    if (c.orderWindow === undefined) patch.orderWindow = '';
+    if (c.meetingRecords === undefined) patch.meetingRecords = [];
+    if (c.promotions === undefined) patch.promotions = [];
     if (Object.keys(patch).length) db.update('clients', c.id, patch);
   });
 }
@@ -83,7 +112,8 @@ const CONTRACT_STATUSES = ['да', 'нет', 'неизвестно'];
 // Поля карточки клиента, которые редактирует ТОЛЬКО администратор
 const CLIENT_ADMIN_ONLY_FIELDS = [
   'name', 'pointType', 'address', 'phone', 'contactName',
-  'visitDay', 'contractStatus', 'paymentMethod', 'ownerId'
+  'visitDay', 'contractStatus', 'paymentMethod', 'ownerId',
+  'inn', 'socialContact', 'bestCallTime', 'decisionMakerName', 'specialRequests', 'orderWindow'
 ];
 // Поля, которые может редактировать и назначенный агент
 const CLIENT_AGENT_EDITABLE_FIELDS = ['notes'];
@@ -199,6 +229,7 @@ function register(router) {
     sendJson(res, 200, {
       user: publicUser(req.user),
       stages: isStaff(req.user) ? TASK_STAGES : TASK_STAGES.filter((s) => !STAFF_ONLY_STAGES.includes(s.key)),
+      saleStages: SALE_STAGES,
       paymentMethods: PAYMENT_METHODS,
       contractStatuses: CONTRACT_STATUSES,
       taskTags: TASK_TAGS
@@ -334,6 +365,14 @@ function register(router) {
       closureRequested: false,
       closureRequestedBy: null,
       contactNotes: [],
+      masters: [],
+      inn: body.inn || '',
+      socialContact: body.socialContact || '',
+      bestCallTime: body.bestCallTime || '',
+      decisionMakerName: body.decisionMakerName || '',
+      specialRequests: body.specialRequests || '',
+      orderWindow: body.orderWindow || '',
+      meetingRecords: [],
       createdAt: new Date().toISOString()
     });
     sendJson(res, 201, { client });
@@ -443,6 +482,62 @@ function register(router) {
     sendJson(res, 200, { client: db.update('clients', params.id, { contactNotes }) });
   }));
 
+  // ---- Мастера точки (сотрудники салона/кабинета/массажной и т.п.) ----
+  // Добавляются сразу (без обязательного подтверждения) — супервайзер видит
+  // непросмотренные через isNew/newMastersCount на дашборде.
+
+  router.post('/api/clients/:id/masters', requireAuth(async (req, res, params) => {
+    const client = db.find('clients', params.id);
+    if (!client) return sendJson(res, 404, { error: 'Не найдено' });
+    if (!isStaff(req.user) && client.ownerId !== req.user.id) return sendJson(res, 403, { error: 'Недостаточно прав' });
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    if (!body.name || !body.name.trim()) return sendJson(res, 400, { error: 'Укажите ФИО мастера' });
+    const master = {
+      id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      name: body.name.trim(),
+      phone: body.phone || '',
+      specialization: body.specialization || '',
+      isNew: !isStaff(req.user),
+      createdBy: req.user.id,
+      createdAt: new Date().toISOString()
+    };
+    const masters = [...(client.masters || []), master];
+    sendJson(res, 201, { client: db.update('clients', params.id, { masters }) });
+  }));
+
+  router.put('/api/clients/:id/masters/:masterId', requireAuth(async (req, res, params) => {
+    const client = db.find('clients', params.id);
+    if (!client) return sendJson(res, 404, { error: 'Не найдено' });
+    if (!isStaff(req.user) && client.ownerId !== req.user.id) return sendJson(res, 403, { error: 'Недостаточно прав' });
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const masters = (client.masters || []).map((m) => {
+      if (m.id !== params.masterId) return m;
+      return {
+        ...m,
+        name: body.name !== undefined ? body.name : m.name,
+        phone: body.phone !== undefined ? body.phone : m.phone,
+        specialization: body.specialization !== undefined ? body.specialization : m.specialization
+      };
+    });
+    sendJson(res, 200, { client: db.update('clients', params.id, { masters }) });
+  }));
+
+  router.post('/api/clients/:id/masters/:masterId/mark-reviewed', requireStaff(async (req, res, params) => {
+    const client = db.find('clients', params.id);
+    if (!client) return sendJson(res, 404, { error: 'Не найдено' });
+    const masters = (client.masters || []).map((m) => (m.id === params.masterId ? { ...m, isNew: false } : m));
+    sendJson(res, 200, { client: db.update('clients', params.id, { masters }) });
+  }));
+
+  router.delete('/api/clients/:id/masters/:masterId', requireStaff(async (req, res, params) => {
+    const client = db.find('clients', params.id);
+    if (!client) return sendJson(res, 404, { error: 'Не найдено' });
+    const masters = (client.masters || []).filter((m) => m.id !== params.masterId);
+    sendJson(res, 200, { client: db.update('clients', params.id, { masters }) });
+  }));
+
   // История визитов по клиенту = его задачи, отсортированные по дате
   router.get('/api/clients/:id/history', requireAuth(async (req, res, params) => {
     const client = db.find('clients', params.id);
@@ -461,7 +556,8 @@ function register(router) {
   router.get('/api/tasks', requireAuth(async (req, res) => {
     sendJson(res, 200, {
       tasks: scoped(db.all('tasks'), req.user, 'assigneeId'),
-      stages: isStaff(req.user) ? TASK_STAGES : TASK_STAGES.filter((s) => !STAFF_ONLY_STAGES.includes(s.key))
+      stages: isStaff(req.user) ? TASK_STAGES : TASK_STAGES.filter((s) => !STAFF_ONLY_STAGES.includes(s.key)),
+      saleStages: SALE_STAGES
     });
   }));
 
@@ -494,15 +590,19 @@ function register(router) {
     }
     const assigneeId = isStaff(req.user) && body.assigneeId ? Number(body.assigneeId) : (req.user.role === 'agent' ? req.user.id : client.ownerId);
     const tags = Array.isArray(body.tags) ? body.tags.filter((t) => TASK_TAGS.includes(t)) : [];
+    const taskType = body.taskType === 'sale' ? 'sale' : 'visit';
     const task = db.insert('tasks', {
       clientId: Number(body.clientId),
-      title: body.title || `Посетить: ${client.name}`,
+      taskType,
+      title: body.title || (taskType === 'sale' ? `Звонок: ${client.name}` : `Посетить: ${client.name}`),
       description: body.description || '',
       dueDate: body.dueDate,
-      stage: 'in_progress',
+      stage: taskType === 'sale' ? 'call' : 'in_progress',
       tags,
       comment: '',
       report: '',
+      explanation: '',
+      dateChangeRequest: null,
       attachments: [],
       assigneeId,
       createdBy: req.user.id,
@@ -529,25 +629,46 @@ function register(router) {
     }
 
     const patch = { updatedAt: new Date().toISOString() };
-    ['title', 'description', 'dueDate', 'comment', 'report'].forEach((f) => {
+    ['title', 'description', 'dueDate', 'comment', 'report', 'explanation'].forEach((f) => {
       if (body[f] !== undefined) patch[f] = body[f];
     });
     if (body.tags !== undefined) {
       patch.tags = Array.isArray(body.tags) ? body.tags.filter((t) => TASK_TAGS.includes(t)) : [];
     }
-    if (body.stage !== undefined && TASK_STAGES.some((s) => s.key === body.stage)) {
-      // "Архив" — только админ/супервайзер подтверждают выполненный визит и переносят туда сами.
-      if (STAFF_ONLY_STAGES.includes(body.stage) && !isStaff(req.user)) {
-        return sendJson(res, 403, { error: 'Перевести задачу в архив может только администратор или супервайзер' });
+    const isSale = task.taskType === 'sale';
+    if (body.stage !== undefined) {
+      if (isSale) {
+        if (SALE_STAGES.some((s) => s.key === body.stage)) patch.stage = body.stage;
+      } else if (TASK_STAGES.some((s) => s.key === body.stage)) {
+        // "Архив" — только админ/супервайзер подтверждают выполненный визит и переносят туда сами.
+        if (STAFF_ONLY_STAGES.includes(body.stage) && !isStaff(req.user)) {
+          return sendJson(res, 403, { error: 'Перевести задачу в архив может только администратор или супервайзер' });
+        }
+        patch.stage = body.stage;
       }
-      patch.stage = body.stage;
     }
 
-    // Нельзя перевести задачу в "Выполнена" без заполненного отчёта по задаче.
     const finalStage = patch.stage !== undefined ? patch.stage : task.stage;
     const finalReport = patch.report !== undefined ? patch.report : task.report;
-    if (finalStage === 'done' && !String(finalReport || '').trim()) {
+    const finalExplanation = patch.explanation !== undefined ? patch.explanation : task.explanation;
+
+    // Нельзя перевести визитную задачу в "Выполнена" без заполненного отчёта.
+    if (!isSale && finalStage === 'done' && !String(finalReport || '').trim()) {
       return sendJson(res, 400, { error: 'Заполните отчёт по задаче — без него нельзя перевести в «Выполнена»' });
+    }
+
+    // Задачу воронки продажи нельзя закрыть в "Сделка"/"Провал" без аудиозаписи
+    // встречи и короткого пояснения — записи хранятся в карточке клиента
+    // (раздел "Записи встреч"), привязка к конкретной задаче — по taskId.
+    if (isSale && SALE_FINAL_STAGES.includes(finalStage) && task.stage !== finalStage) {
+      if (!String(finalExplanation || '').trim()) {
+        return sendJson(res, 400, { error: 'Добавьте короткое пояснение — без него нельзя закрыть в «Сделка»/«Провал»' });
+      }
+      const client = db.find('clients', task.clientId);
+      const hasAudio = client && (client.meetingRecords || []).some((r) => r.taskId === task.id && r.audioUrl);
+      if (!hasAudio) {
+        return sendJson(res, 400, { error: 'Прикрепите аудиозапись встречи (раздел «Записи встреч» у клиента) — без неё нельзя закрыть в «Сделка»/«Провал»' });
+      }
     }
 
     if (isStaff(req.user)) {
@@ -573,6 +694,7 @@ function register(router) {
           if (nextDate) {
             db.insert('tasks', {
               clientId: client.id,
+              taskType: 'visit',
               title: `Посетить: ${client.name}`,
               description: '',
               dueDate: nextDate,
@@ -580,6 +702,8 @@ function register(router) {
               tags: [],
               comment: '',
               report: '',
+              explanation: '',
+              dateChangeRequest: null,
               attachments: [],
               assigneeId: updated.assigneeId,
               createdBy: req.user.id,
@@ -591,7 +715,97 @@ function register(router) {
       }
     }
 
+    // Провал в воронке продажи — автоматически выгружаем строку в Google Таблицу
+    // (для анализа ситуации), без блокировки ответа пользователю.
+    if (isSale && finalStage === 'fail' && task.stage !== 'fail') {
+      const client = db.find('clients', updated.clientId);
+      const agent = db.find('users', updated.assigneeId);
+      googleSheets.appendRow([
+        new Date().toISOString(),
+        client ? client.name : '',
+        agent ? agent.name : '',
+        updated.title,
+        updated.explanation || '',
+        updated.dueDate || ''
+      ]).catch(() => {});
+    }
+
     sendJson(res, 200, { task: updated });
+  }));
+
+  // ---- Заявка на перенос даты задачи (агент просит — админ/супервайзер решает) ----
+
+  router.post('/api/tasks/:id/request-date-change', requireAuth(async (req, res, params) => {
+    const task = db.find('tasks', params.id);
+    if (!task) return sendJson(res, 404, { error: 'Не найдено' });
+    if (!isStaff(req.user) && task.assigneeId !== req.user.id) return sendJson(res, 403, { error: 'Недостаточно прав' });
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    if (!body.requestedDate) return sendJson(res, 400, { error: 'Укажите желаемую дату' });
+    const dateChangeRequest = {
+      requestedDate: body.requestedDate,
+      reason: body.reason || '',
+      requestedBy: req.user.id,
+      createdAt: new Date().toISOString()
+    };
+    sendJson(res, 200, { task: db.update('tasks', params.id, { dateChangeRequest, updatedAt: new Date().toISOString() }) });
+  }));
+
+  router.post('/api/tasks/:id/approve-date-change', requireStaff(async (req, res, params) => {
+    const task = db.find('tasks', params.id);
+    if (!task) return sendJson(res, 404, { error: 'Не найдено' });
+    if (!task.dateChangeRequest) return sendJson(res, 400, { error: 'Нет заявки на перенос' });
+    sendJson(res, 200, {
+      task: db.update('tasks', params.id, {
+        dueDate: task.dateChangeRequest.requestedDate,
+        dateChangeRequest: null,
+        updatedAt: new Date().toISOString()
+      })
+    });
+  }));
+
+  router.post('/api/tasks/:id/reject-date-change', requireStaff(async (req, res, params) => {
+    const task = db.find('tasks', params.id);
+    if (!task) return sendJson(res, 404, { error: 'Не найдено' });
+    sendJson(res, 200, { task: db.update('tasks', params.id, { dateChangeRequest: null, updatedAt: new Date().toISOString() }) });
+  }));
+
+  // ---- Записи встреч (аудио + пояснение), привязаны к клиенту и к конкретной задаче ----
+
+  router.post('/api/tasks/:id/meeting-record', requireAuth(async (req, res, params) => {
+    const task = db.find('tasks', params.id);
+    if (!task) return sendJson(res, 404, { error: 'Не найдено' });
+    if (!isStaff(req.user) && task.assigneeId !== req.user.id) return sendJson(res, 403, { error: 'Недостаточно прав' });
+    const client = db.find('clients', task.clientId);
+    if (!client) return sendJson(res, 400, { error: 'Клиент не найден' });
+    let parsed;
+    try {
+      parsed = await parseMultipart(req, 20 * 1024 * 1024);
+    } catch (e) {
+      return sendJson(res, 400, { error: e.message });
+    }
+    const audioFile = parsed.files.find((f) => /^audio\//.test(f.mimeType));
+    if (!audioFile) return sendJson(res, 400, { error: 'Нужен аудиофайл записи встречи' });
+    const explanation = (parsed.fields && parsed.fields.explanation) || '';
+
+    const meetingsDir = path.join(UPLOADS_DIR, 'meetings', String(client.id));
+    fs.mkdirSync(meetingsDir, { recursive: true });
+    const storedName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${audioFile.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    fs.writeFileSync(path.join(meetingsDir, storedName), audioFile.data);
+
+    const record = {
+      id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      taskId: task.id,
+      explanation,
+      audioUrl: `/uploads/meetings/${client.id}/${storedName}`,
+      authorId: req.user.id,
+      createdAt: new Date().toISOString()
+    };
+    const meetingRecords = [record, ...(client.meetingRecords || [])];
+    db.update('clients', client.id, { meetingRecords });
+    // Пояснение можно сохранить сразу и в самой задаче — удобно видеть в карточке без перехода к клиенту.
+    if (explanation && !task.explanation) db.update('tasks', task.id, { explanation });
+    sendJson(res, 201, { client: db.find('clients', client.id) });
   }));
 
   router.delete('/api/tasks/:id', requireStaff(async (req, res, params) => {
@@ -660,20 +874,119 @@ function register(router) {
     sendJson(res, 200, { task: updated });
   }));
 
+  // ---- Встречи супервайзера с клиентом (отдельно от задач агентов) ----
+  // Видны в календаре: агентам — чтобы видеть, какие дни у клиента уже заняты
+  // визитом супервайзера; у самого супервайзера — отдельным разделом с
+  // возможностью добавить/удалить. Не привязаны к воронке задач намеренно —
+  // это просто бронь дня/времени, без этапов и отчётов.
+  router.get('/api/supervisor-meetings', requireAuth(async (req, res) => {
+    let meetings = db.all('supervisorMeetings');
+    if (req.user.role === 'agent') {
+      const myClientIds = new Set(db.all('clients').filter((c) => c.ownerId === req.user.id).map((c) => c.id));
+      meetings = meetings.filter((m) => myClientIds.has(m.clientId));
+    }
+    sendJson(res, 200, { meetings });
+  }));
+
+  router.post('/api/supervisor-meetings', requireStaff(async (req, res) => {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    if (!body.clientId) return sendJson(res, 400, { error: 'Укажите клиента' });
+    if (!body.date) return sendJson(res, 400, { error: 'Укажите дату встречи' });
+    const client = db.find('clients', body.clientId);
+    if (!client) return sendJson(res, 400, { error: 'Клиент не найден' });
+    const meeting = db.insert('supervisorMeetings', {
+      clientId: Number(body.clientId),
+      date: body.date,
+      time: body.time || '',
+      note: body.note || '',
+      createdBy: req.user.id,
+      createdAt: new Date().toISOString()
+    });
+    sendJson(res, 201, { meeting });
+  }));
+
+  router.delete('/api/supervisor-meetings/:id', requireStaff(async (req, res, params) => {
+    const meeting = db.find('supervisorMeetings', params.id);
+    if (!meeting) return sendJson(res, 404, { error: 'Не найдено' });
+    db.remove('supervisorMeetings', params.id);
+    sendJson(res, 200, { ok: true });
+  }));
+
+  // Экспорт проваленных задач воронки продажи в CSV (работает уже сейчас, без
+  // настройки Google Таблицы — можно скачать и залить на Диск вручную).
+  router.get('/api/tasks/failed-export', requireStaff(async (req, res) => {
+    const failed = db.all('tasks').filter((t) => t.taskType === 'sale' && t.stage === 'fail');
+    const rows = [['Дата', 'Клиент', 'Агент', 'Задача', 'Пояснение', 'Срок']];
+    failed.forEach((t) => {
+      const client = db.find('clients', t.clientId);
+      const agent = db.find('users', t.assigneeId);
+      rows.push([t.updatedAt || t.createdAt, client ? client.name : '', agent ? agent.name : '', t.title, t.explanation || '', t.dueDate || '']);
+    });
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const buf = Buffer.from('﻿' + csv, 'utf8'); // BOM — чтобы Excel корректно показал кириллицу
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="provaly-${new Date().toISOString().slice(0, 10)}.csv"`,
+      'Content-Length': buf.length
+    });
+    res.end(buf);
+  }));
+
+  // ---- Отчёты (супервайзер/администратор) ----
+
+  // Ассортимент по агентам: товар/бренд/шт/выручка/кол-во клиентов, с фильтром по бренду.
+  router.get('/api/reports/assortment-by-agent', requireStaff(async (req, res) => {
+    const agents = db.all('users').filter((u) => u.role === 'agent');
+    const clients = db.all('clients');
+    const brandFilter = new URL(req.url, 'http://internal').searchParams.get('brand');
+
+    const rows = [];
+    agents.forEach((agent) => {
+      const aClients = clients.filter((c) => c.ownerId === agent.id);
+      const byProduct = {};
+      aClients.forEach((c) => {
+        [...(c.regularAssortment || []), ...(c.testAssortment || [])].forEach((it) => {
+          if (brandFilter && brandFilter !== 'all' && it.brand !== brandFilter) return;
+          if (brandFilter === 'colorants' && it.category !== 'Краситель' && it.category !== 'Оксид') return;
+          const key = it.product;
+          if (!byProduct[key]) byProduct[key] = { product: it.product, brand: it.brand, category: it.category, qty: 0, revenue: 0, clientIds: new Set() };
+          byProduct[key].qty += it.avgQty || 0;
+          byProduct[key].revenue += it.revenue || 0;
+          byProduct[key].clientIds.add(c.id);
+        });
+      });
+      Object.values(byProduct).forEach((row) => {
+        rows.push({
+          agentId: agent.id, agentName: agent.name,
+          product: row.product, brand: row.brand, category: row.category,
+          qty: Math.round(row.qty * 100) / 100, revenue: Math.round(row.revenue),
+          clientsCount: row.clientIds.size
+        });
+      });
+    });
+
+    const brands = ['Kapous', 'EPICA', 'Чистовье', 'Палитра', 'Прочее'];
+    sendJson(res, 200, { rows: rows.sort((a, b) => b.revenue - a.revenue), brands });
+  }));
+
   // ---- Дашборд ----
 
   router.get('/api/stats', requireAuth(async (req, res) => {
     const clients = scoped(db.all('clients'), req.user, 'ownerId');
     const tasks = scoped(db.all('tasks'), req.user, 'assigneeId');
     const today = new Date().toISOString().slice(0, 10);
-    const overdueTasks = tasks.filter((t) => ACTIVE_STAGES.includes(t.stage) && t.dueDate && t.dueDate < today);
-    const todayTasks = tasks.filter((t) => ACTIVE_STAGES.includes(t.stage) && t.dueDate === today);
+    const overdueTasks = tasks.filter((t) => isActiveStage(t) && t.dueDate && t.dueDate < today);
+    const todayTasks = tasks.filter((t) => isActiveStage(t) && t.dueDate === today);
     const atRiskClients = clients.filter((c) => (c.regularAssortment || []).some((p) => p.atRisk));
     const pendingApproval = clients.filter((c) => c.pendingApproval).length;
     const totalDebt = clients.reduce((s, c) => s + (c.debtAmount || 0), 0);
 
     const byStage = TASK_STAGES.map((s) => ({
-      key: s.key, label: s.label, count: tasks.filter((t) => t.stage === s.key).length
+      key: s.key, label: s.label, count: tasks.filter((t) => t.taskType !== 'sale' && t.stage === s.key).length
+    }));
+    const byStageSale = SALE_STAGES.map((s) => ({
+      key: s.key, label: s.label, count: tasks.filter((t) => t.taskType === 'sale' && t.stage === s.key).length
     }));
 
     const todayClientIds = new Set(todayTasks.map((t) => t.clientId));
@@ -709,7 +1022,7 @@ function register(router) {
           totalTasks: aTasks.length,
           done,
           notDone,
-          open: aTasks.filter((t) => ACTIVE_STAGES.includes(t.stage)).length,
+          open: aTasks.filter(isActiveStage).length,
           completionRate: closed ? Math.round((done / closed) * 100) : null,
           totalDebt: agentDebt
         };
@@ -719,13 +1032,46 @@ function register(router) {
       // суммарное количество задач по сотрудникам, а не только разбивку по одному.
       payload.teamTotals = {
         totalTasks: allTasks.length,
-        open: allTasks.filter((t) => ACTIVE_STAGES.includes(t.stage)).length,
+        open: allTasks.filter(isActiveStage).length,
         done: allTasks.filter((t) => t.stage === 'done').length,
         notDone: allTasks.filter((t) => t.stage === 'not_done').length,
         archived: allTasks.filter((t) => t.stage === 'archive').length
       };
+      payload.byStageSale = byStageSale;
+
+      // Задачи на день по команде: сколько всего/выполнено/не выполнено сегодня у каждого агента.
+      payload.teamTasksToday = agents.map((agent) => {
+        const aToday = allTasks.filter((t) => t.assigneeId === agent.id && t.dueDate === today);
+        return {
+          agentId: agent.id,
+          agentName: agent.name,
+          total: aToday.length,
+          done: aToday.filter((t) => t.stage === 'done' || t.stage === 'deal').length,
+          notDone: aToday.filter((t) => t.stage === 'not_done' || t.stage === 'fail').length
+        };
+      });
 
       payload.pendingClosureCount = allClients.filter((c) => c.closureRequested).length;
+      payload.newMastersCount = allClients.reduce((s, c) => s + (c.masters || []).filter((m) => m.isNew).length, 0);
+
+      // Рейтинг клиентов: выручка/маржа/активные месяцы — считается из тех же файлов
+      // продаж (поля revenue/margin у позиций ассортимента, см. build_test_assortment.py
+      // и обновлённый aggregate.py). Если данные ещё не пересчитаны — просто будут нули.
+      payload.clientRating = allClients
+        .map((c) => {
+          const items = [...(c.regularAssortment || []), ...(c.testAssortment || [])];
+          const revenue = items.reduce((s, it) => s + (it.revenue || 0), 0);
+          const margin = items.reduce((s, it) => s + (it.margin || 0), 0);
+          const activeMonths = items.reduce((mx, it) => Math.max(mx, it.monthsCount || 0), 0);
+          const owner = agents.find((a) => a.id === c.ownerId);
+          return {
+            clientId: c.id, clientName: c.name, agentName: owner ? owner.name : '',
+            revenue, margin, marginPct: revenue ? Math.round((margin / revenue) * 100) : 0, activeMonths
+          };
+        })
+        .filter((r) => r.revenue > 0)
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 50);
 
       // Клиенты, у которых день визита выпадает на текущую неделю, но задачи на неё пока нет.
       const now = new Date();
@@ -744,6 +1090,35 @@ function register(router) {
         const dateForThisWeek = weekIdxByDay[c.visitDay];
         return !allTasks.some((t) => t.clientId === c.id && t.dueDate === dateForThisWeek);
       });
+    }
+
+    // Метрики для отдельного дашборда агента (продажи, клиенты, топ-товары, встречи/звонки).
+    if (req.user.role === 'agent') {
+      const items = clients.flatMap((c) => [...(c.regularAssortment || []), ...(c.testAssortment || [])]);
+      const salesTotal = items.reduce((s, it) => s + (it.revenue || 0), 0);
+      const clientsWithSales = clients.filter((c) => [...(c.regularAssortment || []), ...(c.testAssortment || [])].some((it) => (it.revenue || 0) > 0)).length;
+
+      const byProduct = {};
+      items.forEach((it) => {
+        if (!it.product) return;
+        if (!byProduct[it.product]) byProduct[it.product] = { product: it.product, qty: 0, revenue: 0 };
+        byProduct[it.product].qty += it.avgQty || 0;
+        byProduct[it.product].revenue += it.revenue || 0;
+      });
+      const topProducts = Object.values(byProduct).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+
+      const myTasksAll = db.all('tasks').filter((t) => t.assigneeId === req.user.id);
+      const saleTasksToday = myTasksAll.filter((t) => t.taskType === 'sale' && t.dueDate === today);
+
+      payload.agentDashboard = {
+        salesTotal,
+        clientsWithSales,
+        topProducts,
+        callsToday: saleTasksToday.filter((t) => t.stage === 'call').length,
+        meetingsToday: saleTasksToday.filter((t) => t.stage === 'meeting').length,
+        doneTasksToday: tasks.filter((t) => t.dueDate === today && (t.stage === 'done' || t.stage === 'deal')).length,
+        overdueTasksCount: overdueTasks.length
+      };
     }
 
     sendJson(res, 200, payload);

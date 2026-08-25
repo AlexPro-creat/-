@@ -578,6 +578,11 @@ th.sortable:hover { color: var(--text); }
 .cal-week-col { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px; min-height: 200px; }
 .cal-week-head { font-size: 12px; color: var(--muted); margin-bottom: 8px; text-align: center; text-transform: uppercase; letter-spacing: .02em; }
 .cal-chip-block { white-space: normal; padding: 6px 8px; margin-bottom: 6px; }
+.cal-dot-sup { background: #a78bfa; width: 6px; height: 6px; vertical-align: middle; }
+.cal-week-sup-col { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.cal-week-sup-head { font-size: 11px; color: #a78bfa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .02em; }
+.cal-chip-sup { background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.35); display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cal-chip-sup .del-sup-meeting { margin-left: auto; }
 
 .cal-day-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 14px; }
 
@@ -598,4 +603,31 @@ th.sortable:hover { color: var(--text); }
   .cal-day-tasks { display: none; }
   .cal-day-dot-wrap { display: flex; }
   .filter-bar select, .filter-bar input[type="text"] { min-width: 130px; }
+}
+
+/* ---- Фаза 6: мастера, бренды, воронка продажи, отчёты ---- */
+.badge-amber { background: rgba(234, 179, 8, 0.2); color: #fbd88a; }
+.badge-green { background: rgba(74, 222, 128, 0.2); color: #86efac; }
+.master-card { display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; margin-bottom: 7px; }
+.master-card .name { font-weight: 600; font-size: 13.5px; }
+.master-card .spec { color: var(--muted); font-size: 12px; margin-top: 2px; }
+#master-form { flex-direction: column; align-items: stretch; }
+#master-form input { margin-bottom: 6px; }
+.brand-badge { display: inline-block; font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: rgba(155, 107, 242, 0.18); color: #c7aefb; margin-left: 6px; }
+.stock-badge { display: inline-block; font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: rgba(74, 222, 128, 0.18); color: #86efac; margin-left: 6px; white-space: nowrap; }
+.stock-badge-empty { background: rgba(248, 113, 113, 0.18); color: #fca5a5; }
+.promo-row { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border); padding: 6px 0; font-size: 13px; }
+.promo-row:last-child { border-bottom: none; }
+.promo-row .promo-qty { color: var(--muted); white-space: nowrap; }
+.assort-brand-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.brand-chip { padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; cursor: pointer; }
+.brand-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.sale-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; overflow-x: auto; }
+.sale-col { background: var(--surface-2, #1c2333); border-radius: 10px; padding: 8px; min-width: 190px; }
+.sale-col h3 { font-size: 12px; color: var(--muted); margin: 4px 6px 8px; text-transform: uppercase; letter-spacing: .02em; }
+.date-change-note { background: rgba(234, 179, 8, 0.12); border: 1px solid rgba(234, 179, 8, 0.35); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; margin-top: 8px; }
+.report-table-wrap { overflow-x: auto; }
+.agent-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 16px; }
+@media (max-width: 900px) {
+  .sale-board { grid-template-columns: 1fr 1fr; }
 }

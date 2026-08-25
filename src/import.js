@@ -60,41 +60,90 @@ function ensureTeam() {
   return agents;
 }
 
+// Фаза 6 (доп.): три новых торговых агента (Батаева регион, Жанара (магазины),
+// Анастасия), добавлены после того, как пользователь прислал ссылки на их таблицы
+// на Google Диске. В отличие от ensureTeam() (который создаёт всю команду только
+// на пустой базе), эта функция идемпотентна и безопасна на КАЖДОМ старте сервера —
+// добавляет только тех агентов из списка, которых ещё нет по имени (важно для уже
+// работающих у пользователя деплоев с непустой базой).
+function ensureExtraAgents() {
+  const existingNames = new Set(db.all('users').filter((u) => u.role === 'agent').map((u) => norm(u.name)));
+  const extraAgentDefs = [
+    { name: 'Батаева', email: 'bataeva@cosmedica.local' },
+    { name: 'Жанара', email: 'zhanara@cosmedica.local' },
+    { name: 'Анастасия', email: 'anastasia@cosmedica.local' }
+  ];
+  let added = 0;
+  extraAgentDefs.forEach((a) => {
+    if (existingNames.has(norm(a.name))) return;
+    db.insert('users', {
+      name: a.name, email: a.email,
+      passwordHash: auth.hashPassword('agent123'), role: 'agent', createdAt: new Date().toISOString()
+    });
+    added++;
+  });
+  return added;
+}
+
 function agentUserMap() {
   const map = {};
   db.all('users').filter((u) => u.role === 'agent').forEach((u) => { map[norm(u.name)] = u; });
   return map;
 }
 
-function computeAssortment(rawItems) {
+// Остаток на складе для позиции ассортимента — по точному совпадению нормализованного
+// названия товара с data/import/stock.json (выгрузка "Актуальные остатки склада").
+// Пользователь явно упростил задачу до "поставь кол-во из таблицы к номенклатуре",
+// без какого-либо распределения остатка между конкурирующими клиентами — просто lookup.
+// Ограничение: названия товаров в файлах продаж обрезаны до 70 символов (так исторически
+// выгружались из 1С), поэтому часть позиций (~11% по проверке) не находит пару в остатках
+// и остаётся без stockQty (не путать с "остаток = 0" — это именно "нет данных").
+function attachStock(item, stockByName) {
+  const hit = stockByName[norm(item.product)];
+  return {
+    ...item,
+    stockQty: hit ? hit.qty : null,
+    stockUnit: hit ? hit.unit : null
+  };
+}
+
+function computeAssortment(rawItems, stockByName) {
   if (!rawItems || !rawItems.length) return [];
   const latestMonth = rawItems.reduce((latest, it) => {
     const li = MONTH_ORDER.indexOf(latest);
     const ci = MONTH_ORDER.indexOf(it.last_month);
     return ci > li ? it.last_month : latest;
   }, rawItems[0].last_month);
-  return rawItems.map((it) => ({
+  return rawItems.map((it) => attachStock({
     product: it.product,
+    brand: it.brand || 'Прочее',
+    category: it.category || null,
     monthsCount: it.months_count,
     lastMonth: it.last_month,
     avgQty: it.avg_qty,
+    revenue: it.revenue || 0,
+    margin: it.margin || 0,
     // Товар был регулярным, но в последнем доступном месяце его не покупали — риск "отвала".
     // Ограничение: данные о продажах помесячные, а не по датам, поэтому это приближение
     // к правилу «не заказывал 14+ дней», а не точный расчёт по дням.
     atRisk: it.last_month !== latestMonth
-  }));
+  }, stockByName));
 }
 
 // "Тестовый ассортимент" — товары, которые клиент покупал хотя бы раз, но не
 // дотянувшие до регулярного ассортимента (< 4 из 7 месяцев) — разовые/пробные позиции.
-function computeTestAssortment(rawItems) {
+function computeTestAssortment(rawItems, stockByName) {
   if (!rawItems || !rawItems.length) return [];
-  return rawItems.map((it) => ({
+  return rawItems.map((it) => attachStock({
     product: it.product,
+    brand: it.brand || 'Прочее',
+    category: it.category || null,
     monthsCount: it.months_count,
     lastMonth: it.last_month,
-    avgQty: it.avg_qty
-  }));
+    avgQty: it.avg_qty,
+    revenue: it.revenue || 0,
+    margin: it.margin || 0
+  }, stockByName));
 }
 
 function runImport() {
@@ -102,6 +151,7 @@ function runImport() {
 
   const createdAgents = ensureTeam();
   const usersCreated = !!createdAgents;
+  const extraAgentsAdded = ensureExtraAgents();
   const agentsByName = agentUserMap();
   const adminUser = db.all('users').find((u) => u.role === 'admin');
 
@@ -109,6 +159,10 @@ function runImport() {
   const assortmentMap = loadJson('regular_assortment.json') || {};
   const testAssortmentMap = loadJson('test_assortment.json') || {};
   const debts = loadJson('debts.json') || [];
+  // stock.json уже хранит ключи в нормализованном виде (см. build_stock в gdrive-data) —
+  // достаточно нормализовать название товара при поиске, сам файл не перестраиваем.
+  const stockByName = loadJson('stock.json') || {};
+  const promotionsMap = loadJson('promotions.json') || {};
 
   const debtByName = {};
   debts.forEach((d) => { debtByName[norm(d.client_name)] = d; });
@@ -119,6 +173,9 @@ function runImport() {
   const testAssortmentByName = {};
   Object.keys(testAssortmentMap).forEach((k) => { testAssortmentByName[norm(k)] = testAssortmentMap[k]; });
 
+  const promotionsByName = {};
+  Object.keys(promotionsMap).forEach((k) => { promotionsByName[norm(k)] = promotionsMap[k]; });
+
   let clientsCreated = 0;
   let clientsUpdated = 0;
   const now = new Date().toISOString();
@@ -128,16 +185,21 @@ function runImport() {
     const assortmentRaw = assortmentByName[key];
     const testAssortmentRaw = testAssortmentByName[key];
     const debt = debtByName[key];
+    const promotions = promotionsByName[key] || [];
     const owner = agentsByName[norm(c.agent)] || adminUser;
 
     let existing = db.all('clients').find((cl) => norm(cl.name) === key);
 
     const computedFields = {
-      regularAssortment: computeAssortment(assortmentRaw),
-      testAssortment: computeTestAssortment(testAssortmentRaw),
+      regularAssortment: computeAssortment(assortmentRaw, stockByName),
+      testAssortment: computeTestAssortment(testAssortmentRaw, stockByName),
       debtAmount: debt ? debt.debt_amount : 0,
       debtOverdue: debt ? !!debt.is_overdue : false,
-      debtAsOf: debt ? (debt.payment_date || null) : null
+      debtAsOf: debt ? (debt.payment_date || null) : null,
+      // "Акции" (Фаза 6, п.15) — кто что брал по акциям склада/магазина за текущий срез
+      // (Загрузка_акции_25.08.xlsx). Как и ассортимент/долг, пересчитывается при каждом
+      // импорте целиком — это срез на дату, а не ручное поле.
+      promotions
     };
 
     if (!existing) {
@@ -164,7 +226,7 @@ function runImport() {
     }
   });
 
-  return { usersCreated, clientsCreated, clientsUpdated };
+  return { usersCreated, extraAgentsAdded, clientsCreated, clientsUpdated };
 }
 
 module.exports = { runImport };
