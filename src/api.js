@@ -5,6 +5,7 @@ const auth = require('./auth');
 const { parseMultipart } = require('./multipart');
 const { buildZip } = require('./miniZip');
 const googleSheets = require('./googleSheets');
+const { normalizePhone, MONTH_ORDER } = require('./import');
 
 // Этапы доски задач. "Новая задача" убрана — задача сразу создаётся в "В работе".
 // "Лист ожидания" и "Прогрев" больше не этапы доски, а теги задачи (см. TASK_TAGS) —
@@ -30,6 +31,18 @@ const SALE_STAGES = [
   { key: 'fail', label: 'Провал' }
 ];
 const SALE_FINAL_STAGES = ['deal', 'fail']; // требуют аудио+пояснение встречи перед переходом
+
+// Воронка "Лист ожидания" (клиент ждёт товар, которого сейчас нет в наличии) —
+// отдельный тип задачи (taskType: 'waitlist'). Финальный этап "получена" закрывает
+// задачу и, как и «Архив» у визитов, подтверждается только администратором/супервайзером.
+const WAITLIST_STAGES = [
+  { key: 'waiting', label: 'Клиент ждёт товар' },
+  { key: 'invoiced', label: 'Накладная оформлена' },
+  { key: 'received', label: 'Товар получен клиентом' }
+];
+const WAITLIST_STAFF_ONLY_STAGES = ['received'];
+const WAITLIST_ACTIVE_STAGES = ['waiting', 'invoiced'];
+const WAITLIST_TAGS = ['Kapous', 'EPICA', 'Чистовье', 'Палитра'];
 const VISIT_DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 // JS: getDay() воскресенье=0, понедельник=1 ... суббота=6
 const VISIT_DAY_INDEX = { 'Понедельник': 1, 'Вторник': 2, 'Среда': 3, 'Четверг': 4, 'Пятница': 5, 'Суббота': 6 };
@@ -51,7 +64,9 @@ const ACTIVE_STAGES = ['in_progress'];
 const SALE_ACTIVE_STAGES = ['call', 'meeting'];
 // Общий помощник: активна ли задача (не закрыта), независимо от её типа (визит/продажа).
 function isActiveStage(task) {
-  return task.taskType === 'sale' ? SALE_ACTIVE_STAGES.includes(task.stage) : ACTIVE_STAGES.includes(task.stage);
+  if (task.taskType === 'sale') return SALE_ACTIVE_STAGES.includes(task.stage);
+  if (task.taskType === 'waitlist') return WAITLIST_ACTIVE_STAGES.includes(task.stage);
+  return ACTIVE_STAGES.includes(task.stage);
 }
 
 // Разовая идемпотентная миграция старых данных при обновлении сервера:
@@ -60,33 +75,66 @@ function isActiveStage(task) {
 //  - этапы "waiting"/"failed" стали тегами — переносим такие задачи в "В работе"
 //    и проставляем соответствующий тег, чтобы ничего не потерять.
 // Безопасно вызывать при каждом запуске: после первого прогона таких задач больше нет.
+// Здесь и в migrateClientDefaults/migrateUserDefaults ниже — пакетный режим
+// (db.beginBatch/endBatch, см. db.js): на "чистой" базе (первый запуск после
+// импорта — сотни новых записей без ещё не проставленных полей по умолчанию)
+// эти миграции проходят по ВСЕМ записям и почти для каждой вызывают db.update —
+// без пакетного режима это O(n²) от размера базы (полная запись файла на диск
+// на каждый вызов) и на реальном объёме данных ощутимо задерживает старт сервера.
 function migrateLegacyTaskStages() {
-  const tasks = db.all('tasks').slice();
-  tasks.forEach((t) => {
-    if (t.stage === 'new') {
-      db.remove('tasks', t.id);
-      return;
-    }
-    const patch = {};
-    if (t.stage === 'waiting' || t.stage === 'failed') {
-      const tagToAdd = t.stage === 'waiting' ? 'Лист ожидания' : 'Прогрев';
-      const tags = Array.isArray(t.tags) ? t.tags.slice() : [];
-      if (!tags.includes(tagToAdd)) tags.push(tagToAdd);
-      patch.stage = 'in_progress';
-      patch.tags = tags;
-    }
-    if (t.report === undefined) patch.report = '';
-    if (t.taskType === undefined) patch.taskType = 'visit';
-    if (t.dateChangeRequest === undefined) patch.dateChangeRequest = null;
-    if (t.explanation === undefined) patch.explanation = '';
-    if (Object.keys(patch).length) db.update('tasks', t.id, patch);
-  });
+  db.beginBatch();
+  try {
+    const tasks = db.all('tasks').slice();
+    tasks.forEach((t) => {
+      if (t.stage === 'new') {
+        db.remove('tasks', t.id);
+        return;
+      }
+      const patch = {};
+      if (t.stage === 'waiting' || t.stage === 'failed') {
+        const tagToAdd = t.stage === 'waiting' ? 'Лист ожидания' : 'Прогрев';
+        const tags = Array.isArray(t.tags) ? t.tags.slice() : [];
+        if (!tags.includes(tagToAdd)) tags.push(tagToAdd);
+        patch.stage = 'in_progress';
+        patch.tags = tags;
+      }
+      if (t.report === undefined) patch.report = '';
+      if (t.taskType === undefined) patch.taskType = 'visit';
+      if (t.dateChangeRequest === undefined) patch.dateChangeRequest = null;
+      if (t.explanation === undefined) patch.explanation = '';
+      if (Object.keys(patch).length) db.update('tasks', t.id, patch);
+    });
+  } finally {
+    db.endBatch();
+  }
+}
+
+// Разрешение сотруднику-агенту редактировать адрес/телефон/контактное лицо у СВОИХ
+// клиентов (по умолчанию выключено — эти поля защищённые, см. CLIENT_ADMIN_ONLY_FIELDS).
+// Включается администратором индивидуально по сотруднику (раздел "Команда").
+function migrateUserDefaults() {
+  db.beginBatch();
+  try {
+    db.all('users').forEach((u) => {
+      if (u.canEditClientContact === undefined) db.update('users', u.id, { canEditClientContact: false });
+    });
+  } finally {
+    db.endBatch();
+  }
 }
 
 // Проставляет значения по умолчанию для новых полей клиента у уже существующих
 // записей (созданных до появления "точка закрыта" / заметок по контакту).
 // Безопасно вызывать при каждом запуске — на уже проинициализированных клиентов не влияет.
 function migrateClientDefaults() {
+  db.beginBatch();
+  try {
+    migrateClientDefaultsBody();
+  } finally {
+    db.endBatch();
+  }
+}
+function migrateClientDefaultsBody() {
   db.all('clients').forEach((c) => {
     const patch = {};
     if (c.closed === undefined) patch.closed = false;
@@ -102,6 +150,18 @@ function migrateClientDefaults() {
     if (c.orderWindow === undefined) patch.orderWindow = '';
     if (c.meetingRecords === undefined) patch.meetingRecords = [];
     if (c.promotions === undefined) patch.promotions = [];
+    if (c.activeMonths === undefined) patch.activeMonths = [];
+    if (c.isRegularClient === undefined) patch.isRegularClient = false;
+    if (c.currentMonthRevenue === undefined) patch.currentMonthRevenue = 0;
+    if (c.currentMonthItems === undefined) patch.currentMonthItems = [];
+    if (c.monthlyAssortment === undefined) patch.monthlyAssortment = {};
+    // Нормализация телефона (ведущий 0 + без лишних пробелов) — прогоняется
+    // при каждом старте безусловно (не через === undefined), но сама функция
+    // идемпотентна: уже нормализованный номер не меняется повторным вызовом.
+    if (c.phone) {
+      const normalized = normalizePhone(c.phone);
+      if (normalized !== c.phone) patch.phone = normalized;
+    }
     if (Object.keys(patch).length) db.update('clients', c.id, patch);
   });
 }
@@ -156,7 +216,7 @@ function readBody(req) {
 
 function publicUser(u) {
   if (!u) return null;
-  return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl || null };
+  return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl || null, canEditClientContact: !!u.canEditClientContact };
 }
 
 function norm(s) {
@@ -230,6 +290,8 @@ function register(router) {
       user: publicUser(req.user),
       stages: isStaff(req.user) ? TASK_STAGES : TASK_STAGES.filter((s) => !STAFF_ONLY_STAGES.includes(s.key)),
       saleStages: SALE_STAGES,
+      waitlistStages: isStaff(req.user) ? WAITLIST_STAGES : WAITLIST_STAGES.filter((s) => !WAITLIST_STAFF_ONLY_STAGES.includes(s.key)),
+      waitlistTags: WAITLIST_TAGS,
       paymentMethods: PAYMENT_METHODS,
       contractStatuses: CONTRACT_STATUSES,
       taskTags: TASK_TAGS
@@ -258,6 +320,7 @@ function register(router) {
       email,
       passwordHash: auth.hashPassword(password),
       role: validRoles.includes(role) ? role : 'agent',
+      canEditClientContact: false,
       createdAt: new Date().toISOString()
     });
     sendJson(res, 201, { user: publicUser(user) });
@@ -267,6 +330,17 @@ function register(router) {
     if (Number(params.id) === req.user.id) return sendJson(res, 400, { error: 'Нельзя удалить самого себя' });
     const ok = db.remove('users', params.id);
     sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'Не найдено' });
+  }));
+
+  // Разрешение агенту редактировать адрес/телефон/контактное лицо у своих клиентов —
+  // включает/выключает только администратор, по умолчанию выключено.
+  router.put('/api/users/:id/permissions', requireAdmin(async (req, res, params) => {
+    const user = db.find('users', params.id);
+    if (!user) return sendJson(res, 404, { error: 'Не найдено' });
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const updated = db.update('users', params.id, { canEditClientContact: !!body.canEditClientContact });
+    sendJson(res, 200, { user: publicUser(updated) });
   }));
 
   // Аватар сотрудника — для быстрого визуального распознавания в списках/канбане
@@ -397,7 +471,7 @@ function register(router) {
         if (f === 'ownerId') { patch.ownerId = Number(body.ownerId); return; }
         if (f === 'contractStatus' && !CONTRACT_STATUSES.includes(body.contractStatus)) return;
         if (f === 'paymentMethod' && body.paymentMethod && !PAYMENT_METHODS.includes(body.paymentMethod)) return;
-        patch[f] = body[f];
+        patch[f] = f === 'phone' ? normalizePhone(body.phone) : body[f];
       });
       if (body.pendingApproval !== undefined) patch.pendingApproval = !!body.pendingApproval;
       if (body.isOffRoute !== undefined) patch.isOffRoute = !!body.isOffRoute;
@@ -405,6 +479,13 @@ function register(router) {
     CLIENT_AGENT_EDITABLE_FIELDS.forEach((f) => {
       if (body[f] !== undefined) patch[f] = body[f];
     });
+    // Если у агента включено разрешение (см. /api/users/:id/permissions) — может
+    // редактировать адрес/телефон/контактное лицо у СВОИХ клиентов, как админ/супервайзер.
+    if (!isStaff(req.user) && owns && req.user.canEditClientContact) {
+      ['address', 'phone', 'contactName'].forEach((f) => {
+        if (body[f] !== undefined) patch[f] = f === 'phone' ? normalizePhone(body[f]) : body[f];
+      });
+    }
 
     sendJson(res, 200, { client: db.update('clients', params.id, patch) });
   }));
@@ -557,7 +638,9 @@ function register(router) {
     sendJson(res, 200, {
       tasks: scoped(db.all('tasks'), req.user, 'assigneeId'),
       stages: isStaff(req.user) ? TASK_STAGES : TASK_STAGES.filter((s) => !STAFF_ONLY_STAGES.includes(s.key)),
-      saleStages: SALE_STAGES
+      saleStages: SALE_STAGES,
+      waitlistStages: isStaff(req.user) ? WAITLIST_STAGES : WAITLIST_STAGES.filter((s) => !WAITLIST_STAFF_ONLY_STAGES.includes(s.key)),
+      waitlistTags: WAITLIST_TAGS
     });
   }));
 
@@ -589,15 +672,15 @@ function register(router) {
       return sendJson(res, 403, { error: 'Это не ваш клиент' });
     }
     const assigneeId = isStaff(req.user) && body.assigneeId ? Number(body.assigneeId) : (req.user.role === 'agent' ? req.user.id : client.ownerId);
-    const tags = Array.isArray(body.tags) ? body.tags.filter((t) => TASK_TAGS.includes(t)) : [];
-    const taskType = body.taskType === 'sale' ? 'sale' : 'visit';
+    const taskType = body.taskType === 'sale' ? 'sale' : (body.taskType === 'waitlist' ? 'waitlist' : 'visit');
+    const tags = Array.isArray(body.tags) ? body.tags.filter((t) => (taskType === 'waitlist' ? WAITLIST_TAGS : TASK_TAGS).includes(t)) : [];
     const task = db.insert('tasks', {
       clientId: Number(body.clientId),
       taskType,
-      title: body.title || (taskType === 'sale' ? `Звонок: ${client.name}` : `Посетить: ${client.name}`),
+      title: body.title || (taskType === 'sale' ? `Звонок: ${client.name}` : taskType === 'waitlist' ? `Ожидание товара: ${client.name}` : `Посетить: ${client.name}`),
       description: body.description || '',
       dueDate: body.dueDate,
-      stage: taskType === 'sale' ? 'call' : 'in_progress',
+      stage: taskType === 'sale' ? 'call' : (taskType === 'waitlist' ? 'waiting' : 'in_progress'),
       tags,
       comment: '',
       report: '',
@@ -632,13 +715,23 @@ function register(router) {
     ['title', 'description', 'dueDate', 'comment', 'report', 'explanation'].forEach((f) => {
       if (body[f] !== undefined) patch[f] = body[f];
     });
-    if (body.tags !== undefined) {
-      patch.tags = Array.isArray(body.tags) ? body.tags.filter((t) => TASK_TAGS.includes(t)) : [];
-    }
     const isSale = task.taskType === 'sale';
+    const isWaitlist = task.taskType === 'waitlist';
+    if (body.tags !== undefined) {
+      const allowedTags = isWaitlist ? WAITLIST_TAGS : TASK_TAGS;
+      patch.tags = Array.isArray(body.tags) ? body.tags.filter((t) => allowedTags.includes(t)) : [];
+    }
     if (body.stage !== undefined) {
       if (isSale) {
         if (SALE_STAGES.some((s) => s.key === body.stage)) patch.stage = body.stage;
+      } else if (isWaitlist) {
+        if (WAITLIST_STAGES.some((s) => s.key === body.stage)) {
+          // "Товар получен клиентом" (закрытая) — подтверждает только админ/супервайзер, как «Архив» у визитов.
+          if (WAITLIST_STAFF_ONLY_STAGES.includes(body.stage) && !isStaff(req.user)) {
+            return sendJson(res, 403, { error: 'Подтвердить получение товара клиентом может только администратор или супервайзер' });
+          }
+          patch.stage = body.stage;
+        }
       } else if (TASK_STAGES.some((s) => s.key === body.stage)) {
         // "Архив" — только админ/супервайзер подтверждают выполненный визит и переносят туда сами.
         if (STAFF_ONLY_STAGES.includes(body.stage) && !isStaff(req.user)) {
@@ -935,18 +1028,29 @@ function register(router) {
 
   // ---- Отчёты (супервайзер/администратор) ----
 
-  // Ассортимент по агентам: товар/бренд/шт/выручка/кол-во клиентов, с фильтром по бренду.
+  // Ассортимент по агентам: товар/бренд/шт/выручка/кол-во клиентов, с фильтром
+  // по бренду, по конкретному агенту (или "Все") и по конкретному месяцу (или
+  // "Все месяцы" — тогда как раньше, 7-месячная агрегация regular/testAssortment;
+  // при выборе месяца — построчные данные из client.monthlyAssortment[month]).
   router.get('/api/reports/assortment-by-agent', requireStaff(async (req, res) => {
-    const agents = db.all('users').filter((u) => u.role === 'agent');
+    const params = new URL(req.url, 'http://internal').searchParams;
+    const brandFilter = params.get('brand');
+    const agentIdFilter = params.get('agentId');
+    const monthFilter = params.get('month');
+    let agents = db.all('users').filter((u) => u.role === 'agent');
+    if (agentIdFilter) agents = agents.filter((a) => a.id === Number(agentIdFilter));
     const clients = db.all('clients');
-    const brandFilter = new URL(req.url, 'http://internal').searchParams.get('brand');
+    const useMonth = monthFilter && monthFilter !== 'all' && MONTH_ORDER.includes(monthFilter);
 
     const rows = [];
     agents.forEach((agent) => {
       const aClients = clients.filter((c) => c.ownerId === agent.id);
       const byProduct = {};
       aClients.forEach((c) => {
-        [...(c.regularAssortment || []), ...(c.testAssortment || [])].forEach((it) => {
+        const items = useMonth
+          ? (c.monthlyAssortment && c.monthlyAssortment[monthFilter] || []).map((it) => ({ ...it, avgQty: it.qty }))
+          : [...(c.regularAssortment || []), ...(c.testAssortment || [])];
+        items.forEach((it) => {
           if (brandFilter && brandFilter !== 'all' && it.brand !== brandFilter) return;
           if (brandFilter === 'colorants' && it.category !== 'Краситель' && it.category !== 'Оксид') return;
           const key = it.product;
@@ -967,7 +1071,38 @@ function register(router) {
     });
 
     const brands = ['Kapous', 'EPICA', 'Чистовье', 'Палитра', 'Прочее'];
-    sendJson(res, 200, { rows: rows.sort((a, b) => b.revenue - a.revenue), brands });
+    sendJson(res, 200, {
+      rows: rows.sort((a, b) => b.revenue - a.revenue),
+      brands,
+      months: MONTH_ORDER,
+      agents: db.all('users').filter((u) => u.role === 'agent').map((a) => ({ id: a.id, name: a.name }))
+    });
+  }));
+
+  // Отдельный отчёт "Акции" — что и кто из клиентов брал по текущим акциям
+  // склада/магазина (client.promotions, срез на дату последнего импорта), с
+  // разбивкой по агенту/клиенту — для супервайзера/администратора.
+  router.get('/api/reports/promotions', requireStaff(async (req, res) => {
+    const agentIdFilter = new URL(req.url, 'http://internal').searchParams.get('agentId');
+    const agentsById = {};
+    db.all('users').forEach((u) => { agentsById[u.id] = u; });
+    let clients = db.all('clients').filter((c) => (c.promotions || []).length);
+    if (agentIdFilter) clients = clients.filter((c) => c.ownerId === Number(agentIdFilter));
+    const rows = [];
+    clients.forEach((c) => {
+      (c.promotions || []).forEach((p) => {
+        const agent = agentsById[c.ownerId];
+        rows.push({
+          clientId: c.id, clientName: c.name,
+          agentId: c.ownerId, agentName: agent ? agent.name : '—',
+          promo: p.promo, qty: p.qty
+        });
+      });
+    });
+    sendJson(res, 200, {
+      rows,
+      agents: db.all('users').filter((u) => u.role === 'agent').map((a) => ({ id: a.id, name: a.name }))
+    });
   }));
 
   // ---- Дашборд ----
@@ -1093,27 +1228,41 @@ function register(router) {
     }
 
     // Метрики для отдельного дашборда агента (продажи, клиенты, топ-товары, встречи/звонки).
+    // Список правок после Фазы 6.1: "Продано" и "Клиентов с продажами" — теперь за
+    // ТЕКУЩИЙ месяц (не за 7 мес.), топ-товаров — топ-10 отдельно по трём брендам за
+    // текущий месяц (Kapous/EPICA без красителей и оксидов), а не общий топ-5 за 7 мес.
     if (req.user.role === 'agent') {
-      const items = clients.flatMap((c) => [...(c.regularAssortment || []), ...(c.testAssortment || [])]);
-      const salesTotal = items.reduce((s, it) => s + (it.revenue || 0), 0);
-      const clientsWithSales = clients.filter((c) => [...(c.regularAssortment || []), ...(c.testAssortment || [])].some((it) => (it.revenue || 0) > 0)).length;
+      const monthItems = clients.flatMap((c) => (c.currentMonthItems || []));
+      const salesTotalThisMonth = clients.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
+      const clientsBoughtThisMonth = clients.filter((c) => (c.currentMonthRevenue || 0) > 0).length;
+      const clientsNotBoughtThisMonth = clients.length - clientsBoughtThisMonth;
 
-      const byProduct = {};
-      items.forEach((it) => {
-        if (!it.product) return;
-        if (!byProduct[it.product]) byProduct[it.product] = { product: it.product, qty: 0, revenue: 0 };
-        byProduct[it.product].qty += it.avgQty || 0;
-        byProduct[it.product].revenue += it.revenue || 0;
-      });
-      const topProducts = Object.values(byProduct).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+      const topByBrand = (brand, excludeColorants) => {
+        const filtered = monthItems.filter((it) => it.brand === brand
+          && (!excludeColorants || (it.category !== 'Оксид' && it.category !== 'Краситель')));
+        const byProduct = {};
+        filtered.forEach((it) => {
+          if (!it.product) return;
+          if (!byProduct[it.product]) byProduct[it.product] = { product: it.product, qty: 0, revenue: 0 };
+          byProduct[it.product].qty += it.qty || 0;
+          byProduct[it.product].revenue += it.revenue || 0;
+        });
+        return Object.values(byProduct).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+      };
 
       const myTasksAll = db.all('tasks').filter((t) => t.assigneeId === req.user.id);
       const saleTasksToday = myTasksAll.filter((t) => t.taskType === 'sale' && t.dueDate === today);
 
       payload.agentDashboard = {
-        salesTotal,
-        clientsWithSales,
-        topProducts,
+        salesTotalThisMonth,
+        clientsBoughtThisMonth,
+        clientsNotBoughtThisMonth,
+        topByBrand: {
+          Kapous: topByBrand('Kapous', true),
+          EPICA: topByBrand('EPICA', true),
+          Чистовье: topByBrand('Чистовье', false)
+        },
+        atRiskClientsCount: atRiskClients.length,
         callsToday: saleTasksToday.filter((t) => t.stage === 'call').length,
         meetingsToday: saleTasksToday.filter((t) => t.stage === 'meeting').length,
         doneTasksToday: tasks.filter((t) => t.dueDate === today && (t.stage === 'done' || t.stage === 'deal')).length,
@@ -1125,4 +1274,4 @@ function register(router) {
   }));
 }
 
-module.exports = { register, migrateLegacyTaskStages, migrateClientDefaults, TASK_STAGES, TASK_TAGS, PAYMENT_METHODS, CONTRACT_STATUSES, sendJson, UPLOADS_DIR };
+module.exports = { register, migrateLegacyTaskStages, migrateClientDefaults, migrateUserDefaults, TASK_STAGES, TASK_TAGS, PAYMENT_METHODS, CONTRACT_STATUSES, sendJson, UPLOADS_DIR };

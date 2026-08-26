@@ -41,10 +41,36 @@ function ensureLoaded() {
   }
 }
 
-function persist() {
+// Пакетный режим — используется массовым импортом (см. import.js), где подряд идут
+// сотни insert/update по контрагентам. Без него каждый вызов сериализует и пишет на
+// диск ВЕСЬ файл базы (сейчас уже несколько МБ — ассортимент/акции/поставторы и т.д.),
+// то есть импорт был бы O(n²) от размера базы. beginBatch()/endBatch() откладывают
+// физическую запись до одного финального persist() — семантика insert/update/remove
+// (что видно через db.all/db.find сразу после вызова) не меняется, меняется только
+// то, когда именно это попадает на диск.
+let batching = false;
+let pendingWrite = false;
+
+function persistNow() {
   const tmp = DB_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf8');
   fs.renameSync(tmp, DB_FILE); // атомарная замена файла
+  pendingWrite = false;
+}
+
+function persist() {
+  if (batching) { pendingWrite = true; return; }
+  persistNow();
+}
+
+function beginBatch() {
+  ensureLoaded();
+  batching = true;
+}
+
+function endBatch() {
+  batching = false;
+  if (pendingWrite) persistNow();
 }
 
 function nextId(collection) {
@@ -128,5 +154,7 @@ module.exports = {
   remove,
   createSession,
   getSession,
-  deleteSession
+  deleteSession,
+  beginBatch,
+  endBatch
 };

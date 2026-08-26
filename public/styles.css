@@ -168,6 +168,9 @@ main#content { padding: 20px; max-width: 1200px; margin: 0 auto; }
 
 .stat-card .num { font-size: 26px; font-weight: 700; color: var(--gold); }
 .stat-card .label { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.stat-card-alert { border-color: #f87171; background: rgba(248, 113, 113, 0.1); }
+.stat-card-alert .num { color: #f87171; }
+.card-agent-filter { margin-top: 8px; width: 100%; font-size: 11.5px; padding: 4px 6px; }
 
 .panel {
   background: var(--surface);
@@ -196,6 +199,8 @@ main#content { padding: 20px; max-width: 1200px; margin: 0 auto; }
 .btn-secondary { background: var(--surface-2); border: 1px solid var(--border); padding: 8px 14px; color: var(--text); }
 .btn-secondary:hover { background: var(--border); }
 .btn-secondary.active { border-color: var(--primary); color: var(--primary); }
+.btn-cancel-muted { border-color: rgba(248, 113, 113, 0.4); color: #f3a8a8; }
+.btn-cancel-muted:hover { background: rgba(248, 113, 113, 0.12); border-color: rgba(248, 113, 113, 0.6); }
 
 .icon-btn { background: transparent; padding: 4px 8px; color: var(--muted); }
 .icon-btn:hover { color: var(--text); }
@@ -271,6 +276,7 @@ th.sortable:hover { color: var(--text); }
 .badge-today { background: rgba(234, 179, 8, 0.2); color: #fbd88a; }
 .badge-pending { background: rgba(234, 179, 8, 0.2); color: #fbd88a; margin-left: 6px; }
 .badge-offroute { background: rgba(155, 107, 242, 0.2); color: #c7aefb; margin-left: 6px; }
+.badge-promo { background: rgba(216, 180, 106, 0.22); color: var(--gold); margin-left: 6px; }
 .badge-pay { background: rgba(155, 107, 242, 0.2); color: #c7aefb; }
 .badge-yes { background: rgba(74, 222, 128, 0.2); color: #86efac; }
 .badge-no { background: rgba(248, 113, 113, 0.2); color: #fca5a5; }
@@ -416,6 +422,7 @@ th.sortable:hover { color: var(--text); }
 /* ---- Ссылки: позвонить / карта ---- */
 .tel-link, .maps-link { color: var(--primary); text-decoration: none; font-weight: 600; }
 .tel-link:hover, .maps-link:hover { text-decoration: underline; color: var(--gold); }
+.wa-link { text-decoration: none; font-size: 13px; filter: grayscale(0); }
 
 .stale-visit { color: var(--warning); font-weight: 600; }
 .row-closed { opacity: 0.5; }
@@ -482,6 +489,14 @@ th.sortable:hover { color: var(--text); }
   border-top: 1px dashed var(--border);
   font-size: 12px;
   color: var(--warning);
+  font-weight: 600;
+}
+.assort-group-heading {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+  color: #c7aefb;
   font-weight: 600;
 }
 
@@ -620,7 +635,7 @@ th.sortable:hover { color: var(--text); }
 .promo-row:last-child { border-bottom: none; }
 .promo-row .promo-qty { color: var(--muted); white-space: nowrap; }
 .assort-brand-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.brand-chip { padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; cursor: pointer; }
+.brand-chip { padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; cursor: pointer; color: #fff; }
 .brand-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .sale-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; overflow-x: auto; }
 .sale-col { background: var(--surface-2, #1c2333); border-radius: 10px; padding: 8px; min-width: 190px; }
@@ -631,3 +646,27 @@ th.sortable:hover { color: var(--text); }
 @media (max-width: 900px) {
   .sale-board { grid-template-columns: 1fr 1fr; }
 }
+
+/* Поле даты ДД.ММ.ГГ (замена нативного input[type=date] с 4-значным годом) */
+.date-field { display: flex; gap: 6px; align-items: center; }
+.date-field .date-display-input { width: 92px; text-align: center; letter-spacing: .03em; }
+.date-field .date-display-input.invalid { border-color: #f87171; }
+.date-pick-btn {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 9px; cursor: pointer; font-size: 14px; line-height: 1;
+}
+.date-pick-btn:hover { background: var(--border); }
+.date-pick-btn:disabled { opacity: .4; cursor: default; }
+.mini-date-picker {
+  z-index: 500; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.4); width: 220px;
+}
+.mdp-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.mdp-nav { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; padding: 2px 8px; }
+.mdp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.mdp-wd { text-align: center; font-size: 10px; color: var(--muted); padding: 2px 0; }
+.mdp-cell { text-align: center; font-size: 12.5px; padding: 5px 0; border-radius: 6px; cursor: pointer; }
+.mdp-cell:hover { background: var(--surface-2); }
+.mdp-outside { color: var(--muted); opacity: .5; }
+.mdp-today { border: 1px solid var(--primary); }
+.mdp-selected { background: var(--primary); color: #fff; }

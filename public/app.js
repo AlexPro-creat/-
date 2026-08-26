@@ -3,6 +3,9 @@
 const state = {
   user: null,
   stages: [],
+  saleStages: [],
+  waitlistStages: [],
+  waitlistTags: [],
   taskTags: [],
   paymentMethods: [],
   contractStatuses: [],
@@ -12,7 +15,7 @@ const state = {
   supervisorMeetings: [],
   view: 'dashboard',
   stats: null,
-  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, showClosed: false, search: '' },
+  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, showClosed: false, search: '' },
   clientSort: { key: null, dir: -1 },
   taskTagFilter: new Set(),
   calendar: { mode: 'month', date: new Date() },
@@ -32,6 +35,15 @@ const ACTIVE_STAGES = ['in_progress'];
 // не пересекается с обычными визитными задачами. Финальные этапы требуют аудиозаписи
 // встречи + пояснения (проверяется на сервере, тут — только для UI-подсказок).
 const SALE_FINAL_STAGES_CLIENT = ['deal', 'fail'];
+const SALE_ACTIVE_STAGES_CLIENT = ['call', 'meeting'];
+const WAITLIST_ACTIVE_STAGES_CLIENT = ['waiting', 'invoiced'];
+// Активна ли задача (не закрыта), независимо от типа воронки — используется
+// для клиентского пересчёта карточек дашборда при фильтре по агенту (см. dashCardValue).
+function isTaskActiveClient(t) {
+  if (t.taskType === 'sale') return SALE_ACTIVE_STAGES_CLIENT.includes(t.stage);
+  if (t.taskType === 'waitlist') return WAITLIST_ACTIVE_STAGES_CLIENT.includes(t.stage);
+  return ACTIVE_STAGES.includes(t.stage);
+}
 
 // ---------- Утилита запросов к API ----------
 
@@ -71,6 +83,107 @@ function fmtDateTime(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// ---------- Поле ввода даты с годом в 2 цифры (ДД.ММ.ГГ) ----------
+// Хранение и передача на сервер — в прежнем формате ISO (YYYY-MM-DD),
+// меняется только то, как год отображается пользователю при вводе.
+function isoToShortDisplay(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  if (!d) return '';
+  return `${d}.${m}.${(y || '').slice(-2)}`;
+}
+function shortDisplayToIso(disp) {
+  const m = /^\s*(\d{1,2})\.(\d{1,2})\.(\d{2,4})\s*$/.exec(disp || '');
+  if (!m) return null;
+  let [, d, mo, y] = m;
+  if (y.length === 2) y = '20' + y;
+  d = pad2(Number(d)); mo = pad2(Number(mo));
+  if (Number(mo) < 1 || Number(mo) > 12 || Number(d) < 1 || Number(d) > 31) return null;
+  return `${y}-${mo}-${d}`;
+}
+let _dateFieldSeq = 0;
+function dateFieldHTML(opts) {
+  const { name, id, value, required, disabled } = opts || {};
+  const hiddenId = id || `df-${name}-${++_dateFieldSeq}`;
+  return `
+    <span class="date-field">
+      <input type="hidden" name="${name}" id="${hiddenId}" value="${value || ''}" ${required ? 'data-required="1"' : ''}>
+      <input type="text" class="date-display-input" inputmode="numeric" placeholder="ДД.ММ.ГГ" maxlength="8"
+             value="${isoToShortDisplay(value)}" data-for="${hiddenId}" ${disabled ? 'disabled' : ''} autocomplete="off">
+      <button type="button" class="date-pick-btn" data-for="${hiddenId}" ${disabled ? 'disabled' : ''} title="Выбрать дату">📅</button>
+    </span>`;
+}
+function _dateFieldSync(hiddenInput) {
+  const wrap = hiddenInput.closest('.date-field');
+  const textInput = wrap && wrap.querySelector('.date-display-input');
+  if (textInput) textInput.value = isoToShortDisplay(hiddenInput.value);
+}
+document.addEventListener('input', (e) => {
+  if (!e.target.classList || !e.target.classList.contains('date-display-input')) return;
+  const hidden = document.getElementById(e.target.dataset.for);
+  if (!hidden) return;
+  const iso = shortDisplayToIso(e.target.value);
+  if (iso) { hidden.value = iso; e.target.classList.remove('invalid'); }
+  else if (e.target.value.trim()) e.target.classList.add('invalid');
+  else { hidden.value = ''; e.target.classList.remove('invalid'); }
+});
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest && e.target.closest('.date-pick-btn');
+  if (btn) { e.preventDefault(); if (btn.disabled) return; openMiniDatePicker(btn); return; }
+  const openPopup = document.querySelector('.mini-date-picker');
+  if (openPopup && !openPopup.contains(e.target) && !(e.target.closest && e.target.closest('.date-pick-btn'))) openPopup.remove();
+});
+function openMiniDatePicker(anchorBtn) {
+  const existing = document.querySelector('.mini-date-picker');
+  if (existing) existing.remove();
+  const hidden = document.getElementById(anchorBtn.dataset.for);
+  if (!hidden) return;
+  const base = hidden.value ? new Date(hidden.value) : new Date();
+  const view = { y: base.getFullYear(), m: base.getMonth() };
+  const pop = el('<div class="mini-date-picker"></div>');
+  const rect = anchorBtn.getBoundingClientRect();
+  pop.style.position = 'fixed';
+  pop.style.top = `${rect.bottom + 4}px`;
+  pop.style.left = `${Math.max(4, rect.left - 200)}px`;
+  document.body.appendChild(pop);
+  function draw() {
+    const todayKey = toDateKey(new Date());
+    const selKey = hidden.value || '';
+    const startDate = startOfWeek(new Date(view.y, view.m, 1));
+    let html = `
+      <div class="mdp-header">
+        <button type="button" class="mdp-nav" data-dir="-1">‹</button>
+        <span>${MONTH_LABELS[view.m]} ${view.y}</span>
+        <button type="button" class="mdp-nav" data-dir="1">›</button>
+      </div>
+      <div class="mdp-grid">
+        ${WEEKDAY_LABELS.map((w) => `<div class="mdp-wd">${w}</div>`).join('')}
+    `;
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
+      const key = toDateKey(d);
+      const outside = d.getMonth() !== view.m;
+      html += `<div class="mdp-cell ${outside ? 'mdp-outside' : ''} ${key === todayKey ? 'mdp-today' : ''} ${key === selKey ? 'mdp-selected' : ''}" data-key="${key}">${d.getDate()}</div>`;
+    }
+    html += '</div>';
+    pop.innerHTML = html;
+    pop.querySelectorAll('.mdp-nav').forEach((btnEl) => btnEl.addEventListener('click', () => {
+      const dir = Number(btnEl.dataset.dir);
+      view.m += dir;
+      if (view.m < 0) { view.m = 11; view.y--; }
+      if (view.m > 11) { view.m = 0; view.y++; }
+      draw();
+    }));
+    pop.querySelectorAll('.mdp-cell').forEach((c) => c.addEventListener('click', () => {
+      hidden.value = c.dataset.key;
+      _dateFieldSync(hidden);
+      pop.remove();
+    }));
+  }
+  draw();
 }
 
 function el(html) {
@@ -131,6 +244,8 @@ async function loadAll() {
   state.tasks = tasksRes.tasks;
   state.stages = tasksRes.stages;
   state.saleStages = tasksRes.saleStages || [];
+  state.waitlistStages = tasksRes.waitlistStages || [];
+  state.waitlistTags = tasksRes.waitlistTags || state.waitlistTags;
   state.users = usersRes.users;
   state.stats = statsRes;
   state.supervisorMeetings = supMeetingsRes.meetings || [];
@@ -159,6 +274,8 @@ async function boot() {
     state.user = me.user;
     state.stages = me.stages;
     state.saleStages = me.saleStages || [];
+    state.waitlistStages = me.waitlistStages || [];
+    state.waitlistTags = me.waitlistTags || [];
     state.paymentMethods = me.paymentMethods;
     state.contractStatuses = me.contractStatuses;
     state.taskTags = me.taskTags || [];
@@ -194,15 +311,25 @@ function render() {
 
 // ---------- Ссылки: позвонить / открыть карту ----------
 
+// Ссылка WhatsApp — по номеру телефона (kg-номера, как правило, набраны без
+// кода страны в наших данных: "0555..." → +996555... для wa.me).
+function waLink(phone) {
+  if (!phone) return '';
+  let digits = phone.replace(/[^\d]/g, '');
+  if (digits.startsWith('0')) digits = '996' + digits.slice(1);
+  if (!digits) return '';
+  return `<a class="wa-link" target="_blank" rel="noopener" href="https://wa.me/${digits}" onclick="event.stopPropagation()" title="Написать в WhatsApp">🟢</a>`;
+}
+
 function telLink(phone, label) {
   if (!phone) return escapeHtml(label !== undefined ? label : '—');
   const digits = phone.replace(/[^\d+]/g, '');
-  return `<a class="tel-link" href="tel:${digits}" onclick="event.stopPropagation()">${escapeHtml(label !== undefined ? label : phone)}</a>`;
+  return `<a class="tel-link" href="tel:${digits}" onclick="event.stopPropagation()">${escapeHtml(label !== undefined ? label : phone)}</a> ${waLink(phone)}`;
 }
 
 function mapsLink(address) {
   if (!address) return '';
-  return `<a class="maps-link" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}" onclick="event.stopPropagation()">📍 Карта</a>`;
+  return `<a class="maps-link" target="_blank" rel="noopener" href="https://2gis.kg/bishkek/search/${encodeURIComponent(address)}" onclick="event.stopPropagation()">📍 Карта</a>`;
 }
 
 // ---------- Аватар сотрудника ----------
@@ -226,16 +353,77 @@ function agentTag(userId) {
 
 // ---------- Дашборд ----------
 
+function renderTopBrandTable(brandLabel, items, colorantsExcluded) {
+  if (!items || !items.length) return `<h3 style="margin:12px 0 6px">${escapeHtml(brandLabel)}</h3><div class="muted" style="font-size:13px">Нет продаж по этому бренду в этом месяце.</div>`;
+  return `
+    <h3 style="margin:12px 0 6px">${escapeHtml(brandLabel)}${colorantsExcluded ? ' <span class="muted" style="font-weight:400;font-size:12px">(без красителей и оксидов)</span>' : ''}</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Товар</th><th>Шт (месяц)</th><th>Выручка</th></tr></thead>
+        <tbody>
+          ${items.map((p) => `<tr><td>${escapeHtml(p.product)}</td><td>${Math.round(p.qty * 100) / 100}</td><td>${fmtMoney(p.revenue)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// Пересчёт значения одной карточки дашборда супервайзера/админа с учётом фильтра
+// по агенту — на уже загруженных на клиенте state.clients/state.tasks (эти списки
+// для admin/supervisor и так содержат всех клиентов/все задачи, см. scoped() в api.js).
+function dashCardValue(key, agentId, paymentMethod) {
+  const aid = agentId ? Number(agentId) : null;
+  let clientsF = aid ? state.clients.filter((c) => c.ownerId === aid) : state.clients;
+  if (paymentMethod) clientsF = clientsF.filter((c) => (c.paymentMethod || '') === paymentMethod);
+  const tasksF = aid ? state.tasks.filter((t) => t.assigneeId === aid) : state.tasks;
+  const today = new Date().toISOString().slice(0, 10);
+  switch (key) {
+    case 'clientsCount': return String(clientsF.length);
+    case 'todayTasksCount': return String(tasksF.filter((t) => isTaskActiveClient(t) && t.dueDate === today).length);
+    case 'overdueTasksCount': return String(tasksF.filter((t) => isTaskActiveClient(t) && t.dueDate && t.dueDate < today).length);
+    case 'atRiskClientsCount': return String(clientsF.filter((c) => riskCount(c) > 0).length);
+    case 'totalDebt': return fmtMoney(clientsF.reduce((s, c) => s + (c.debtAmount || 0), 0));
+    default: return '';
+  }
+}
+function agentFilterSelectHTML(cardKey) {
+  const agents = state.users.filter((u) => u.role === 'agent');
+  return `
+    <select class="card-agent-filter" data-card="${cardKey}" onclick="event.stopPropagation()">
+      <option value="">Все агенты</option>
+      ${agents.map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}
+    </select>`;
+}
+function paymentMethodFilterSelectHTML(cardKey) {
+  return `
+    <select class="card-payment-filter" data-card="${cardKey}" onclick="event.stopPropagation()">
+      <option value="">Все формы оплаты</option>
+      ${state.paymentMethods.map((p) => `<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join('')}
+    </select>`;
+}
+function wireCardAgentFilters(root) {
+  function recompute(card) {
+    const agentSel = card.querySelector('.card-agent-filter');
+    const paySel = card.querySelector('.card-payment-filter');
+    const numEl = card.querySelector('.num');
+    const key = (agentSel || paySel).dataset.card;
+    if (numEl) numEl.textContent = dashCardValue(key, agentSel ? agentSel.value : '', paySel ? paySel.value : '');
+  }
+  root.querySelectorAll('.card-agent-filter, .card-payment-filter').forEach((sel) => {
+    sel.addEventListener('change', () => recompute(sel.closest('.stat-card')));
+  });
+}
+
 async function renderDashboard(content) {
   const stats = await api('GET', '/api/stats');
   content.appendChild(el(`
     <div>
       <div class="stat-grid">
-        <div class="stat-card"><div class="num">${stats.clientsCount}</div><div class="label">Клиентов</div></div>
-        <div class="stat-card"><div class="num">${stats.todayTasksCount}</div><div class="label">Задач на сегодня</div></div>
-        <div class="stat-card"><div class="num">${stats.overdueTasksCount}</div><div class="label">Просроченных задач</div></div>
-        <div class="stat-card"><div class="num">${stats.atRiskClientsCount}</div><div class="label">Клиентов с риском «отвала» товара</div></div>
-        <div class="stat-card"><div class="num">${fmtMoney(stats.totalDebt)}</div><div class="label">Общий долг</div></div>
+        <div class="stat-card"><div class="num">${stats.clientsCount}</div><div class="label">Клиентов</div>${isStaff() ? agentFilterSelectHTML('clientsCount') : ''}</div>
+        <div class="stat-card"><div class="num">${stats.todayTasksCount}</div><div class="label">Задач на сегодня</div>${isStaff() ? agentFilterSelectHTML('todayTasksCount') : ''}</div>
+        <div class="stat-card"><div class="num">${stats.overdueTasksCount}</div><div class="label">Просроченных задач</div>${isStaff() ? agentFilterSelectHTML('overdueTasksCount') : ''}</div>
+        <div class="stat-card stat-card-alert"><div class="num">${stats.atRiskClientsCount}</div><div class="label">Клиентов с риском «отвала» товара</div>${isStaff() ? agentFilterSelectHTML('atRiskClientsCount') : ''}</div>
+        <div class="stat-card"><div class="num">${fmtMoney(stats.totalDebt)}</div><div class="label">Общий долг</div>${isStaff() ? agentFilterSelectHTML('totalDebt') + paymentMethodFilterSelectHTML('totalDebt') : ''}</div>
         ${isStaff() && stats.teamTotals ? `<div class="stat-card"><div class="num">${stats.teamTotals.totalTasks}</div><div class="label">Всего задач по команде (в работе: ${stats.teamTotals.open})</div></div>` : ''}
         ${isStaff() ? `<div class="stat-card"><div class="num">${stats.pendingApprovalCount}</div><div class="label">Новых точек на согласовании</div></div>` : ''}
         ${isStaff() && stats.pendingClosureCount ? `<div class="stat-card"><div class="num">${stats.pendingClosureCount}</div><div class="label">Заявок на закрытие точки</div></div>` : ''}
@@ -246,21 +434,18 @@ async function renderDashboard(content) {
       <div class="panel">
         <h2>Мои показатели</h2>
         <div class="agent-metric-grid">
-          <div class="stat-card"><div class="num">${fmtMoney(stats.agentDashboard.salesTotal)}</div><div class="label">Продано (7 мес)</div></div>
-          <div class="stat-card"><div class="num">${stats.agentDashboard.clientsWithSales}</div><div class="label">Клиентов с продажами</div></div>
+          <div class="stat-card"><div class="num">${fmtMoney(stats.agentDashboard.salesTotalThisMonth)}</div><div class="label">Продано (этот месяц)</div></div>
+          <div class="stat-card"><div class="num">${stats.agentDashboard.clientsBoughtThisMonth}/${stats.agentDashboard.clientsNotBoughtThisMonth}</div><div class="label">Купили / не купили в этом месяце</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.callsToday}</div><div class="label">Звонков сегодня</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.meetingsToday}</div><div class="label">Встреч сегодня</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.doneTasksToday}</div><div class="label">Выполнено сегодня</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.overdueTasksCount}</div><div class="label">Просрочено</div></div>
         </div>
-        <h3 style="margin:0 0 8px">Топ-5 товаров</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Товар</th><th>Шт (7 мес)</th><th>Выручка</th></tr></thead>
-            <tbody>
-              ${stats.agentDashboard.topProducts.map((p) => `<tr><td>${escapeHtml(p.product)}</td><td>${Math.round(p.qty * 100) / 100}</td><td>${fmtMoney(p.revenue)}</td></tr>`).join('')}
-            </tbody>
-          </table>
+        <button type="button" class="assort-btn" id="top-brands-toggle">🏆 Топ-10 по брендам (этот месяц)</button>
+        <div class="assort-panel" id="top-brands-panel" style="display:none">
+          ${renderTopBrandTable('Kapous', stats.agentDashboard.topByBrand.Kapous, true)}
+          ${renderTopBrandTable('EPICA', stats.agentDashboard.topByBrand.EPICA, true)}
+          ${renderTopBrandTable('Чистовье', stats.agentDashboard.topByBrand.Чистовье, false)}
         </div>
       </div>` : ''}
 
@@ -410,6 +595,9 @@ async function renderDashboard(content) {
     </div>
   `));
 
+  if (stats.agentDashboard) wireToggle('top-brands-toggle', 'top-brands-panel');
+  if (isStaff()) wireCardAgentFilters(content);
+
   const todayKanban = document.getElementById('today-kanban');
   if (!stats.todayTasks.length) {
     todayKanban.appendChild(el('<div class="empty-state">На сегодня задач нет.</div>'));
@@ -441,9 +629,10 @@ function filteredClients() {
     if (f.visitDay && c.visitDay !== f.visitDay) return false;
     if (f.pointType && (c.pointType || '') !== f.pointType) return false;
     if (f.paymentMethod && (c.paymentMethod || '') !== f.paymentMethod) return false;
-    if (f.onlyRegular && !(c.regularAssortment || []).length) return false;
+    if (f.onlyRegular && !c.isRegularClient) return false;
     if (f.onlyDebt && !(c.debtAmount > 0)) return false;
     if (f.onlyShortfall && !riskCount(c)) return false;
+    if (f.onlyPromotions && !(c.promotions || []).length) return false;
     if (f.search) {
       const q = f.search.trim().toLowerCase();
       const hay = `${c.name} ${c.phone || ''} ${c.contactName || ''}`.toLowerCase();
@@ -495,7 +684,7 @@ function exportClientsCsv(list) {
 function renderClients(content) {
   const pointTypes = Array.from(new Set(state.clients.map((c) => c.pointType).filter(Boolean))).sort();
   const f = state.clientFilters;
-  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.showClosed || f.search;
+  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.onlyPromotions || f.showClosed || f.search;
   const bulk = state.clientBulkMode;
   content.appendChild(el(`
     <div>
@@ -524,6 +713,7 @@ function renderClients(content) {
         <label class="filter-check"><input type="checkbox" id="filter-onlyRegular" ${f.onlyRegular ? 'checked' : ''}> Постоянный клиент</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyDebt" ${f.onlyDebt ? 'checked' : ''}> Есть задолженность</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyShortfall" ${f.onlyShortfall ? 'checked' : ''}> Не добрал</label>
+        <label class="filter-check"><input type="checkbox" id="filter-onlyPromotions" ${f.onlyPromotions ? 'checked' : ''}> Есть акции</label>
         ${isStaff() ? `<label class="filter-check"><input type="checkbox" id="filter-showClosed" ${f.showClosed ? 'checked' : ''}> Показать закрытые</label>` : ''}
         ${filtersActive ? '<button type="button" class="link-btn" id="filter-reset">Сбросить</button>' : ''}
       </div>
@@ -565,11 +755,12 @@ function renderClients(content) {
   document.getElementById('filter-onlyRegular').addEventListener('change', (e) => { state.clientFilters.onlyRegular = e.target.checked; render(); });
   document.getElementById('filter-onlyDebt').addEventListener('change', (e) => { state.clientFilters.onlyDebt = e.target.checked; render(); });
   document.getElementById('filter-onlyShortfall').addEventListener('change', (e) => { state.clientFilters.onlyShortfall = e.target.checked; render(); });
+  document.getElementById('filter-onlyPromotions').addEventListener('change', (e) => { state.clientFilters.onlyPromotions = e.target.checked; render(); });
   const showClosedCb = document.getElementById('filter-showClosed');
   if (showClosedCb) showClosedCb.addEventListener('change', (e) => { state.clientFilters.showClosed = e.target.checked; render(); });
   const resetBtn = document.getElementById('filter-reset');
   if (resetBtn) resetBtn.addEventListener('click', () => {
-    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, showClosed: false, search: '' };
+    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, showClosed: false, search: '' };
     render();
   });
   content.querySelectorAll('th.sortable').forEach((th) => {
@@ -610,6 +801,7 @@ function renderClients(content) {
           ${c.closureRequested ? '<span class="badge badge-pending">на закрытие</span>' : ''}
           ${c.pendingApproval ? '<span class="badge badge-pending">на согласовании</span>' : ''}
           ${c.isOffRoute ? '<span class="badge badge-offroute">вне маршрута</span>' : ''}
+          ${(c.promotions || []).length ? '<span class="badge badge-promo" title="Есть акции">🎁 акции</span>' : ''}
         </td>
         <td>${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${overdueDays}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
         <td>${risk ? `<span class="badge badge-overdue">${risk} риск</span>` : '—'}</td>
@@ -799,18 +991,21 @@ async function openClientModal(client) {
 
   const lastVisit = isEdit ? lastVisitInfo(client) : null;
 
+  const canEditContact = isOwner && !!state.user.canEditClientContact;
+
   let bodyHtml;
   if (isEdit && !canEditCore) {
     // Просмотр для агента: карточка + доступное редактирование заметок
+    // (+ адрес/телефон/конт.лицо, если администратор выдал такое разрешение — см. «Команда»).
     bodyHtml = `
       <h2>${escapeHtml(client.name)}</h2>
       ${client.pendingApproval ? '<p class="note-pending">Точка на согласовании у администратора</p>' : ''}
       ${renderClosureBlock(client)}
       <div class="panel-inline">
         ${fieldRow('Тип точки', escapeHtml(client.pointType || '—'), true)}
-        ${fieldRow('Адрес', `${escapeHtml(client.address || '—')} ${mapsLink(client.address)}`, true)}
-        ${fieldRow('Телефон', telLink(client.phone), true)}
-        ${fieldRow('Контактное лицо', escapeHtml(client.contactName || '—'), true)}
+        ${canEditContact ? '' : fieldRow('Адрес', `${escapeHtml(client.address || '—')} ${mapsLink(client.address)}`, true)}
+        ${canEditContact ? '' : fieldRow('Телефон', telLink(client.phone), true)}
+        ${canEditContact ? '' : fieldRow('Контактное лицо', escapeHtml(client.contactName || '—'), true)}
         ${fieldRow('День визита', escapeHtml(client.visitDay || '—'), true)}
         ${fieldRow('Работает по договору', escapeHtml(client.contractStatus), true)}
         ${fieldRow('Способ оплаты', escapeHtml(client.paymentMethod || 'не указан'), true)}
@@ -825,11 +1020,18 @@ async function openClientModal(client) {
         ${fieldRow('Особые пожелания', escapeHtml(client.specialRequests || '—'), true)}
       </div>
       <form id="client-form">
+        ${canEditContact ? `
+        <label>Адрес ${client.address ? mapsLink(client.address) : ''}</label>
+        <input name="address" value="${escapeAttr(client.address)}">
+        <div class="field-row">
+          <div><label>Телефон ${client.phone ? telLink(client.phone) : ''}</label><input name="phone" value="${escapeAttr(client.phone)}"></div>
+          <div><label>Контактное лицо</label><input name="contactName" value="${escapeAttr(client.contactName)}"></div>
+        </div>` : ''}
         <label>Заметки</label>
         <textarea name="notes">${escapeHtml(client.notes || '')}</textarea>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" id="cancel-modal">Закрыть</button>
-          <button type="submit" class="btn-primary">Сохранить заметки</button>
+          <button type="submit" class="btn-primary">Сохранить${canEditContact ? '' : ' заметки'}</button>
         </div>
       </form>
       ${renderMastersSection(client)}
@@ -895,7 +1097,7 @@ async function openClientModal(client) {
         <div class="modal-actions">
           ${isEdit && isStaff() ? '<button type="button" class="btn-secondary" id="delete-client">Удалить</button>' : ''}
           ${isEdit && client.pendingApproval && isStaff() ? '<button type="button" class="btn-secondary" id="approve-client">Одобрить точку</button>' : ''}
-          <button type="button" class="btn-secondary" id="cancel-modal">Отмена</button>
+          <button type="button" class="btn-secondary btn-cancel-muted" id="cancel-modal">Отмена</button>
           <button type="submit" class="btn-primary">Сохранить</button>
         </div>
       </form>
@@ -1039,20 +1241,39 @@ function renderTestAssortmentSection(client) {
   `;
 }
 
+// Краски и оксиды — отдельная видимая группа внутри регулярного/тестового
+// ассортимента (по просьбе пользователя), а не просто пункт фильтра по бренду.
+// В разделе "риск отвала" (не добрал) такого разделения нет — там остаётся
+// единый список, как раньше.
+function isColorantItem(p) { return p.category === 'Краситель' || p.category === 'Оксид'; }
+
+function renderGroupedAssort(items) {
+  if (!items.length) return '<div class="muted" style="font-size:13px;padding:4px 0">Нет позиций по этому фильтру.</div>';
+  const colorants = items.filter(isColorantItem);
+  const others = items.filter((p) => !isColorantItem(p));
+  return `
+    ${others.length ? others.map(assortRow).join('') : ''}
+    ${colorants.length ? `
+      <div class="assort-group-heading">🎨 Краски и оксиды</div>
+      ${colorants.map(assortRow).join('')}
+    ` : ''}
+  `;
+}
+
 function renderAssortBody(items, brand, mode) {
   const filtered = filterAssortItems(items, brand);
   if (mode === 'regular') {
     const normal = filtered.filter((p) => !p.atRisk);
     const risky = filtered.filter((p) => p.atRisk);
     return `
-      ${normal.length ? normal.map(assortRow).join('') : '<div class="muted" style="font-size:13px;padding:4px 0">Нет позиций по этому фильтру.</div>'}
+      ${normal.length ? renderGroupedAssort(normal) : '<div class="muted" style="font-size:13px;padding:4px 0">Нет позиций по этому фильтру.</div>'}
       ${risky.length ? `
         <div class="assort-risk-heading">⚠️ Риск «отвала» — не заказывали в последнем доступном месяце</div>
         ${risky.map(assortRow).join('')}
       ` : ''}
     `;
   }
-  return filtered.length ? filtered.map(assortRow).join('') : '<div class="muted" style="font-size:13px;padding:4px 0">Нет позиций по этому фильтру.</div>';
+  return renderGroupedAssort(filtered);
 }
 
 function wireBrandFilter(groupId, items, bodyElId, mode) {
@@ -1135,16 +1356,19 @@ function renderTasks(content) {
         </div>
       </div>
       <div class="filter-bar">
-        <button type="button" class="btn-secondary ${typeView === 'visit' ? 'active' : ''}" id="task-type-visit-btn">Визиты</button>
+        <button type="button" class="btn-secondary ${typeView === 'visit' ? 'active' : ''}" id="task-type-visit-btn">Визиты с супервайзером</button>
         <button type="button" class="btn-secondary ${typeView === 'sale' ? 'active' : ''}" id="task-type-sale-btn">Воронка продаж</button>
+        <button type="button" class="btn-secondary ${typeView === 'waitlist' ? 'active' : ''}" id="task-type-waitlist-btn">Лист ожидания</button>
       </div>
       ${typeView === 'visit' ? `
       <div class="filter-bar">
         <span class="muted" style="font-size:13px">Фильтр по тегам:</span>
         ${state.taskTags.map((tag) => `<button type="button" class="tag-filter-btn ${state.taskTagFilter.has(tag) ? 'active' : ''}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}
         ${state.taskTagFilter.size ? '<button type="button" class="link-btn" id="tag-filter-reset">Сбросить</button>' : ''}
-      </div>` : `
+      </div>` : typeView === 'sale' ? `
       <div class="sub muted" style="margin-bottom:6px">Звонок (узнать когда на месте) → Встреча (дата/время, показать ассортимент, аудиозапись) → Сделка / Провал (нельзя закрыть без аудио и пояснения).</div>
+      ` : `
+      <div class="sub muted" style="margin-bottom:6px">Клиент ждёт товар → Накладная оформлена → Товар получен клиентом (закрытая — подтверждает администратор/супервайзер).</div>
       `}
       ${bulk && typeView === 'visit' ? `<div class="filter-bar">
         <span class="muted" style="font-size:13px">Выбрано: <span id="task-bulk-count">0</span></span>
@@ -1156,6 +1380,7 @@ function renderTasks(content) {
   document.getElementById('add-task-btn').addEventListener('click', () => openTaskModal(null, typeView));
   document.getElementById('task-type-visit-btn').addEventListener('click', () => { state.taskTypeView = 'visit'; render(); });
   document.getElementById('task-type-sale-btn').addEventListener('click', () => { state.taskTypeView = 'sale'; render(); });
+  document.getElementById('task-type-waitlist-btn').addEventListener('click', () => { state.taskTypeView = 'waitlist'; render(); });
   const taskBulkModeBtn = document.getElementById('task-bulk-mode-btn');
   if (taskBulkModeBtn) taskBulkModeBtn.addEventListener('click', () => { state.taskBulkMode = !state.taskBulkMode; state.taskBulkSelected = new Set(); render(); });
   const taskBulkDeleteBtn = document.getElementById('task-bulk-delete-btn');
@@ -1181,11 +1406,12 @@ function renderTasks(content) {
   if (tagResetBtn) tagResetBtn.addEventListener('click', () => { state.taskTagFilter = new Set(); render(); });
 
   if (typeView === 'sale') { renderSaleKanban(); return; }
+  if (typeView === 'waitlist') { renderWaitlistKanban(); return; }
 
   const today = new Date().toISOString().slice(0, 10);
   const kanban = document.getElementById('kanban');
   state.stages.forEach((stage) => {
-    let inStage = state.tasks.filter((t) => (t.taskType || 'visit') !== 'sale' && t.stage === stage.key);
+    let inStage = state.tasks.filter((t) => (t.taskType || 'visit') === 'visit' && t.stage === stage.key);
     if (state.taskTagFilter.size) {
       inStage = inStage.filter((t) => (t.tags || []).some((tag) => state.taskTagFilter.has(tag)));
     }
@@ -1283,6 +1509,50 @@ function renderSaleKanban() {
   });
 }
 
+// ---------- Воронка "Лист ожидания": клиент ждёт товар → накладная → получен ----------
+
+function renderWaitlistKanban() {
+  const kanban = document.getElementById('kanban');
+  const stages = state.waitlistStages || [];
+  const today = new Date().toISOString().slice(0, 10);
+  stages.forEach((stage) => {
+    const inStage = state.tasks.filter((t) => t.taskType === 'waitlist' && t.stage === stage.key);
+    const col = el(`
+      <div class="kanban-col" data-stage="${stage.key}">
+        <h3>${escapeHtml(stage.label)} <span class="col-sum">· ${inStage.length}</span></h3>
+        <div class="col-body"></div>
+      </div>
+    `);
+    const colBody = col.querySelector('.col-body');
+    inStage.forEach((t) => {
+      const client = clientById(t.clientId);
+      const overdue = t.dueDate && t.dueDate < today && stage.key !== 'received';
+      const card = el(`
+        <div class="deal-card" draggable="true" data-id="${t.id}">
+          <div class="deal-title">${escapeHtml(t.title)}</div>
+          <div class="deal-client">${client ? escapeHtml(client.name) : '—'}</div>
+          <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''}</div>
+          ${taskTagBadges(t) ? `<div class="card-tags">${taskTagBadges(t)}</div>` : ''}
+        </div>
+      `);
+      card.addEventListener('click', () => openTaskModal(t));
+      card.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', t.id));
+      colBody.appendChild(card);
+    });
+    col.addEventListener('dragover', (e) => e.preventDefault());
+    col.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const id = e.dataTransfer.getData('text/plain');
+      try {
+        await api('PUT', `/api/tasks/${id}`, { stage: stage.key });
+        await loadAll();
+        render();
+      } catch (err) { alert(err.message); }
+    });
+    kanban.appendChild(col);
+  });
+}
+
 function openTaskModal(task, forceType) {
   const isEdit = !!task;
   if (!state.clients.length) {
@@ -1302,43 +1572,51 @@ function openTaskModal(task, forceType) {
   const taskClient = isEdit ? clientById(task.clientId) : null;
   const hasAssortment = taskClient && ((taskClient.regularAssortment || []).length || (taskClient.testAssortment || []).length);
   const isSale = isEdit ? task.taskType === 'sale' : forceType === 'sale';
-  const stageOptions = isSale ? (state.saleStages || []) : state.stages;
+  const isWaitlist = isEdit ? task.taskType === 'waitlist' : forceType === 'waitlist';
+  const stageOptions = isSale ? (state.saleStages || []) : isWaitlist ? (state.waitlistStages || []) : state.stages;
 
   const typeSelectBlock = !isEdit ? `
       <label>Тип задачи</label>
       <select name="taskType" id="task-type-select">
-        <option value="visit" ${forceType !== 'sale' ? 'selected' : ''}>Визит</option>
+        <option value="visit" ${forceType !== 'sale' && forceType !== 'waitlist' ? 'selected' : ''}>Визит</option>
         <option value="sale" ${forceType === 'sale' ? 'selected' : ''}>Продажа (звонок → встреча → сделка)</option>
+        <option value="waitlist" ${forceType === 'waitlist' ? 'selected' : ''}>Лист ожидания (товар под заказ)</option>
       </select>
   ` : '';
 
   const body = `
-    <h2>${isEdit ? (isSale ? 'Задача воронки продаж' : 'Задача') : 'Новая задача'}</h2>
+    <h2>${isEdit ? (isSale ? 'Задача воронки продаж' : isWaitlist ? 'Задача листа ожидания' : 'Задача') : 'Новая задача'}</h2>
     ${isEdit && isStaff() ? `<div class="muted" style="font-size:12px;margin-bottom:8px">Создано: ${fmtDateTime(task.createdAt)} · ${escapeHtml(userName(task.createdBy))}</div>` : ''}
     <form id="task-form">
       <label>Клиент *</label>
       <select name="clientId" required ${isEdit ? 'disabled' : ''}>
         ${myClients.map((c) => `<option value="${c.id}" ${task && task.clientId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
+      ${isEdit && taskClient && taskClient.phone ? `<div class="muted" style="font-size:13px;margin:-6px 0 10px">📞 ${telLink(taskClient.phone)}</div>` : ''}
       ${typeSelectBlock}
       <label>Название</label>
-      <input name="title" value="${task ? escapeAttr(task.title) : ''}" placeholder="${isSale ? 'Звонок клиенту' : 'Посетить клиента'}">
+      <input name="title" value="${task ? escapeAttr(task.title) : ''}" placeholder="${isSale ? 'Звонок клиенту' : isWaitlist ? 'Ожидание товара' : 'Посетить клиента'}">
       <label>Описание</label>
       <textarea name="description">${task ? escapeHtml(task.description || '') : ''}</textarea>
       <div class="field-row">
         <div><label>Срок *${dateLocked ? ' <span class="lock" title="Обратитесь к супервайзеру">🔒</span>' : ''}</label>
-          <input name="dueDate" type="date" required value="${task ? task.dueDate : ''}" ${dateLocked ? 'disabled title="Обратитесь к супервайзеру"' : ''}>
+          ${dateFieldHTML({ name: 'dueDate', value: task ? task.dueDate : '', required: true, disabled: dateLocked })}
         </div>
         ${isEdit ? `<div><label>Этап</label><select name="stage">${stageOptions.map((s) => `<option value="${s.key}" ${task.stage === s.key ? 'selected' : ''}>${s.label}</option>`).join('')}</select></div>` : ''}
       </div>
       ${assigneeBlock}
-      ${!isSale ? `
+      ${!isSale && !isWaitlist ? `
       <label>Теги</label>
       <div class="tag-checks">
         ${state.taskTags.map((tag) => `<label class="tag-check"><input type="checkbox" name="tags" value="${escapeAttr(tag)}" ${task && (task.tags || []).includes(tag) ? 'checked' : ''}> ${escapeHtml(tag)}</label>`).join('')}
       </div>` : ''}
-      ${isEdit && !isSale ? `<label>Комментарий по визиту</label><textarea name="comment">${escapeHtml(task.comment || '')}</textarea>` : ''}
-      ${isEdit && !isSale ? `<label>Отчёт по задаче ${task.stage === 'done' ? '*' : ''}</label><textarea name="report" placeholder="Без отчёта нельзя перевести в «Выполнена»">${escapeHtml(task.report || '')}</textarea>` : ''}
+      ${isWaitlist ? `
+      <label>Бренд товара</label>
+      <div class="tag-checks">
+        ${(state.waitlistTags || []).map((tag) => `<label class="tag-check"><input type="checkbox" name="tags" value="${escapeAttr(tag)}" ${task && (task.tags || []).includes(tag) ? 'checked' : ''}> ${escapeHtml(tag)}</label>`).join('')}
+      </div>` : ''}
+      ${isEdit && !isSale && !isWaitlist ? `<label>Комментарий по визиту</label><textarea name="comment">${escapeHtml(task.comment || '')}</textarea>` : ''}
+      ${isEdit && !isSale && !isWaitlist ? `<label>Отчёт по задаче ${task.stage === 'done' ? '*' : ''}</label><textarea name="report" placeholder="Без отчёта нельзя перевести в «Выполнена»">${escapeHtml(task.report || '')}</textarea>` : ''}
       ${isEdit && isSale ? `<label>Пояснение${SALE_FINAL_STAGES_CLIENT.includes(task.stage) ? '' : ' (обязательно перед «Сделка»/«Провал»)'}</label><textarea name="explanation" placeholder="Короткое пояснение по итогам звонка/встречи">${escapeHtml(task.explanation || '')}</textarea>` : ''}
       <div class="modal-actions">
         ${isEdit && isStaff() ? '<button type="button" class="btn-secondary" id="delete-task">Удалить</button>' : ''}
@@ -1399,7 +1677,7 @@ function renderDateChangeSection(task) {
       <button type="button" class="btn-secondary" id="open-date-change-form">Запросить перенос даты</button>
       <div id="date-change-form" style="display:none;margin-top:8px">
         <label>Новая дата</label>
-        <input type="date" id="date-change-date" value="${task.dueDate || ''}">
+        ${dateFieldHTML({ name: 'dateChangeDate', id: 'date-change-date', value: task.dueDate || '' })}
         <label>Причина</label>
         <textarea id="date-change-reason" placeholder="Почему нужно перенести"></textarea>
         <button type="button" class="btn-primary" id="submit-date-change" style="margin-top:6px">Отправить заявку</button>
@@ -1547,51 +1825,130 @@ async function renderReports(content) {
   content.appendChild(el(`
     <div>
       <h2 style="margin-top:0">Ассортимент по агентам</h2>
-      <div class="sub muted" style="margin-bottom:10px">Товар / бренд / штук за 7 мес / выручка / число клиентов — фильтр по бренду, чтобы отделить, например, только красители при подготовке предложения.</div>
+      <div class="sub muted" style="margin-bottom:10px">Товар / бренд / штук / выручка / число клиентов — фильтры по бренду, агенту и месяцу (по умолчанию — 7-месячная агрегация; при выборе конкретного месяца показаны данные только за него).</div>
+      <div class="filter-bar" style="margin-bottom:10px">
+        <select id="reports-agent-filter">
+          <option value="">Все агенты</option>
+        </select>
+        <select id="reports-month-filter">
+          <option value="all">Все месяцы (7 мес)</option>
+        </select>
+      </div>
       <div id="reports-brand-bar" class="assort-brand-filter"></div>
       <div id="reports-table" class="report-table-wrap"><div class="muted">Загрузка…</div></div>
+
+      <h2 style="margin-top:26px">🎁 Акции</h2>
+      <div class="sub muted" style="margin-bottom:10px">Кто из клиентов и что именно брал по текущим акциям склада/магазина (срез на дату последнего импорта) — с фильтром по агенту.</div>
+      <div class="filter-bar" style="margin-bottom:10px">
+        <select id="promo-report-agent-filter">
+          <option value="">Все агенты</option>
+        </select>
+      </div>
+      <div id="promo-report-table" class="report-table-wrap"><div class="muted">Загрузка…</div></div>
     </div>
   `));
 
-  const res = await api('GET', '/api/reports/assortment-by-agent');
-  const bar = document.getElementById('reports-brand-bar');
-  bar.innerHTML = `
-    <button type="button" class="brand-chip active" data-brand="all">Все</button>
-    ${res.brands.map((b) => `<button type="button" class="brand-chip" data-brand="${escapeAttr(b)}">${escapeHtml(b)}</button>`).join('')}
-    <button type="button" class="brand-chip" data-brand="colorants">Красители/оксиды</button>
-  `;
+  let currentBrand = 'all';
 
-  function renderTable(brand) {
-    const rows = !brand || brand === 'all' ? res.rows
-      : brand === 'colorants' ? res.rows.filter((r) => r.category === 'Краситель' || r.category === 'Оксид')
-      : res.rows.filter((r) => r.brand === brand);
-    document.getElementById('reports-table').innerHTML = rows.length ? `
+  async function load() {
+    const agentId = document.getElementById('reports-agent-filter').value;
+    const month = document.getElementById('reports-month-filter').value;
+    const qs = new URLSearchParams();
+    if (agentId) qs.set('agentId', agentId);
+    if (month) qs.set('month', month);
+    const res = await api('GET', `/api/reports/assortment-by-agent?${qs.toString()}`);
+
+    const agentSel = document.getElementById('reports-agent-filter');
+    if (!agentSel.dataset.filled) {
+      agentSel.innerHTML = '<option value="">Все агенты</option>' +
+        res.agents.map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+      agentSel.value = agentId;
+      agentSel.dataset.filled = '1';
+    }
+    const monthSel = document.getElementById('reports-month-filter');
+    if (!monthSel.dataset.filled) {
+      monthSel.innerHTML = '<option value="all">Все месяцы (7 мес)</option>' +
+        res.months.map((m) => `<option value="${escapeAttr(m)}">${escapeHtml(m.charAt(0).toUpperCase() + m.slice(1))}</option>`).join('');
+      monthSel.value = month || 'all';
+      monthSel.dataset.filled = '1';
+    }
+
+    const bar = document.getElementById('reports-brand-bar');
+    bar.innerHTML = `
+      <button type="button" class="brand-chip ${currentBrand === 'all' ? 'active' : ''}" data-brand="all">Все</button>
+      ${res.brands.map((b) => `<button type="button" class="brand-chip ${currentBrand === b ? 'active' : ''}" data-brand="${escapeAttr(b)}">${escapeHtml(b)}</button>`).join('')}
+      <button type="button" class="brand-chip ${currentBrand === 'colorants' ? 'active' : ''}" data-brand="colorants">Красители/оксиды</button>
+    `;
+
+    function renderTable(brand) {
+      const rows = !brand || brand === 'all' ? res.rows
+        : brand === 'colorants' ? res.rows.filter((r) => r.category === 'Краситель' || r.category === 'Оксид')
+        : res.rows.filter((r) => r.brand === brand);
+      const qtyHeader = month && month !== 'all' ? 'Шт (за месяц)' : 'Шт (7 мес)';
+      document.getElementById('reports-table').innerHTML = rows.length ? `
+        <table>
+          <thead><tr><th>Агент</th><th>Товар</th><th>Бренд</th><th>${qtyHeader}</th><th>Выручка</th><th>Клиентов</th></tr></thead>
+          <tbody>
+            ${rows.slice(0, 300).map((r) => `
+              <tr>
+                <td>${escapeHtml(r.agentName)}</td>
+                <td>${escapeHtml(r.product)}</td>
+                <td><span class="brand-badge">${escapeHtml(r.brand)}</span></td>
+                <td>${r.qty}</td>
+                <td>${fmtMoney(r.revenue)}</td>
+                <td>${r.clientsCount}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        ${rows.length > 300 ? `<div class="muted" style="margin-top:6px;font-size:12px">Показаны первые 300 из ${rows.length} — сузьте фильтр по бренду.</div>` : ''}
+      ` : '<div class="empty-state">Нет данных по этому фильтру.</div>';
+    }
+    renderTable(currentBrand);
+    bar.querySelectorAll('.brand-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        currentBrand = chip.dataset.brand;
+        bar.querySelectorAll('.brand-chip').forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        renderTable(currentBrand);
+      });
+    });
+  }
+
+  document.getElementById('reports-agent-filter').addEventListener('change', load);
+  document.getElementById('reports-month-filter').addEventListener('change', load);
+  await load();
+
+  async function loadPromoReport() {
+    const agentId = document.getElementById('promo-report-agent-filter').value;
+    const qs = new URLSearchParams();
+    if (agentId) qs.set('agentId', agentId);
+    const res = await api('GET', `/api/reports/promotions?${qs.toString()}`);
+    const agentSel = document.getElementById('promo-report-agent-filter');
+    if (!agentSel.dataset.filled) {
+      agentSel.innerHTML = '<option value="">Все агенты</option>' +
+        res.agents.map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+      agentSel.value = agentId;
+      agentSel.dataset.filled = '1';
+    }
+    document.getElementById('promo-report-table').innerHTML = res.rows.length ? `
       <table>
-        <thead><tr><th>Агент</th><th>Товар</th><th>Бренд</th><th>Шт (7 мес)</th><th>Выручка</th><th>Клиентов</th></tr></thead>
+        <thead><tr><th>Агент</th><th>Клиент</th><th>Акция</th><th>Кол-во</th></tr></thead>
         <tbody>
-          ${rows.slice(0, 300).map((r) => `
+          ${res.rows.map((r) => `
             <tr>
               <td>${escapeHtml(r.agentName)}</td>
-              <td>${escapeHtml(r.product)}</td>
-              <td><span class="brand-badge">${escapeHtml(r.brand)}</span></td>
-              <td>${r.qty}</td>
-              <td>${fmtMoney(r.revenue)}</td>
-              <td>${r.clientsCount}</td>
+              <td>${escapeHtml(r.clientName)}</td>
+              <td>${escapeHtml(r.promo)}</td>
+              <td>${formatQty(r.qty)}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
-      ${rows.length > 300 ? `<div class="muted" style="margin-top:6px;font-size:12px">Показаны первые 300 из ${rows.length} — сузьте фильтр по бренду.</div>` : ''}
-    ` : '<div class="empty-state">Нет данных по этому фильтру.</div>';
+    ` : '<div class="empty-state">По этому фильтру акций нет.</div>';
   }
-  renderTable('all');
-  bar.querySelectorAll('.brand-chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      bar.querySelectorAll('.brand-chip').forEach((c) => c.classList.remove('active'));
-      chip.classList.add('active');
-      renderTable(chip.dataset.brand);
-    });
-  });
+  document.getElementById('promo-report-agent-filter').addEventListener('change', loadPromoReport);
+  await loadPromoReport();
 }
 
 // ---------- Команда (только админ) ----------
@@ -1609,7 +1966,7 @@ function renderTeam(content) {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Аватар</th><th>Имя</th><th>Email</th><th>Роль</th><th></th></tr></thead>
+          <thead><tr><th>Аватар</th><th>Имя</th><th>Email</th><th>Роль</th><th>Может менять адрес/телефон/конт.лицо</th><th></th></tr></thead>
           <tbody id="users-tbody"></tbody>
         </table>
       </div>
@@ -1629,6 +1986,7 @@ function renderTeam(content) {
         <td>${escapeHtml(u.name)}</td>
         <td>${escapeHtml(u.email || '')}</td>
         <td>${roleLabel(u.role)}</td>
+        <td>${u.role === 'agent' ? `<input type="checkbox" class="edit-contact-perm" data-id="${u.id}" ${u.canEditClientContact ? 'checked' : ''}>` : '—'}</td>
         <td>${u.id !== state.user.id ? '<button class="link-btn delete-user">Удалить</button>' : ''}</td>
       </tr>
     `);
@@ -1638,6 +1996,13 @@ function renderTeam(content) {
       await api('DELETE', `/api/users/${u.id}`);
       await loadAll();
       render();
+    });
+    const permCheck = row.querySelector('.edit-contact-perm');
+    if (permCheck) permCheck.addEventListener('change', async () => {
+      try {
+        await api('PUT', `/api/users/${u.id}/permissions`, { canEditClientContact: permCheck.checked });
+        await loadAll();
+      } catch (e) { alert(e.message); permCheck.checked = !permCheck.checked; }
     });
     const avatarInput = row.querySelector('.avatar-input');
     avatarInput.addEventListener('change', async () => {
@@ -1892,6 +2257,7 @@ function renderCalDay() {
     const row = el(`
       <div class="history-row cal-day-row">
         <div><strong>${escapeHtml(c ? c.name : '—')}</strong> ${m.time ? `<span class="badge">${escapeHtml(m.time)}</span>` : ''}</div>
+        <div class="muted">${c ? agentTag(c.ownerId) : ''}</div>
         ${m.note ? `<div class="muted">${escapeHtml(m.note)}</div>` : ''}
         ${state.user.role === 'supervisor' ? '<button type="button" class="btn-secondary del-sup-meeting" style="margin-top:6px">Удалить</button>' : ''}
       </div>
@@ -1917,7 +2283,7 @@ function openSupervisorMeetingModal(dateKey) {
         ${state.clients.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
       <label>Дата *</label>
-      <input name="date" type="date" required value="${dateKey || ''}">
+      ${dateFieldHTML({ name: 'date', value: dateKey || '', required: true })}
       <label>Время</label>
       <input name="time" type="time">
       <label>Заметка</label>
@@ -2068,6 +2434,15 @@ function openModal(innerHtml, onSubmit) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errBox.textContent = '';
+    // Скрытые поля даты (виджет ДД.ММ.ГГ) не участвуют в нативной HTML5-валидации
+    // required, поэтому обязательность проверяем вручную.
+    const missingDate = Array.from(form.querySelectorAll('.date-field input[type="hidden"][data-required="1"]')).find((h) => !h.value);
+    if (missingDate) {
+      const textInput = missingDate.closest('.date-field').querySelector('.date-display-input');
+      errBox.textContent = 'Укажите корректную дату (ДД.ММ.ГГ)';
+      if (textInput) textInput.classList.add('invalid');
+      return;
+    }
     try {
       await onSubmit(form);
     } catch (err) {

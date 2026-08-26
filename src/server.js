@@ -95,6 +95,7 @@ if (importResult.extraAgentsAdded) {
 // при каждом старте, после первого раза она ничего не делает.
 api.migrateLegacyTaskStages();
 api.migrateClientDefaults();
+api.migrateUserDefaults();
 
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url);

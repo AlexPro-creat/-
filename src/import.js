@@ -33,6 +33,19 @@ function norm(s) {
   return (s || '').toString().trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
 }
 
+// Нормализация номера телефона: ведущий 0, если его нет (и номер не в формате
+// +996...), убрать все пробелы внутри номера. Несколько номеров через "/" —
+// каждый нормализуется отдельно. Используется и здесь (при создании нового
+// клиента импортом), и в migrateClientDefaults (api.js) — для уже существующих.
+function normalizePhone(phone) {
+  if (!phone) return phone;
+  return phone.split('/').map((part) => {
+    let p = part.replace(/\s+/g, '').trim();
+    if (p && !p.startsWith('0') && !p.startsWith('+')) p = '0' + p;
+    return p;
+  }).filter(Boolean).join(' / ');
+}
+
 function ensureTeam() {
   if (db.all('users').length > 0) return false;
 
@@ -148,7 +161,20 @@ function computeTestAssortment(rawItems, stockByName) {
 
 function runImport() {
   db.ensureLoaded();
+  // Импорт делает сотни insert/update подряд (по контрагенту на строку) — без
+  // пакетного режима каждый вызов писал бы на диск ВЕСЬ файл базы (db.js persist()),
+  // что при текущем объёме данных (ассортимент/акции/помесячные срезы) ощутимо
+  // замедляет каждый перезапуск сервера. beginBatch()/endBatch() сводят это к
+  // одной записи на диск в конце — поведение insert/update/remove не меняется.
+  db.beginBatch();
+  try {
+    return runImportBody();
+  } finally {
+    db.endBatch();
+  }
+}
 
+function runImportBody() {
   const createdAgents = ensureTeam();
   const usersCreated = !!createdAgents;
   const extraAgentsAdded = ensureExtraAgents();
@@ -163,6 +189,19 @@ function runImport() {
   // достаточно нормализовать название товара при поиске, сам файл не перестраиваем.
   const stockByName = loadJson('stock.json') || {};
   const promotionsMap = loadJson('promotions.json') || {};
+  // Список правок после Фазы 6.1: "постоянный клиент" больше не завязан на
+  // regularAssortment (конкретный товар в >=4 из 7 мес.) — теперь это "были
+  // покупки (любой ассортимент) 3 последних месяца подряд". Источник —
+  // active_months.json (по каждому клиенту — месяцы, где была хотя бы одна
+  // покупка, из тех же сырых файлов продаж, что и regular/test assortment).
+  const activeMonthsMap = loadJson('active_months.json') || {};
+  // Сумма продаж и товарные строки ТОЛЬКО за текущий месяц (август) — для
+  // дашборда агента (сумма за месяц вместо суммы за 7 мес., топ по брендам).
+  const currentMonthMap = loadJson('current_month_sales.json') || {};
+  // По каждому клиенту и каждому месяцу — построчный ассортимент (см. build_assortment_by_month.py
+  // в gdrive-data). Нужно для фильтра "по месяцам" в вкладке "Отчёты" (у супервайзера/админа) —
+  // 7-месячная агрегация (regular/testAssortment) не хранит разбивку по отдельным месяцам.
+  const monthlyAssortmentMap = loadJson('assortment_by_month.json') || {};
 
   const debtByName = {};
   debts.forEach((d) => { debtByName[norm(d.client_name)] = d; });
@@ -176,6 +215,22 @@ function runImport() {
   const promotionsByName = {};
   Object.keys(promotionsMap).forEach((k) => { promotionsByName[norm(k)] = promotionsMap[k]; });
 
+  const activeMonthsByName = {};
+  Object.keys(activeMonthsMap).forEach((k) => { activeMonthsByName[norm(k)] = activeMonthsMap[k]; });
+
+  const currentMonthByName = {};
+  Object.keys(currentMonthMap).forEach((k) => { currentMonthByName[norm(k)] = currentMonthMap[k]; });
+
+  const monthlyAssortmentByName = {};
+  Object.keys(monthlyAssortmentMap).forEach((k) => { monthlyAssortmentByName[norm(k)] = monthlyAssortmentMap[k]; });
+
+  // Последние 3 месяца из скользящего 7-месячного окна (сейчас: июнь/июль/август).
+  const last3Months = MONTH_ORDER.slice(-3);
+  function isRegularByLast3Months(activeMonths) {
+    if (!activeMonths || !activeMonths.length) return false;
+    return last3Months.every((m) => activeMonths.includes(m));
+  }
+
   let clientsCreated = 0;
   let clientsUpdated = 0;
   const now = new Date().toISOString();
@@ -187,6 +242,9 @@ function runImport() {
     const debt = debtByName[key];
     const promotions = promotionsByName[key] || [];
     const owner = agentsByName[norm(c.agent)] || adminUser;
+    const activeMonths = activeMonthsByName[key] || [];
+    const currentMonth = currentMonthByName[key] || null;
+    const monthlyAssortment = monthlyAssortmentByName[key] || {};
 
     let existing = db.all('clients').find((cl) => norm(cl.name) === key);
 
@@ -199,7 +257,16 @@ function runImport() {
       // "Акции" (Фаза 6, п.15) — кто что брал по акциям склада/магазина за текущий срез
       // (Загрузка_акции_25.08.xlsx). Как и ассортимент/долг, пересчитывается при каждом
       // импорте целиком — это срез на дату, а не ручное поле.
-      promotions
+      promotions,
+      // "Постоянный клиент" (новая логика после Фазы 6.1) — покупки 3 последних
+      // месяца подряд, независимо от товара. activeMonths хранится целиком —
+      // пригодится, если пользователь попросит другой порог месяцев позже.
+      activeMonths,
+      isRegularClient: isRegularByLast3Months(activeMonths),
+      currentMonthRevenue: currentMonth ? currentMonth.revenue : 0,
+      currentMonthItems: currentMonth ? currentMonth.items : [],
+      // Ассортимент по месяцам { 'февраль': [...], ... } — только для отчёта "по месяцам".
+      monthlyAssortment
     };
 
     if (!existing) {
@@ -207,7 +274,7 @@ function runImport() {
         name: c.name,
         pointType: c.point_type || '',
         address: c.address || '',
-        phone: c.phone || '',
+        phone: normalizePhone(c.phone || ''),
         contactName: c.contact_name || '',
         visitDay: c.visit_day || '',
         contractStatus: c.contract_status || 'неизвестно',
@@ -229,4 +296,5 @@ function runImport() {
   return { usersCreated, extraAgentsAdded, clientsCreated, clientsUpdated };
 }
 
-module.exports = { runImport };
+module.exports = { runImport, normalizePhone, MONTH_ORDER };
+
