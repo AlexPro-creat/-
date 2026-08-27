@@ -246,7 +246,12 @@ function runImportBody() {
     const currentMonth = currentMonthByName[key] || null;
     const monthlyAssortment = monthlyAssortmentByName[key] || {};
 
-    let existing = db.all('clients').find((cl) => norm(cl.name) === key);
+    // Совпадение ищем в пределах ТОГО ЖЕ агента (owner), а не по всей базе —
+    // иначе общие для нескольких агентов ярлыки вроде «Частное лицо»/«Частники»
+    // (разные реальные клиенты у разных агентов) схлопывались бы в одну карточку
+    // первого встретившегося агента (найдено и исправлено 27.08.2026).
+    const ownerId = owner ? owner.id : adminUser.id;
+    let existing = db.all('clients').find((cl) => norm(cl.name) === key && cl.ownerId === ownerId);
 
     const computedFields = {
       regularAssortment: computeAssortment(assortmentRaw, stockByName),
