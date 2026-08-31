@@ -284,6 +284,8 @@ function runImportBody() {
         visitDay: c.visit_day || '',
         contractStatus: c.contract_status || 'неизвестно',
         paymentMethod: '',
+        discountTerms: c.discount_terms || '',
+        salesPlan: Number(c.sales_plan) || 0,
         notes: c.note_from_import || '',
         ownerId: owner ? owner.id : adminUser.id,
         isOffRoute: false,

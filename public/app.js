@@ -15,9 +15,10 @@ const state = {
   supervisorMeetings: [],
   view: 'dashboard',
   stats: null,
-  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, showClosed: false, search: '' },
+  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, showClosed: false, search: '' },
   clientSort: { key: null, dir: -1 },
   taskTagFilter: new Set(),
+  waitlistTagFilter: new Set(),
   calendar: { mode: 'month', date: new Date() },
   clientBulkMode: false,
   clientBulkSelected: new Set(),
@@ -422,7 +423,7 @@ async function renderDashboard(content) {
         <div class="stat-card"><div class="num">${stats.clientsCount}</div><div class="label">Клиентов</div>${isStaff() ? agentFilterSelectHTML('clientsCount') : ''}</div>
         <div class="stat-card"><div class="num">${stats.todayTasksCount}</div><div class="label">Задач на сегодня</div>${isStaff() ? agentFilterSelectHTML('todayTasksCount') : ''}</div>
         <div class="stat-card"><div class="num">${stats.overdueTasksCount}</div><div class="label">Просроченных задач</div>${isStaff() ? agentFilterSelectHTML('overdueTasksCount') : ''}</div>
-        <div class="stat-card stat-card-alert"><div class="num">${stats.atRiskClientsCount}</div><div class="label">Клиентов с риском «отвала» товара</div>${isStaff() ? agentFilterSelectHTML('atRiskClientsCount') : ''}</div>
+        <div class="stat-card stat-card-alert"><div class="num">${stats.atRiskClientsCount}</div><div class="label">Клиентов «недопродано»</div>${isStaff() ? agentFilterSelectHTML('atRiskClientsCount') : ''}</div>
         <div class="stat-card"><div class="num">${fmtMoney(stats.totalDebt)}</div><div class="label">Общий долг</div>${isStaff() ? agentFilterSelectHTML('totalDebt') + paymentMethodFilterSelectHTML('totalDebt') : ''}</div>
         ${isStaff() && stats.teamTotals ? `<div class="stat-card"><div class="num">${stats.teamTotals.totalTasks}</div><div class="label">Всего задач по команде (в работе: ${stats.teamTotals.open})</div></div>` : ''}
         ${isStaff() ? `<div class="stat-card"><div class="num">${stats.pendingApprovalCount}</div><div class="label">Новых точек на согласовании</div></div>` : ''}
@@ -440,6 +441,10 @@ async function renderDashboard(content) {
           <div class="stat-card"><div class="num">${stats.agentDashboard.meetingsToday}</div><div class="label">Встреч сегодня</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.doneTasksToday}</div><div class="label">Выполнено сегодня</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.overdueTasksCount}</div><div class="label">Просрочено</div></div>
+          <div class="stat-card" title="Сумма не считается — в данных по акциям нет цены/суммы по позиции, только описание и количество">
+            <div class="num">${stats.agentDashboard.promotionsClientsCount}</div>
+            <div class="label">Клиентов с акциями (${stats.agentDashboard.promotionsItemsCount} поз., сумма не указана в источнике)</div>
+          </div>
         </div>
         <button type="button" class="assort-btn" id="top-brands-toggle">🏆 Топ-10 по брендам (этот месяц)</button>
         <div class="assort-panel" id="top-brands-panel" style="display:none">
@@ -633,6 +638,7 @@ function filteredClients() {
     if (f.onlyDebt && !(c.debtAmount > 0)) return false;
     if (f.onlyShortfall && !riskCount(c)) return false;
     if (f.onlyPromotions && !(c.promotions || []).length) return false;
+    if (f.onlyDiscount && !(c.discountTerms || '').trim()) return false;
     if (f.search) {
       const q = f.search.trim().toLowerCase();
       const hay = `${c.name} ${c.phone || ''} ${c.contactName || ''}`.toLowerCase();
@@ -667,7 +673,7 @@ function daysOverdueText(c) {
 }
 
 function exportClientsCsv(list) {
-  const headers = ['Название', 'Долг', 'Ассортимент риск', 'Тип точки', 'Телефон', 'Контактное лицо', 'День визита', 'Ответственный'];
+  const headers = ['Название', 'Долг', 'Недопродано', 'Тип точки', 'Телефон', 'Контактное лицо', 'День визита', 'Ответственный'];
   const rows = list.map((c) => [c.name, c.debtAmount || 0, riskCount(c), c.pointType || '', c.phone || '', c.contactName || '', c.visitDay || '', userName(c.ownerId)]);
   const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
@@ -684,7 +690,7 @@ function exportClientsCsv(list) {
 function renderClients(content) {
   const pointTypes = Array.from(new Set(state.clients.map((c) => c.pointType).filter(Boolean))).sort();
   const f = state.clientFilters;
-  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.onlyPromotions || f.showClosed || f.search;
+  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.onlyPromotions || f.onlyDiscount || f.showClosed || f.search;
   const bulk = state.clientBulkMode;
   content.appendChild(el(`
     <div>
@@ -714,6 +720,7 @@ function renderClients(content) {
         <label class="filter-check"><input type="checkbox" id="filter-onlyDebt" ${f.onlyDebt ? 'checked' : ''}> Есть задолженность</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyShortfall" ${f.onlyShortfall ? 'checked' : ''}> Не добрал</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyPromotions" ${f.onlyPromotions ? 'checked' : ''}> Есть акции</label>
+        <label class="filter-check"><input type="checkbox" id="filter-onlyDiscount" ${f.onlyDiscount ? 'checked' : ''}> Со скидкой/особыми условиями</label>
         ${isStaff() ? `<label class="filter-check"><input type="checkbox" id="filter-showClosed" ${f.showClosed ? 'checked' : ''}> Показать закрытые</label>` : ''}
         ${filtersActive ? '<button type="button" class="link-btn" id="filter-reset">Сбросить</button>' : ''}
       </div>
@@ -731,8 +738,7 @@ function renderClients(content) {
             ${bulk ? '<th></th>' : ''}
             <th class="sticky-col">Название</th>
             <th class="sortable" data-sort="debt">Долг${sortArrow('debt')}</th>
-            <th class="sortable" data-sort="risk">Ассортимент риск${sortArrow('risk')}</th>
-            <th></th>
+            <th class="sortable" data-sort="risk">Недопродано${sortArrow('risk')}</th>
             <th>Тип точки</th>
             <th>Номер телефона</th>
             <th>Контактное лицо</th>
@@ -756,11 +762,12 @@ function renderClients(content) {
   document.getElementById('filter-onlyDebt').addEventListener('change', (e) => { state.clientFilters.onlyDebt = e.target.checked; render(); });
   document.getElementById('filter-onlyShortfall').addEventListener('change', (e) => { state.clientFilters.onlyShortfall = e.target.checked; render(); });
   document.getElementById('filter-onlyPromotions').addEventListener('change', (e) => { state.clientFilters.onlyPromotions = e.target.checked; render(); });
+  document.getElementById('filter-onlyDiscount').addEventListener('change', (e) => { state.clientFilters.onlyDiscount = e.target.checked; render(); });
   const showClosedCb = document.getElementById('filter-showClosed');
   if (showClosedCb) showClosedCb.addEventListener('change', (e) => { state.clientFilters.showClosed = e.target.checked; render(); });
   const resetBtn = document.getElementById('filter-reset');
   if (resetBtn) resetBtn.addEventListener('click', () => {
-    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, showClosed: false, search: '' };
+    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, showClosed: false, search: '' };
     render();
   });
   content.querySelectorAll('th.sortable').forEach((th) => {
@@ -786,7 +793,7 @@ function renderClients(content) {
   const tbody = document.getElementById('clients-tbody');
   const list = filteredClients();
   if (!list.length) {
-    tbody.appendChild(el(`<tr><td colspan="${bulk ? 8 : 7}"><div class="empty-state">${state.clients.length ? 'Ничего не найдено по выбранным фильтрам.' : 'Пока нет клиентов. Добавьте первого.'}</div></td></tr>`));
+    tbody.appendChild(el(`<tr><td colspan="${bulk ? 7 : 6}"><div class="empty-state">${state.clients.length ? 'Ничего не найдено по выбранным фильтрам.' : 'Пока нет клиентов. Добавьте первого.'}</div></td></tr>`));
     return;
   }
   list.forEach((c) => {
@@ -795,7 +802,7 @@ function renderClients(content) {
     const row = el(`
       <tr class="${c.closed ? 'row-closed' : ''}">
         ${bulk ? `<td><input type="checkbox" class="bulk-check" data-id="${c.id}" ${state.clientBulkSelected.has(c.id) ? 'checked' : ''}></td>` : ''}
-        <td class="sticky-col">
+        <td class="sticky-col open-client" title="Двойной клик — открыть карточку">
           <strong>${escapeHtml(c.name)}</strong>
           ${c.closed ? '<span class="badge badge-offroute">закрыта</span>' : ''}
           ${c.closureRequested ? '<span class="badge badge-pending">на закрытие</span>' : ''}
@@ -804,14 +811,13 @@ function renderClients(content) {
           ${(c.promotions || []).length ? '<span class="badge badge-promo" title="Есть акции">🎁 акции</span>' : ''}
         </td>
         <td>${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${overdueDays}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
-        <td>${risk ? `<span class="badge badge-overdue">${risk} риск</span>` : '—'}</td>
-        <td><button class="link-btn open-client">Открыть</button></td>
+        <td>${risk ? `<span class="badge badge-overdue">${risk} недопродано</span>` : '—'}</td>
         <td>${escapeHtml(c.pointType || '—')}</td>
         <td>${telLink(c.phone)}</td>
         <td>${escapeHtml(c.contactName || '—')}</td>
       </tr>
     `);
-    row.querySelector('.open-client').addEventListener('click', () => openClientModal(c));
+    row.querySelector('.open-client').addEventListener('dblclick', () => openClientModal(c));
     const cb = row.querySelector('.bulk-check');
     if (cb) cb.addEventListener('change', () => {
       if (cb.checked) state.clientBulkSelected.add(c.id); else state.clientBulkSelected.delete(c.id);
@@ -993,6 +999,15 @@ async function openClientModal(client) {
 
   const canEditContact = isOwner && !!state.user.canEditClientContact;
 
+  // Быстрое создание задачи по любой из 3 воронок прямо из карточки клиента.
+  const taskButtonsHtml = isEdit ? `
+    <div class="filter-bar" style="margin:8px 0">
+      <span class="muted" style="font-size:13px">Создать задачу:</span>
+      <button type="button" class="btn-secondary" id="quick-task-visit">Визит</button>
+      <button type="button" class="btn-secondary" id="quick-task-sale">Продажа</button>
+      <button type="button" class="btn-secondary" id="quick-task-waitlist">Лист ожидания</button>
+    </div>` : '';
+
   let bodyHtml;
   if (isEdit && !canEditCore) {
     // Просмотр для агента: карточка + доступное редактирование заметок
@@ -1000,6 +1015,7 @@ async function openClientModal(client) {
     bodyHtml = `
       <h2>${escapeHtml(client.name)}</h2>
       ${client.pendingApproval ? '<p class="note-pending">Точка на согласовании у администратора</p>' : ''}
+      ${taskButtonsHtml}
       ${renderClosureBlock(client)}
       <div class="panel-inline">
         ${fieldRow('Тип точки', escapeHtml(client.pointType || '—'), true)}
@@ -1009,6 +1025,8 @@ async function openClientModal(client) {
         ${fieldRow('День визита', escapeHtml(client.visitDay || '—'), true)}
         ${fieldRow('Работает по договору', escapeHtml(client.contractStatus), true)}
         ${fieldRow('Способ оплаты', escapeHtml(client.paymentMethod || 'не указан'), true)}
+        ${fieldRow('Скидка / условия оплаты', escapeHtml(client.discountTerms || '—'), true)}
+        ${fieldRow('План продаж (мес.)', client.salesPlan ? `${fmtMoney(client.salesPlan)} (факт: ${fmtMoney(client.currentMonthRevenue || 0)})` : '—', true)}
         ${fieldRow('Ответственный', escapeHtml(userName(client.ownerId)), true)}
         ${fieldRow('Задолженность', client.debtAmount ? fmtMoney(client.debtAmount) + (client.debtOverdue ? ' (просрочка)' : '') : 'нет', true)}
         ${fieldRow('Последний визит', `<span class="${lastVisit.stale ? 'stale-visit' : ''}">${lastVisit.html}</span>`, true)}
@@ -1044,6 +1062,7 @@ async function openClientModal(client) {
   } else {
     bodyHtml = `
       <h2>${isEdit ? 'Контрагент' : 'Новый контрагент'}</h2>
+      ${taskButtonsHtml}
       <form id="client-form">
         <label>Название *</label>
         <input name="name" required value="${client ? escapeAttr(client.name) : ''}">
@@ -1075,6 +1094,11 @@ async function openClientModal(client) {
             </select>
           </div>
         </div>
+        <label>Скидка / условия оплаты</label>
+        <input name="discountTerms" value="${client ? escapeAttr(client.discountTerms || '') : ''}" placeholder="Например: -10%, нал/безнал">
+        <label>План продаж на клиента (сум/мес.)</label>
+        <input type="number" min="0" step="1" name="salesPlan" value="${client && client.salesPlan ? client.salesPlan : ''}" placeholder="Например: 50000">
+
         ${isStaff() ? `<label>Ответственный агент</label>
           <select name="ownerId">
             ${ownerOptions.map((u) => `<option value="${u.id}" ${client && client.ownerId === u.id ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
@@ -1148,6 +1172,13 @@ async function openClientModal(client) {
     closeModal();
     render();
   });
+
+  const quickTaskVisitBtn = document.getElementById('quick-task-visit');
+  if (quickTaskVisitBtn) quickTaskVisitBtn.addEventListener('click', () => { closeModal(); openTaskModal(null, 'visit', client.id); });
+  const quickTaskSaleBtn = document.getElementById('quick-task-sale');
+  if (quickTaskSaleBtn) quickTaskSaleBtn.addEventListener('click', () => { closeModal(); openTaskModal(null, 'sale', client.id); });
+  const quickTaskWaitlistBtn = document.getElementById('quick-task-waitlist');
+  if (quickTaskWaitlistBtn) quickTaskWaitlistBtn.addEventListener('click', () => { closeModal(); openTaskModal(null, 'waitlist', client.id); });
 
   if (isEdit) {
     wireAssortmentToggle(client.id);
@@ -1268,7 +1299,7 @@ function renderAssortBody(items, brand, mode) {
     return `
       ${normal.length ? renderGroupedAssort(normal) : '<div class="muted" style="font-size:13px;padding:4px 0">Нет позиций по этому фильтру.</div>'}
       ${risky.length ? `
-        <div class="assort-risk-heading">⚠️ Риск «отвала» — не заказывали в последнем доступном месяце</div>
+        <div class="assort-risk-heading">⚠️ Недопродано — не заказывали в последнем доступном месяце</div>
         ${risky.map(assortRow).join('')}
       ` : ''}
     `;
@@ -1366,9 +1397,14 @@ function renderTasks(content) {
         ${state.taskTags.map((tag) => `<button type="button" class="tag-filter-btn ${state.taskTagFilter.has(tag) ? 'active' : ''}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}
         ${state.taskTagFilter.size ? '<button type="button" class="link-btn" id="tag-filter-reset">Сбросить</button>' : ''}
       </div>` : typeView === 'sale' ? `
-      <div class="sub muted" style="margin-bottom:6px">Звонок (узнать когда на месте) → Встреча (дата/время, показать ассортимент, аудиозапись) → Сделка / Провал (нельзя закрыть без аудио и пояснения).</div>
+      <div class="sub muted" style="margin-bottom:6px">Звонок (узнать когда на месте) → Встреча (дата/время, показать ассортимент) → Сделка / Провал (нельзя закрыть без пояснения).</div>
       ` : `
       <div class="sub muted" style="margin-bottom:6px">Клиент ждёт товар → Накладная оформлена → Товар получен клиентом (закрытая — подтверждает администратор/супервайзер).</div>
+      <div class="filter-bar">
+        <span class="muted" style="font-size:13px">Фильтр по тегам:</span>
+        ${(state.waitlistTags || []).map((tag) => `<button type="button" class="tag-filter-btn waitlist-tag-filter-btn ${state.waitlistTagFilter.has(tag) ? 'active' : ''}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}
+        ${state.waitlistTagFilter.size ? '<button type="button" class="link-btn" id="waitlist-tag-filter-reset">Сбросить</button>' : ''}
+      </div>
       `}
       ${bulk && typeView === 'visit' ? `<div class="filter-bar">
         <span class="muted" style="font-size:13px">Выбрано: <span id="task-bulk-count">0</span></span>
@@ -1405,6 +1441,17 @@ function renderTasks(content) {
   const tagResetBtn = document.getElementById('tag-filter-reset');
   if (tagResetBtn) tagResetBtn.addEventListener('click', () => { state.taskTagFilter = new Set(); render(); });
 
+  content.querySelectorAll('.waitlist-tag-filter-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tag = btn.dataset.tag;
+      if (state.waitlistTagFilter.has(tag)) state.waitlistTagFilter.delete(tag);
+      else state.waitlistTagFilter.add(tag);
+      render();
+    });
+  });
+  const waitlistTagResetBtn = document.getElementById('waitlist-tag-filter-reset');
+  if (waitlistTagResetBtn) waitlistTagResetBtn.addEventListener('click', () => { state.waitlistTagFilter = new Set(); render(); });
+
   if (typeView === 'sale') { renderSaleKanban(); return; }
   if (typeView === 'waitlist') { renderWaitlistKanban(); return; }
 
@@ -1430,7 +1477,7 @@ function renderTasks(content) {
           ${bulk ? `<input type="checkbox" class="bulk-check task-bulk-check" data-id="${t.id}" ${state.taskBulkSelected.has(t.id) ? 'checked' : ''} onclick="event.stopPropagation()">` : ''}
           <div class="deal-title">${escapeHtml(t.title)}</div>
           <div class="deal-client">${client ? escapeHtml(client.name) : '—'}</div>
-          <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''} ${t.report ? '<span class="report-check" title="Отчёт заполнен">✓ отчёт</span>' : ''}</div>
+          <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''}${t.visitTime ? ' · ' + escapeHtml(t.visitTime) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''} ${t.report ? '<span class="report-check" title="Отчёт заполнен">✓ отчёт</span>' : ''}</div>
           ${taskTagBadges(t) ? `<div class="card-tags">${taskTagBadges(t)}</div>` : ''}
           ${(t.attachments || []).length ? `<div class="muted">📎 ${t.attachments.length}</div>` : ''}
         </div>
@@ -1493,8 +1540,8 @@ function renderSaleKanban() {
       e.preventDefault();
       const id = e.dataTransfer.getData('text/plain');
       const draggedTask = state.tasks.find((x) => String(x.id) === String(id));
-      // В "Сделку"/"Провал" нельзя перетащить напрямую — нужно аудио + пояснение,
-      // поэтому просто открываем карточку задачи, где есть загрузка записи.
+      // В "Сделку"/"Провал" нельзя перетащить напрямую — нужно короткое пояснение,
+      // поэтому просто открываем карточку задачи, где есть это поле.
       if (draggedTask && SALE_FINAL_STAGES_CLIENT.includes(stage.key) && draggedTask.stage !== stage.key) {
         openTaskModal(draggedTask);
         return;
@@ -1516,7 +1563,10 @@ function renderWaitlistKanban() {
   const stages = state.waitlistStages || [];
   const today = new Date().toISOString().slice(0, 10);
   stages.forEach((stage) => {
-    const inStage = state.tasks.filter((t) => t.taskType === 'waitlist' && t.stage === stage.key);
+    let inStage = state.tasks.filter((t) => t.taskType === 'waitlist' && t.stage === stage.key);
+    if (state.waitlistTagFilter.size) {
+      inStage = inStage.filter((t) => (t.tags || []).some((tag) => state.waitlistTagFilter.has(tag)));
+    }
     const col = el(`
       <div class="kanban-col" data-stage="${stage.key}">
         <h3>${escapeHtml(stage.label)} <span class="col-sum">· ${inStage.length}</span></h3>
@@ -1553,7 +1603,7 @@ function renderWaitlistKanban() {
   });
 }
 
-function openTaskModal(task, forceType) {
+function openTaskModal(task, forceType, presetClientId) {
   const isEdit = !!task;
   if (!state.clients.length) {
     alert('Сначала добавьте хотя бы одного клиента во вкладке «Клиенты».');
@@ -1590,7 +1640,7 @@ function openTaskModal(task, forceType) {
     <form id="task-form">
       <label>Клиент *</label>
       <select name="clientId" required ${isEdit ? 'disabled' : ''}>
-        ${myClients.map((c) => `<option value="${c.id}" ${task && task.clientId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+        ${myClients.map((c) => `<option value="${c.id}" ${(task && task.clientId === c.id) || (!isEdit && presetClientId && Number(presetClientId) === c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
       ${isEdit && taskClient && taskClient.phone ? `<div class="muted" style="font-size:13px;margin:-6px 0 10px">📞 ${telLink(taskClient.phone)}</div>` : ''}
       ${typeSelectBlock}
@@ -1602,6 +1652,7 @@ function openTaskModal(task, forceType) {
         <div><label>Срок *${dateLocked ? ' <span class="lock" title="Обратитесь к супервайзеру">🔒</span>' : ''}</label>
           ${dateFieldHTML({ name: 'dueDate', value: task ? task.dueDate : '', required: true, disabled: dateLocked })}
         </div>
+        ${!isSale && !isWaitlist ? `<div><label>Время визита</label><input type="time" name="visitTime" value="${task ? escapeAttr(task.visitTime || '') : ''}"></div>` : ''}
         ${isEdit ? `<div><label>Этап</label><select name="stage">${stageOptions.map((s) => `<option value="${s.key}" ${task.stage === s.key ? 'selected' : ''}>${s.label}</option>`).join('')}</select></div>` : ''}
       </div>
       ${assigneeBlock}

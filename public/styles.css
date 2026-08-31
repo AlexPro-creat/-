@@ -253,6 +253,7 @@ tr:last-child td { border-bottom: none; }
 }
 
 th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+td.open-client { cursor: pointer; }
 th.sortable:hover { color: var(--text); }
 
 .badge {

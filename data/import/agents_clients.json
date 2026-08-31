@@ -5983,33 +5983,36 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0530062450",
+    "contact_name": "Демилай",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Madina Hair",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "г.Ош 0554550929",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0554550929",
+    "contact_name": "Марина",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "без скидок"
   },
   {
     "name": "Ак-Куш магазин ИП Эркимбаева",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0559920303",
+    "contact_name": "Шайыл Шакирова",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Арзан Сити ИП Ташбалтаев А.А.",
@@ -6027,8 +6030,8 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "Азия Молл",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0559927999",
+    "contact_name": "Алина",
     "visit_day": "",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
@@ -6038,8 +6041,8 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0559927999",
+    "contact_name": "Алина",
     "visit_day": "",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
@@ -6049,30 +6052,32 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0559927999",
+    "contact_name": "Алина",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Бьюти Шоурум Глобус (ИП Бабаджанов Алымжан.)",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0559927999",
+    "contact_name": "Алина",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-20%"
   },
   {
     "name": "Бьюти Шоурум Ред Центр (ИП Бабаджанова Адиля.)",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "Ред центр по Московской,73",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0559927999",
+    "contact_name": "Алина",
     "visit_day": "",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
@@ -6082,22 +6087,24 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0550171120",
+    "contact_name": "Виктория",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Джалал  Абад опт Махаббат",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0503999094",
+    "contact_name": "Махаббат",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Джунхай Саида 4прох 444",
@@ -6126,11 +6133,12 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0776380638",
+    "contact_name": "Диля",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Дордой Джунхай проход 4 конт 349-350 Нурпери",
@@ -6163,7 +6171,8 @@
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "без скидок"
   },
   {
     "name": "Магазин \"Bareskin\"",
@@ -6185,7 +6194,8 @@
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "без скидок"
   },
   {
     "name": "Магазин K-beauty",
@@ -6218,18 +6228,20 @@
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Магазин Ак-Куш ( ИП Юсифова)",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "ул.Фрунзе,583",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0559920303",
+    "contact_name": "Шайыл Шакирова",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Магазин Ак-Куш Сеул ИП Абасов",
@@ -6251,7 +6263,8 @@
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "без скидок"
   },
   {
     "name": "Магазин Бонус Сатыбалдиева",
@@ -6273,7 +6286,8 @@
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Магазин КОКА Айдана",
@@ -6291,19 +6305,20 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0706552277",
+    "contact_name": "Асель (хозяйка)",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-15%"
   },
   {
     "name": "Магазин Оптовые Цены Гражданская Токтосунова",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "ул.Гражданская/ Алмаатинка",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0702765555",
+    "contact_name": "Сардар (бухгалтер)",
     "visit_day": "",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
@@ -6335,30 +6350,32 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0779336745",
+    "contact_name": "Атай",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "без скидок"
   },
   {
     "name": "Магазин Фен Боконбаева ( ИП Асанова)",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "ул.Боконбаева 96 А",
-    "phone": "",
+    "phone": "0707957520",
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Магазин Фен г.Ош ИП Алибаева Молмол Жанибековна",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "ул.Алымбек даика, 349",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0770644100",
+    "contact_name": "Молмол",
     "visit_day": "",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
@@ -6368,7 +6385,7 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "М.Гвардия,21",
-    "phone": "",
+    "phone": "0707957520",
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
@@ -6379,11 +6396,12 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "Восток 5",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0555643525",
+    "contact_name": "Дина",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Мега косметикс",
@@ -6412,11 +6430,12 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "Восток-5",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0706150377",
+    "contact_name": "Марина",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Новый салон Арген",
@@ -6434,11 +6453,12 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0700227926",
+    "contact_name": "Салима",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Римма",
@@ -6460,14 +6480,15 @@
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "без скидок"
   },
   {
     "name": "Салон Жазгуль",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "ул.Осмонкула,165",
-    "phone": "",
+    "phone": "0551002425",
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
@@ -6478,7 +6499,7 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "ул. Т.Байзаков 41а",
-    "phone": "",
+    "phone": "0502990166",
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
@@ -6489,22 +6510,24 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "ул.Алымбек датка,264",
-    "phone": "",
+    "phone": "0772642020",
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "без скидок"
   },
   {
     "name": "Студия Тазагул (ИП Сыдыкова)",
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
+    "phone": "0770373884",
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-10%"
   },
   {
     "name": "Тиан Де Лиля ИП Кирдибаева Лилиагуль",
@@ -6522,7 +6545,7 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
+    "phone": "0707466394",
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
@@ -6533,7 +6556,7 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
+    "phone": "0704040006",
     "contact_name": null,
     "visit_day": "",
     "contract_status": "неизвестно",
@@ -6555,8 +6578,8 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0554900700",
+    "contact_name": "Зульфия",
     "visit_day": "",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
@@ -6588,11 +6611,12 @@
     "agent": "Жанара",
     "point_type": "Магазин",
     "address": "Орто-Сай рк ул.Суеркулова,20/15",
-    "phone": "",
-    "contact_name": null,
+    "phone": "0508609030",
+    "contact_name": "Султан",
     "visit_day": "",
     "contract_status": "неизвестно",
-    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
+    "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
+    "discount_terms": "-15%"
   },
   {
     "name": "Этуаль Караван  Бутик Жанна",

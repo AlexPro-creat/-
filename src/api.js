@@ -42,7 +42,7 @@ const WAITLIST_STAGES = [
 ];
 const WAITLIST_STAFF_ONLY_STAGES = ['received'];
 const WAITLIST_ACTIVE_STAGES = ['waiting', 'invoiced'];
-const WAITLIST_TAGS = ['Kapous', 'EPICA', 'Чистовье', 'Палитра'];
+const WAITLIST_TAGS = ['Kapous', 'EPICA', 'Чистовье', 'Палитра', 'Каталог', 'Пробники'];
 const VISIT_DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 // JS: getDay() воскресенье=0, понедельник=1 ... суббота=6
 const VISIT_DAY_INDEX = { 'Понедельник': 1, 'Вторник': 2, 'Среда': 3, 'Четверг': 4, 'Пятница': 5, 'Суббота': 6 };
@@ -59,7 +59,7 @@ function nextDateForWeekday(weekdayName) {
   return d.toISOString().slice(0, 10);
 }
 
-const TASK_TAGS = ['Kapous', 'EPICA', 'Чистовье', 'Палитра', 'новый клиент', 'Лист ожидания', 'Прогрев'];
+const TASK_TAGS = ['Kapous', 'EPICA', 'Чистовье', 'новый клиент', 'Технолог', 'Долги'];
 const ACTIVE_STAGES = ['in_progress'];
 const SALE_ACTIVE_STAGES = ['call', 'meeting'];
 // Общий помощник: активна ли задача (не закрыта), независимо от её типа (визит/продажа).
@@ -102,6 +102,7 @@ function migrateLegacyTaskStages() {
       if (t.taskType === undefined) patch.taskType = 'visit';
       if (t.dateChangeRequest === undefined) patch.dateChangeRequest = null;
       if (t.explanation === undefined) patch.explanation = '';
+      if (t.visitTime === undefined) patch.visitTime = '';
       if (Object.keys(patch).length) db.update('tasks', t.id, patch);
     });
   } finally {
@@ -148,6 +149,8 @@ function migrateClientDefaultsBody() {
     if (c.decisionMakerName === undefined) patch.decisionMakerName = '';
     if (c.specialRequests === undefined) patch.specialRequests = '';
     if (c.orderWindow === undefined) patch.orderWindow = '';
+    if (c.discountTerms === undefined) patch.discountTerms = '';
+    if (c.salesPlan === undefined) patch.salesPlan = 0;
     if (c.meetingRecords === undefined) patch.meetingRecords = [];
     if (c.promotions === undefined) patch.promotions = [];
     if (c.activeMonths === undefined) patch.activeMonths = [];
@@ -173,7 +176,7 @@ const CONTRACT_STATUSES = ['да', 'нет', 'неизвестно'];
 const CLIENT_ADMIN_ONLY_FIELDS = [
   'name', 'pointType', 'address', 'phone', 'contactName',
   'visitDay', 'contractStatus', 'paymentMethod', 'ownerId',
-  'inn', 'socialContact', 'bestCallTime', 'decisionMakerName', 'specialRequests', 'orderWindow'
+  'inn', 'socialContact', 'bestCallTime', 'decisionMakerName', 'specialRequests', 'orderWindow', 'discountTerms', 'salesPlan'
 ];
 // Поля, которые может редактировать и назначенный агент
 const CLIENT_AGENT_EDITABLE_FIELDS = ['notes'];
@@ -426,6 +429,8 @@ function register(router) {
       visitDay: body.visitDay || '',
       contractStatus: CONTRACT_STATUSES.includes(body.contractStatus) ? body.contractStatus : 'неизвестно',
       paymentMethod: PAYMENT_METHODS.includes(body.paymentMethod) ? body.paymentMethod : '',
+      discountTerms: body.discountTerms || '',
+      salesPlan: Number(body.salesPlan) || 0,
       notes: body.notes || '',
       ownerId,
       isOffRoute: isAgent ? true : !!body.isOffRoute,
@@ -471,6 +476,7 @@ function register(router) {
         if (f === 'ownerId') { patch.ownerId = Number(body.ownerId); return; }
         if (f === 'contractStatus' && !CONTRACT_STATUSES.includes(body.contractStatus)) return;
         if (f === 'paymentMethod' && body.paymentMethod && !PAYMENT_METHODS.includes(body.paymentMethod)) return;
+        if (f === 'salesPlan') { patch.salesPlan = Number(body.salesPlan) || 0; return; }
         patch[f] = f === 'phone' ? normalizePhone(body.phone) : body[f];
       });
       if (body.pendingApproval !== undefined) patch.pendingApproval = !!body.pendingApproval;
@@ -680,6 +686,7 @@ function register(router) {
       title: body.title || (taskType === 'sale' ? `Звонок: ${client.name}` : taskType === 'waitlist' ? `Ожидание товара: ${client.name}` : `Посетить: ${client.name}`),
       description: body.description || '',
       dueDate: body.dueDate,
+      visitTime: taskType === 'visit' ? (body.visitTime || '') : '',
       stage: taskType === 'sale' ? 'call' : (taskType === 'waitlist' ? 'waiting' : 'in_progress'),
       tags,
       comment: '',
@@ -712,7 +719,7 @@ function register(router) {
     }
 
     const patch = { updatedAt: new Date().toISOString() };
-    ['title', 'description', 'dueDate', 'comment', 'report', 'explanation'].forEach((f) => {
+    ['title', 'description', 'dueDate', 'visitTime', 'comment', 'report', 'explanation'].forEach((f) => {
       if (body[f] !== undefined) patch[f] = body[f];
     });
     const isSale = task.taskType === 'sale';
@@ -750,17 +757,13 @@ function register(router) {
       return sendJson(res, 400, { error: 'Заполните отчёт по задаче — без него нельзя перевести в «Выполнена»' });
     }
 
-    // Задачу воронки продажи нельзя закрыть в "Сделка"/"Провал" без аудиозаписи
-    // встречи и короткого пояснения — записи хранятся в карточке клиента
-    // (раздел "Записи встреч"), привязка к конкретной задаче — по taskId.
+    // Задачу воронки продажи нельзя закрыть в "Сделка"/"Провал" без короткого
+    // пояснения (аудиозапись встречи раньше тоже была обязательна — убрано по
+    // решению пользователя 28.08.2026; загрузка записи осталась доступна
+    // добровольно в разделе "Записи встреч" у клиента).
     if (isSale && SALE_FINAL_STAGES.includes(finalStage) && task.stage !== finalStage) {
       if (!String(finalExplanation || '').trim()) {
         return sendJson(res, 400, { error: 'Добавьте короткое пояснение — без него нельзя закрыть в «Сделка»/«Провал»' });
-      }
-      const client = db.find('clients', task.clientId);
-      const hasAudio = client && (client.meetingRecords || []).some((r) => r.taskId === task.id && r.audioUrl);
-      if (!hasAudio) {
-        return sendJson(res, 400, { error: 'Прикрепите аудиозапись встречи (раздел «Записи встреч» у клиента) — без неё нельзя закрыть в «Сделка»/«Провал»' });
       }
     }
 
@@ -1253,10 +1256,20 @@ function register(router) {
       const myTasksAll = db.all('tasks').filter((t) => t.assigneeId === req.user.id);
       const saleTasksToday = myTasksAll.filter((t) => t.taskType === 'sale' && t.dueDate === today);
 
+      // Карточка "Акции" на дашборде агента — сколько клиентов и сколько позиций
+      // по акциям сейчас числится (срез на дату импорта). Сумма в деньгах здесь
+      // НЕ считается: в исходном файле акций (promotions.json / выгрузка склада)
+      // нет цены/суммы по позиции, только текст акции и количество — добавлена
+      // 28.08.2026 по запросу пользователя, денежная сумма не досчитана намеренно.
+      const clientsWithPromotions = clients.filter((c) => (c.promotions || []).length);
+      const promotionsItemsCount = clientsWithPromotions.reduce((s, c) => s + (c.promotions || []).length, 0);
+
       payload.agentDashboard = {
         salesTotalThisMonth,
         clientsBoughtThisMonth,
         clientsNotBoughtThisMonth,
+        promotionsClientsCount: clientsWithPromotions.length,
+        promotionsItemsCount,
         topByBrand: {
           Kapous: topByBrand('Kapous', true),
           EPICA: topByBrand('EPICA', true),
