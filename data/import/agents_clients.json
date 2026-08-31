@@ -157,7 +157,7 @@
     "address": "ул. Фрунзе 300/3",
     "phone": "555728006",
     "contact_name": "Фаризат",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -227,7 +227,7 @@
     "address": "ул.Юнусалиева,57",
     "phone": "554903433",
     "contact_name": "админ",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -327,7 +327,7 @@
     "address": "Карасаева,68",
     "phone": "553503031",
     "contact_name": "Оксана",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -597,7 +597,7 @@
     "address": "7мкр 52/3",
     "phone": "500509770",
     "contact_name": "Назгуль",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -667,7 +667,7 @@
     "address": "Боконбаева, 177",
     "phone": "5550285368",
     "contact_name": "админ",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -707,7 +707,7 @@
     "address": "м-н Асанбай Куттубаева,31/1 (7788#)",
     "phone": "555251705",
     "contact_name": "Андрей",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -797,7 +797,7 @@
     "address": "7 мкр 8/18",
     "phone": "0707 885 151",
     "contact_name": "админ",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -837,7 +837,7 @@
     "address": "7 мкр",
     "phone": "0557 091 074",
     "contact_name": "Наталья",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -957,7 +957,7 @@
     "address": "3 мкр., ул. Суеркулова, 16/1",
     "phone": "0700 901 688",
     "contact_name": "Администратор",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -1117,7 +1117,7 @@
     "address": "ул. Молодой Гвардии 2/1",
     "phone": "0776 632 079",
     "contact_name": "Администратор",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -1137,7 +1137,7 @@
     "address": "ул. Тимирязева, 78",
     "phone": "0501 120 488",
     "contact_name": "Айсулуу",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Нагима",
@@ -1197,7 +1197,7 @@
     "address": "ул.Тоголок Молдо 7/2",
     "phone": "0995 555 115",
     "contact_name": "Неля",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1207,7 +1207,7 @@
     "address": "Кокандский переулок, 18/ медерова 1 этаж",
     "phone": "0500 101 100",
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1247,7 +1247,7 @@
     "address": "пер.Геологический.19",
     "phone": "709231730",
     "contact_name": "Жылдыз Эже",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1257,7 +1257,7 @@
     "address": "пр.Чынгыз Айтматова,95/3",
     "phone": "556400570",
     "contact_name": "Элиза",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1277,7 +1277,7 @@
     "address": "ул.Тыныстанова,38",
     "phone": "0700 906 906",
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1287,7 +1287,7 @@
     "address": "Турусбекова 109 /3",
     "phone": "0 555 565 040",
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1407,7 +1407,7 @@
     "address": "7мкр д.49/6",
     "phone": "0507 023 456",
     "contact_name": "Айжан",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1497,7 +1497,7 @@
     "address": "ул.Гагарина,74а",
     "phone": "0702 371 111",
     "contact_name": "Осман",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1527,7 +1527,7 @@
     "address": "ул. Байтик Баатыра,70 БЦSoho 2эт",
     "phone": "0 707 110 997",
     "contact_name": "астра",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1667,7 +1667,7 @@
     "address": "ул.Уметалиева,155",
     "phone": "0 702 271 084",
     "contact_name": "жазгуль",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1717,7 +1717,7 @@
     "address": "пр.Чингиза Айтматова,299/1",
     "phone": "0 700 068 595",
     "contact_name": "Роза еже",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1767,7 +1767,7 @@
     "address": "ул.Б.Батыра,д,51 кв,14",
     "phone": "0555 132 112",
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1787,7 +1787,7 @@
     "address": "ул.Семетей,27/7",
     "phone": "0555 404 981",
     "contact_name": "Алёна",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1807,7 +1807,7 @@
     "address": "ул.Раззакова,45",
     "phone": "0 708 829 097",
     "contact_name": "Галина",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -1817,7 +1817,7 @@
     "address": "пр.Чингиза Айтматова,303 (ВДНХ СЭЗ)",
     "phone": "0770 779 812",
     "contact_name": "мерим",
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -2227,7 +2227,7 @@
     "address": "пр. Чуй, 117",
     "phone": "0 550 687 988",
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -2287,7 +2287,7 @@
     "address": "ул.Грибоедова,16",
     "phone": "0 501 961 313",
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -2427,7 +2427,7 @@
     "address": "ул.Ашхабадская,28/Горького",
     "phone": "0 555 559 929",
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Татьяна",
@@ -2567,7 +2567,7 @@
     "address": "ул.Исанова,25а",
     "phone": null,
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Альбина",
@@ -2577,7 +2577,7 @@
     "address": "ул.Исанова,25а",
     "phone": null,
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Альбина",
@@ -3137,7 +3137,7 @@
     "address": "Токонбаева 23/4",
     "phone": null,
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Альбина",
@@ -3147,7 +3147,7 @@
     "address": "ул.Токомбаева,9а",
     "phone": null,
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Альбина",
@@ -3347,7 +3347,7 @@
     "address": "ул.Аалы Токомбаева,21/2",
     "phone": null,
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Альбина",
@@ -3367,7 +3367,7 @@
     "address": "ул.Айылчиева,63",
     "phone": null,
     "contact_name": null,
-    "contract_status": "неизвестно"
+    "contract_status": "да"
   },
   {
     "agent": "Альбина",
@@ -3665,7 +3665,7 @@
     "phone": "0500311408",
     "contact_name": "Сергей",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Батаева регион"
   },
   {
@@ -4687,7 +4687,7 @@
     "address": "ул.Советская",
     "phone": "0405325603",
     "contact_name": "Томсон",
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4698,7 +4698,7 @@
     "address": "ул.Ахунбаева,127/1 7эт",
     "phone": "0400393957",
     "contact_name": "Томсон",
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4720,7 +4720,7 @@
     "address": "ул.Боконбаева 103 пересекает Тыныстанова",
     "phone": "0999247177",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4731,7 +4731,7 @@
     "address": "10мкр 17/1",
     "phone": "0508996980",
     "contact_name": "Айгерим",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4742,7 +4742,7 @@
     "address": "ул. Ахунбаева 127/1 Цокольный эт.",
     "phone": "0557608888",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4753,7 +4753,7 @@
     "address": "ул. Ибраимова 108",
     "phone": "0404908390",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4764,7 +4764,7 @@
     "address": "ул.Тыныстанова,64",
     "phone": "0500421276",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4775,7 +4775,7 @@
     "address": "",
     "phone": "0406447117",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Среда",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4786,7 +4786,7 @@
     "address": "Ахунбаева 117 /Тыныстанова",
     "phone": "0990926547",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4797,7 +4797,7 @@
     "address": "г.Бишкек, Советская,6",
     "phone": "0778444004",
     "contact_name": "Жанна",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4808,7 +4808,7 @@
     "address": "9 мкр, ул. Байтик Баатыра д.2",
     "phone": "0501113366",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4830,7 +4830,7 @@
     "address": "ул.Ахунбаева,127/1/Малдыбаева",
     "phone": "0555959111",
     "contact_name": "Эля",
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4841,7 +4841,7 @@
     "address": "ул.Ахунбаева,127/1/Малдыбаева,9эт 901каб",
     "phone": "0772669878",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4852,7 +4852,7 @@
     "address": "ул.Боконбаева,97",
     "phone": "0555511740",
     "contact_name": "Нина",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4863,7 +4863,7 @@
     "address": "ул.Боконбаева,14/Шопокова",
     "phone": "0555887655",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4874,7 +4874,7 @@
     "address": "ул.Московская,64",
     "phone": "0501682970",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4885,7 +4885,7 @@
     "address": "8мкр 32/1",
     "phone": "0704300153",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4896,8 +4896,8 @@
     "address": "ул.Малдыбаева/Ахунбаева 127/1",
     "phone": "0740222732",
     "contact_name": "Умара",
-    "visit_day": "",
-    "contract_status": "неизвестно",
+    "visit_day": "Пятница",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
   {
@@ -4907,7 +4907,7 @@
     "address": "ул. Правда/Бокомбаева",
     "phone": "0550433553",
     "contact_name": "Алена",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4918,7 +4918,7 @@
     "address": "ул.Тыныстанова,18",
     "phone": "0550120360",
     "contact_name": "Алиена",
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4929,7 +4929,7 @@
     "address": "м-н Тунгуч 2/10",
     "phone": "0704934747 / 0442511353",
     "contact_name": "Руслан / Тунгуч, Ош базар",
-    "visit_day": "",
+    "visit_day": "Среда",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4940,7 +4940,7 @@
     "address": "Берен Голд 6эт 1/1",
     "phone": "0555748290",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4951,7 +4951,7 @@
     "address": "",
     "phone": "0703629080",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4962,7 +4962,7 @@
     "address": "ул.Токтоналиева,60/1",
     "phone": "0702187103",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4973,7 +4973,7 @@
     "address": "бул.Эркиндик,35",
     "phone": "0550820340",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4984,7 +4984,7 @@
     "address": "г.Бишкек",
     "phone": "0708800361",
     "contact_name": "Курбек",
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -4995,7 +4995,7 @@
     "address": "пр.Чуй.204 Берекет Гранд 86 бутик",
     "phone": "0708172722",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5006,7 +5006,7 @@
     "address": "ул.Бейшеналиева,15/1",
     "phone": "0401508567",
     "contact_name": "Кумуштай",
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5017,7 +5017,7 @@
     "address": "мкр. Достук дом 11/1",
     "phone": "",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5028,7 +5028,7 @@
     "address": "",
     "phone": "0502466555",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5039,7 +5039,7 @@
     "address": "ул.Туголбай Ата, 67/1",
     "phone": "0703641789",
     "contact_name": "Айгеда",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5050,8 +5050,8 @@
     "address": "ул.Тыныстанова,213",
     "phone": "0553283158",
     "contact_name": "Каныметов",
-    "visit_day": "",
-    "contract_status": "неизвестно",
+    "visit_day": "Понедельник",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
   {
@@ -5061,8 +5061,8 @@
     "address": "ул.Б.Батыра,8",
     "phone": "0770648925",
     "contact_name": null,
-    "visit_day": "",
-    "contract_status": "неизвестно",
+    "visit_day": "Четверг",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
   {
@@ -5072,7 +5072,7 @@
     "address": "ул. Т.Молдо/Московская,139",
     "phone": "0700922244",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5083,8 +5083,8 @@
     "address": "ул. Донецкая/Абая",
     "phone": "0558644716",
     "contact_name": null,
-    "visit_day": "",
-    "contract_status": "неизвестно",
+    "visit_day": "Четверг",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
   {
@@ -5094,7 +5094,7 @@
     "address": "8 мкр. 32/1",
     "phone": "0704300153",
     "contact_name": "Гуля",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5105,8 +5105,8 @@
     "address": "ул.Советская/Донецкая",
     "phone": "0555085715",
     "contact_name": "Алия",
-    "visit_day": "",
-    "contract_status": "неизвестно",
+    "visit_day": "Пятница",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
   {
@@ -5116,7 +5116,7 @@
     "address": "ул. Тыныстанова, 20",
     "phone": "0550200202",
     "contact_name": "Наргиза",
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5127,7 +5127,7 @@
     "address": "ул.Бейшеналиева,45",
     "phone": "0700581395",
     "contact_name": "Бегимай",
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5138,7 +5138,7 @@
     "address": "ул.Боконбаева,99",
     "phone": "0555243373",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5149,8 +5149,8 @@
     "address": "ул.Фучика3/5",
     "phone": "0441904090 / 0402040209",
     "contact_name": "Бактыгуль",
-    "visit_day": "",
-    "contract_status": "неизвестно",
+    "visit_day": "Вторник",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
   {
@@ -5160,7 +5160,7 @@
     "address": "ул. Ибраимова, 84",
     "phone": "0553744297",
     "contact_name": "Карина",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5171,7 +5171,7 @@
     "address": "ул.Кулиева,20",
     "phone": "0555365230 / 0774365230",
     "contact_name": "Асем",
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5182,7 +5182,7 @@
     "address": "ул.Исакеева 32/2",
     "phone": "0554334549",
     "contact_name": "Сезим",
-    "visit_day": "",
+    "visit_day": "Среда",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5193,7 +5193,7 @@
     "address": "ул.Киевская,39 1этаж",
     "phone": "0779177930",
     "contact_name": "Курман",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5204,7 +5204,7 @@
     "address": "ул.Панфилова,81",
     "phone": "0990979363",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5215,7 +5215,7 @@
     "address": "ул.Душанбинская,59б",
     "phone": "0557774028",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5226,7 +5226,7 @@
     "address": "9 мкр",
     "phone": "0557090771",
     "contact_name": "Летне Эко",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5237,8 +5237,8 @@
     "address": "ул. Абая,43",
     "phone": "0551554927",
     "contact_name": "Джамиля",
-    "visit_day": "",
-    "contract_status": "неизвестно",
+    "visit_day": "Пятница",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
   {
@@ -5248,7 +5248,7 @@
     "address": "ул.Фучика,д.34",
     "phone": "0772108107",
     "contact_name": "Жамиля",
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5259,7 +5259,7 @@
     "address": "ул.Ахунбаева,107",
     "phone": "0999477539",
     "contact_name": "Айгерим",
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5270,7 +5270,7 @@
     "address": "8 мкр 32/1",
     "phone": "0552494090",
     "contact_name": "Бегимгуль",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5281,7 +5281,7 @@
     "address": "ул.Орозбекова,87",
     "phone": "0447974425",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5292,7 +5292,7 @@
     "address": "2эт",
     "phone": "0507600188",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5303,7 +5303,7 @@
     "address": "ул.Токтогула,87",
     "phone": "04003610422",
     "contact_name": "Курман",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5314,8 +5314,8 @@
     "address": "ул. Чалдоварская, 91 В",
     "phone": "0415747310",
     "contact_name": null,
-    "visit_day": "",
-    "contract_status": "неизвестно",
+    "visit_day": "Четверг",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
   {
@@ -5325,7 +5325,7 @@
     "address": "ул.Тыныстанова,14",
     "phone": "0509110401",
     "contact_name": "Эльмира",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5336,7 +5336,7 @@
     "address": "ул.Абдрахманова,101",
     "phone": "04036201748",
     "contact_name": "Эльмира",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5347,7 +5347,7 @@
     "address": "ул.Ахунбаева,127/1",
     "phone": "0408331040",
     "contact_name": "Катя",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5358,7 +5358,7 @@
     "address": "м-н Тунгуч 65/1",
     "phone": "0708242900",
     "contact_name": "Катя",
-    "visit_day": "",
+    "visit_day": "Среда",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5369,7 +5369,7 @@
     "address": "ул.Абдрахманова,99/1 пер Линейная",
     "phone": "0504747449",
     "contact_name": "Диля",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5380,7 +5380,7 @@
     "address": "ул.Боконбаева,101",
     "phone": "0553998469",
     "contact_name": "Эля",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5391,7 +5391,7 @@
     "address": "ул.Токомбаева,46/2",
     "phone": "0400047047",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5402,7 +5402,7 @@
     "address": "10 мкр д,4",
     "phone": "0503119228",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5413,7 +5413,7 @@
     "address": "ул. Ахунбаева, 137/Душамбинская",
     "phone": "0402098147",
     "contact_name": "Джамиля",
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5435,7 +5435,7 @@
     "address": "ул.Советская,191/Абдымомунова",
     "phone": "0772114170",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5446,7 +5446,7 @@
     "address": "ул.Токтогула/Держинка",
     "phone": "0703620420",
     "contact_name": "Элина",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5457,7 +5457,7 @@
     "address": "ул.Малдыбаева,54б",
     "phone": "0551016747",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5468,7 +5468,7 @@
     "address": "ул.Ахунбаева,127/2 Молдыбаева",
     "phone": "0500460112",
     "contact_name": "Азелия",
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5479,7 +5479,7 @@
     "address": "м-н Тунгуч 36",
     "phone": "0703257067",
     "contact_name": "Назира",
-    "visit_day": "",
+    "visit_day": "Среда",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5490,7 +5490,7 @@
     "address": "ул.Ахунбаева,98",
     "phone": "0702766466",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5501,7 +5501,7 @@
     "address": "ул.Правда/Боконбаева",
     "phone": "0550026920",
     "contact_name": "Шима",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5512,7 +5512,7 @@
     "address": "ул. Абрахманова, 152",
     "phone": "0550630339",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5523,7 +5523,7 @@
     "address": "8 мкр, д.34",
     "phone": "0702512101",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5534,7 +5534,7 @@
     "address": "ул. Токтогула, 93",
     "phone": "0555931916",
     "contact_name": "Татьяна",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5545,7 +5545,7 @@
     "address": "Исакеева 18/7",
     "phone": "0551999042 / 0552510291",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Среда",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5556,7 +5556,7 @@
     "address": "ул. Московская/Шопокова",
     "phone": "0550339921 / 0554998042",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5567,7 +5567,7 @@
     "address": "ул.Орозбекова,17/Московская",
     "phone": "0551888825",
     "contact_name": "Саида",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5578,7 +5578,7 @@
     "address": "ул.Московская,78 2эт,4каб",
     "phone": "0553900023",
     "contact_name": "Олеся",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5589,7 +5589,7 @@
     "address": "ул. Донецкая,5/2/Тыныстанова",
     "phone": "0501011001",
     "contact_name": "Зарина",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5600,7 +5600,7 @@
     "address": "пр,молодая Гврдия,96",
     "phone": "0552990140",
     "contact_name": "Алина",
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5611,7 +5611,7 @@
     "address": "М.Гвардия,271/Чуй",
     "phone": "0705202040",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5622,7 +5622,7 @@
     "address": "ул. Панфилова, 241/Ж.Жолу",
     "phone": "0550105397",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5633,7 +5633,7 @@
     "address": "пр.Чуй,202 Ош р/к по лестнице 2эт",
     "phone": "0552300222",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5644,7 +5644,7 @@
     "address": "ул.Тыныстанова 94 Токтогула",
     "phone": "0504313333",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5655,7 +5655,7 @@
     "address": "ул.Боконбаева,103",
     "phone": "0700203353",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5666,7 +5666,7 @@
     "address": "ул.Махатмы Ганди, 173/Касымалы Баялинова",
     "phone": "0706440405 / 0443566358",
     "contact_name": "Дина",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5677,7 +5677,7 @@
     "address": "ул.Байтик Баатыра, 3а",
     "phone": "0504321828",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5688,7 +5688,7 @@
     "address": "ул. Тыныстанова, 189/1/Боконбаева",
     "phone": "0703606229",
     "contact_name": "Жазгуль",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5699,7 +5699,7 @@
     "address": "ул.Б.Баатыра,36/1",
     "phone": "0703144341",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5710,7 +5710,7 @@
     "address": "Горького 162",
     "phone": "0771203558",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5721,7 +5721,7 @@
     "address": "",
     "phone": "",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5732,7 +5732,7 @@
     "address": "Кулиева 4/1 А",
     "phone": "0556521047",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5743,7 +5743,7 @@
     "address": "ул.Джантошева,126",
     "phone": "0553300900 / 0703600300",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5754,7 +5754,7 @@
     "address": "ул.Токтогула 87",
     "phone": "0550419452",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5765,7 +5765,7 @@
     "address": "ул. Правда/Бокомбаева",
     "phone": "0706422616 / 0553504332",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5776,7 +5776,7 @@
     "address": "ул.Аалы Токомбаева, 46/2",
     "phone": "077243220",
     "contact_name": "Эля",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5787,7 +5787,7 @@
     "address": "ул.Абая 58/4",
     "phone": "0504737745",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5798,7 +5798,7 @@
     "address": "ул.Анкара,1/35",
     "phone": "0504737745",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Среда",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5809,7 +5809,7 @@
     "address": "ул.Московская,221",
     "phone": "0552402237",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5820,7 +5820,7 @@
     "address": "ул. Ахунбаева, 108",
     "phone": "0772577557",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5831,7 +5831,7 @@
     "address": "ул.Ибраимова,34",
     "phone": "0400216215",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5842,7 +5842,7 @@
     "address": "",
     "phone": "0700403330",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Вторник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5853,7 +5853,7 @@
     "address": "ул. Тыныстанова/Ахунбаева",
     "phone": "0703203276",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5864,7 +5864,7 @@
     "address": "10мкр,д,34",
     "phone": "0555113165",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5875,7 +5875,7 @@
     "address": "8мкр 46/2",
     "phone": "0400047047",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5886,7 +5886,7 @@
     "address": "ул.Абдрахманова,137",
     "phone": "0507001103",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5897,7 +5897,7 @@
     "address": "Ахунбаева 127/1 БЦ Магнум цокольный этаж",
     "phone": "0505008025",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5908,7 +5908,7 @@
     "address": "8мкр д.8/3",
     "phone": "0408033047",
     "contact_name": "Ирина",
-    "visit_day": "",
+    "visit_day": "Четверг",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5919,7 +5919,7 @@
     "address": "ул.Усенбаева/Линейная",
     "phone": "0555082030",
     "contact_name": "Элека",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5930,7 +5930,7 @@
     "address": "Ахунбаева 129 1 этаж",
     "phone": "222000888",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5941,7 +5941,7 @@
     "address": "ул.Киевская/Советская",
     "phone": "0555111759",
     "contact_name": "Мадина",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5952,7 +5952,7 @@
     "address": "ул.Токтогула/Тыныстанова,93",
     "phone": "0550624443",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5963,7 +5963,7 @@
     "address": "ул. Ахунбаева/Абая, 119",
     "phone": "0554546337",
     "contact_name": null,
-    "visit_day": "",
+    "visit_day": "Пятница",
     "contract_status": "неизвестно",
     "note_from_import": "Импорт 25.08.2026: Анастасия"
   },
@@ -5986,7 +5986,7 @@
     "phone": "0530062450",
     "contact_name": "Демилай",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
     "discount_terms": "-10%"
   },
@@ -6010,7 +6010,7 @@
     "phone": "0559920303",
     "contact_name": "Шайыл Шакирова",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
     "discount_terms": "-10%"
   },
@@ -6022,7 +6022,7 @@
     "phone": "",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6033,7 +6033,7 @@
     "phone": "0559927999",
     "contact_name": "Алина",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6044,7 +6044,7 @@
     "phone": "0559927999",
     "contact_name": "Алина",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6055,7 +6055,7 @@
     "phone": "0559927999",
     "contact_name": "Алина",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
     "discount_terms": "-10%"
   },
@@ -6067,7 +6067,7 @@
     "phone": "0559927999",
     "contact_name": "Алина",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
     "discount_terms": "-20%"
   },
@@ -6079,7 +6079,7 @@
     "phone": "0559927999",
     "contact_name": "Алина",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6125,7 +6125,7 @@
     "phone": "",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6216,7 +6216,7 @@
     "phone": "",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6239,7 +6239,7 @@
     "phone": "0559920303",
     "contact_name": "Шайыл Шакирова",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
     "discount_terms": "-10%"
   },
@@ -6251,7 +6251,7 @@
     "phone": "",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6262,7 +6262,7 @@
     "phone": "",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
     "discount_terms": "без скидок"
   },
@@ -6274,7 +6274,7 @@
     "phone": "",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6308,7 +6308,7 @@
     "phone": "0706552277",
     "contact_name": "Асель (хозяйка)",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
     "discount_terms": "-15%"
   },
@@ -6365,7 +6365,7 @@
     "phone": "0707957520",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
     "discount_terms": "-10%"
   },
@@ -6388,7 +6388,7 @@
     "phone": "0707957520",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6411,7 +6411,7 @@
     "phone": "",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6433,7 +6433,7 @@
     "phone": "0706150377",
     "contact_name": "Марина",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
     "discount_terms": "-10%"
   },
@@ -6525,7 +6525,7 @@
     "phone": "0770373884",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)",
     "discount_terms": "-10%"
   },
@@ -6537,7 +6537,7 @@
     "phone": "",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6548,7 +6548,7 @@
     "phone": "0707466394",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6570,7 +6570,7 @@
     "phone": "",
     "contact_name": null,
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6581,7 +6581,7 @@
     "phone": "0554900700",
     "contact_name": "Зульфия",
     "visit_day": "",
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Импорт 25.08.2026: Жанара (магазины)"
   },
   {
@@ -6918,7 +6918,7 @@
   {
     "agent": "Анастасия",
     "name": "SPA салон Сиям массаж",
-    "visit_day": "",
+    "visit_day": "Пятница",
     "point_type": "Спа салон",
     "address": "ул.Байтик Баатыра 34а",
     "phone": "",
@@ -6951,12 +6951,12 @@
   {
     "agent": "Анастасия",
     "name": "ОсОО \"Орион Хотелс\"",
-    "visit_day": "",
+    "visit_day": "Понедельник",
     "point_type": "другое",
     "address": "бул.Эркиндик,21",
     "phone": "",
     "contact_name": null,
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Добавлено 27.08.2026: сверка продаж с CRM (не найден в исходном списке клиентов)"
   },
   {
@@ -7050,7 +7050,7 @@
   {
     "agent": "Анастасия",
     "name": "Шугаринг Калык Акиева 72 цокольн. этаж",
-    "visit_day": "",
+    "visit_day": "Пятница",
     "point_type": "Салон депиляции",
     "address": "",
     "phone": "",
@@ -7066,7 +7066,7 @@
     "address": "ул.Ахунбаева,183",
     "phone": "",
     "contact_name": null,
-    "contract_status": "неизвестно",
+    "contract_status": "да",
     "note_from_import": "Добавлено 27.08.2026: сверка продаж с CRM (не найден в исходном списке клиентов)"
   },
   {

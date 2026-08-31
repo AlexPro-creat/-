@@ -1029,6 +1029,112 @@ function register(router) {
     res.end(buf);
   }));
 
+  // Полная выгрузка задач в файл (JSON) — на случай пересборки/передеплоя проекта,
+  // когда data/db.json не переносится и все задачи "теряются" (правка от 31.08.2026).
+  // Экспортируем задачи вместе с человекочитаемыми ключами (имя клиента, имя
+  // ответственного агента, имя постановщика) — специально НЕ полагаемся на числовые
+  // id, потому что после пересборки клиенты/пользователи создаются заново импортом
+  // и их id могут не совпасть с прежними. Вложения (файлы) в выгрузку не входят —
+  // сами файлы на диске всё равно теряются при пересборке, в файл идёт только
+  // текстовая часть задачи.
+  router.get('/api/tasks/export', requireStaff(async (req, res) => {
+    const clientsById = {};
+    db.all('clients').forEach((c) => { clientsById[c.id] = c; });
+    const usersById = {};
+    db.all('users').forEach((u) => { usersById[u.id] = u; });
+    const tasks = db.all('tasks').map((t) => {
+      const client = clientsById[t.clientId];
+      const assignee = usersById[t.assigneeId];
+      const creator = usersById[t.createdBy];
+      return {
+        clientName: client ? client.name : null,
+        agentName: assignee ? assignee.name : null,
+        createdByName: creator ? creator.name : null,
+        taskType: t.taskType,
+        title: t.title,
+        description: t.description || '',
+        dueDate: t.dueDate,
+        visitTime: t.visitTime || '',
+        stage: t.stage,
+        tags: t.tags || [],
+        comment: t.comment || '',
+        report: t.report || '',
+        explanation: t.explanation || '',
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt
+      };
+    });
+    const buf = Buffer.from(JSON.stringify({ exportedAt: new Date().toISOString(), tasks }, null, 2), 'utf8');
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="zadachi-${new Date().toISOString().slice(0, 10)}.json"`,
+      'Content-Length': buf.length
+    });
+    res.end(buf);
+  }));
+
+  // Обратная загрузка ранее выгруженного файла (после пересборки/передеплоя) —
+  // восстанавливает задачи, сопоставляя клиента и агента ПО ИМЕНИ (не по id, см.
+  // комментарий выше у /api/tasks/export). Задачи, для которых клиент или агент не
+  // нашлись (например, клиента переименовали или он был удалён), пропускаются и
+  // перечисляются в ответе — ничего не додумываем и не создаём "на угад". Уже
+  // существующие задачи (то же имя клиента + заголовок + срок + дата создания) не
+  // дублируются — можно безопасно загрузить один и тот же файл повторно.
+  router.post('/api/tasks/import', requireStaff(async (req, res) => {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const incoming = Array.isArray(body.tasks) ? body.tasks : [];
+    if (!incoming.length) return sendJson(res, 400, { error: 'Файл пуст или не в ожидаемом формате' });
+
+    const clientsByName = {};
+    db.all('clients').forEach((c) => { clientsByName[norm(c.name)] = c; });
+    const usersByName = {};
+    db.all('users').forEach((u) => { usersByName[norm(u.name)] = u; });
+    const clientsById = {};
+    db.all('clients').forEach((c) => { clientsById[c.id] = c; });
+    const existingKeys = new Set(
+      db.all('tasks').map((t) => {
+        const c = clientsById[t.clientId];
+        return [c ? norm(c.name) : t.clientId, t.title, t.dueDate, t.createdAt].join('||');
+      })
+    );
+
+    let imported = 0, skippedDuplicate = 0;
+    const unresolved = [];
+    incoming.forEach((t) => {
+      const client = t.clientName ? clientsByName[norm(t.clientName)] : null;
+      if (!client) { unresolved.push({ reason: 'клиент не найден', clientName: t.clientName, title: t.title }); return; }
+      const assignee = t.agentName ? usersByName[norm(t.agentName)] : null;
+      const assigneeId = assignee ? assignee.id : client.ownerId;
+      const key = [norm(client.name), t.title, t.dueDate, t.createdAt].join('||');
+      if (existingKeys.has(key)) { skippedDuplicate++; return; }
+      const creator = t.createdByName ? usersByName[norm(t.createdByName)] : null;
+      db.insert('tasks', {
+        clientId: client.id,
+        taskType: t.taskType === 'sale' ? 'sale' : (t.taskType === 'waitlist' ? 'waitlist' : 'visit'),
+        title: t.title || '',
+        description: t.description || '',
+        dueDate: t.dueDate,
+        visitTime: t.visitTime || '',
+        stage: t.stage || 'in_progress',
+        tags: Array.isArray(t.tags) ? t.tags : [],
+        comment: t.comment || '',
+        report: t.report || '',
+        explanation: t.explanation || '',
+        dateChangeRequest: null,
+        attachments: [],
+        assigneeId,
+        createdBy: creator ? creator.id : req.user.id,
+        createdAt: t.createdAt || new Date().toISOString(),
+        updatedAt: t.updatedAt || new Date().toISOString()
+      });
+      existingKeys.add(key);
+      imported++;
+    });
+
+    sendJson(res, 200, { imported, skippedDuplicate, unresolvedCount: unresolved.length, unresolved });
+  }));
+
   // ---- Отчёты (супервайзер/администратор) ----
 
   // Ассортимент по агентам: товар/бренд/шт/выручка/кол-во клиентов, с фильтром
@@ -1039,11 +1145,18 @@ function register(router) {
     const params = new URL(req.url, 'http://internal').searchParams;
     const brandFilter = params.get('brand');
     const agentIdFilter = params.get('agentId');
-    const monthFilter = params.get('month');
+    // "month" может быть одним месяцем ("август") или несколькими через запятую
+    // ("июнь,июль,август") — правка "несколько месяцев сразу" в Отчётах (31.08.2026).
+    // При нескольких месяцах строки по одному товару у одного клиента суммируются
+    // по всем выбранным месяцам (qty/revenue складываются).
+    const monthFilterRaw = params.get('month');
+    const selectedMonths = (monthFilterRaw && monthFilterRaw !== 'all')
+      ? monthFilterRaw.split(',').map((m) => m.trim()).filter((m) => MONTH_ORDER.includes(m))
+      : [];
     let agents = db.all('users').filter((u) => u.role === 'agent');
     if (agentIdFilter) agents = agents.filter((a) => a.id === Number(agentIdFilter));
     const clients = db.all('clients');
-    const useMonth = monthFilter && monthFilter !== 'all' && MONTH_ORDER.includes(monthFilter);
+    const useMonth = selectedMonths.length > 0;
 
     const rows = [];
     agents.forEach((agent) => {
@@ -1051,7 +1164,7 @@ function register(router) {
       const byProduct = {};
       aClients.forEach((c) => {
         const items = useMonth
-          ? (c.monthlyAssortment && c.monthlyAssortment[monthFilter] || []).map((it) => ({ ...it, avgQty: it.qty }))
+          ? selectedMonths.flatMap((m) => (c.monthlyAssortment && c.monthlyAssortment[m] || []).map((it) => ({ ...it, avgQty: it.qty })))
           : [...(c.regularAssortment || []), ...(c.testAssortment || [])];
         items.forEach((it) => {
           if (brandFilter && brandFilter !== 'all' && it.brand !== brandFilter) return;
@@ -1086,24 +1199,31 @@ function register(router) {
   // склада/магазина (client.promotions, срез на дату последнего импорта), с
   // разбивкой по агенту/клиенту — для супервайзера/администратора.
   router.get('/api/reports/promotions', requireStaff(async (req, res) => {
-    const agentIdFilter = new URL(req.url, 'http://internal').searchParams.get('agentId');
+    const params = new URL(req.url, 'http://internal').searchParams;
+    const agentIdFilter = params.get('agentId');
+    const promoFilter = params.get('promo'); // правка 31.08.2026: фильтр по конкретной акции
     const agentsById = {};
     db.all('users').forEach((u) => { agentsById[u.id] = u; });
     let clients = db.all('clients').filter((c) => (c.promotions || []).length);
     if (agentIdFilter) clients = clients.filter((c) => c.ownerId === Number(agentIdFilter));
     const rows = [];
+    const promoSet = new Set();
     clients.forEach((c) => {
       (c.promotions || []).forEach((p) => {
+        promoSet.add(p.promo);
+        if (promoFilter && p.promo !== promoFilter) return;
         const agent = agentsById[c.ownerId];
         rows.push({
           clientId: c.id, clientName: c.name,
           agentId: c.ownerId, agentName: agent ? agent.name : '—',
-          promo: p.promo, qty: p.qty
+          promo: p.promo, qty: p.qty, sum: p.sum || 0
         });
       });
     });
     sendJson(res, 200, {
       rows,
+      totalSum: rows.reduce((s, r) => s + (r.sum || 0), 0),
+      promos: Array.from(promoSet).sort(),
       agents: db.all('users').filter((u) => u.role === 'agent').map((a) => ({ id: a.id, name: a.name }))
     });
   }));
@@ -1228,6 +1348,43 @@ function register(router) {
         const dateForThisWeek = weekIdxByDay[c.visitDay];
         return !allTasks.some((t) => t.clientId === c.id && t.dueDate === dateForThisWeek);
       });
+
+      // Карточка "Акции" в дашборде супервайзера (п.3 правок 31.08.2026) — не было
+      // раньше, была только у агента. По всей команде + разбивка по агентам.
+      const clientsWithPromo = allClients.filter((c) => (c.promotions || []).length);
+      payload.promotionsSummary = {
+        clientsCount: clientsWithPromo.length,
+        itemsCount: clientsWithPromo.reduce((s, c) => s + (c.promotions || []).length, 0),
+        sumTotal: clientsWithPromo.reduce((s, c) => s + (c.promotions || []).reduce((s2, p) => s2 + (p.sum || 0), 0), 0),
+        byAgent: agents.map((agent) => {
+          const aClients = clientsWithPromo.filter((c) => c.ownerId === agent.id);
+          return {
+            agentId: agent.id, agentName: agent.name,
+            clientsCount: aClients.length,
+            itemsCount: aClients.reduce((s, c) => s + (c.promotions || []).length, 0),
+            sumTotal: aClients.reduce((s, c) => s + (c.promotions || []).reduce((s2, p) => s2 + (p.sum || 0), 0), 0)
+          };
+        })
+      };
+
+      // "Выполнение" в сомах + разбивка по брендам (п.10 правок 31.08.2026) — план
+      // (salesPlan, поле клиента из Фазы 8) против факта этого месяца, по всей
+      // команде; пересчёт при смене фильтра по агенту делается на клиенте (app.js),
+      // т.к. state.clients у супервайзера и так содержит все нужные поля.
+      const planTotal = allClients.reduce((s, c) => s + (c.salesPlan || 0), 0);
+      const actualTotal = allClients.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
+      const byBrandMap = {};
+      allClients.forEach((c) => {
+        (c.currentMonthItems || []).forEach((it) => {
+          const b = it.brand || 'Прочее';
+          byBrandMap[b] = (byBrandMap[b] || 0) + (it.revenue || 0);
+        });
+      });
+      payload.salesPerformance = {
+        planTotal,
+        actualTotal,
+        byBrand: Object.entries(byBrandMap).map(([brand, revenue]) => ({ brand, revenue })).sort((a, b) => b.revenue - a.revenue)
+      };
     }
 
     // Метрики для отдельного дашборда агента (продажи, клиенты, топ-товары, встречи/звонки).
@@ -1256,20 +1413,43 @@ function register(router) {
       const myTasksAll = db.all('tasks').filter((t) => t.assigneeId === req.user.id);
       const saleTasksToday = myTasksAll.filter((t) => t.taskType === 'sale' && t.dueDate === today);
 
-      // Карточка "Акции" на дашборде агента — сколько клиентов и сколько позиций
-      // по акциям сейчас числится (срез на дату импорта). Сумма в деньгах здесь
-      // НЕ считается: в исходном файле акций (promotions.json / выгрузка склада)
-      // нет цены/суммы по позиции, только текст акции и количество — добавлена
-      // 28.08.2026 по запросу пользователя, денежная сумма не досчитана намеренно.
+      // Карточка "Акции" на дашборде агента — сколько клиентов, сколько позиций
+      // и на какую сумму по акциям сейчас числится (срез на дату импорта).
+      // Добавлена 28.08.2026 без суммы (в старом promotions.json не было цены);
+      // 31.08.2026 пользователь прислал файлы с суммой по каждой акции за
+      // март-август — сумма теперь считается по-настоящему (см. build_promotions_by_month.py).
       const clientsWithPromotions = clients.filter((c) => (c.promotions || []).length);
       const promotionsItemsCount = clientsWithPromotions.reduce((s, c) => s + (c.promotions || []).length, 0);
+      const promotionsSumTotal = clientsWithPromotions.reduce(
+        (s, c) => s + (c.promotions || []).reduce((s2, p) => s2 + (p.sum || 0), 0), 0
+      );
+
+      // Полная сумма продаж за все 7 месяцев (не только текущий) + разбивка по
+      // клиентам — правка 31.08.2026 (п.9): "сумма из отчётов по реализации
+      // полностью". Разбивка по клиентам форматируется через "/" в интерфейсе
+      // (см. app.js) — сама по себе это список "клиент: сумма".
+      const salesTotalAllMonths = clients.reduce((s, c) => {
+        const items = [...(c.regularAssortment || []), ...(c.testAssortment || [])];
+        return s + items.reduce((s2, it) => s2 + (it.revenue || 0), 0);
+      }, 0);
+      const salesByClientAllMonths = clients
+        .map((c) => {
+          const items = [...(c.regularAssortment || []), ...(c.testAssortment || [])];
+          const revenue = items.reduce((s2, it) => s2 + (it.revenue || 0), 0);
+          return { clientId: c.id, clientName: c.name, revenue };
+        })
+        .filter((r) => r.revenue > 0)
+        .sort((a, b) => b.revenue - a.revenue);
 
       payload.agentDashboard = {
         salesTotalThisMonth,
         clientsBoughtThisMonth,
         clientsNotBoughtThisMonth,
+        salesTotalAllMonths,
+        salesByClientAllMonths,
         promotionsClientsCount: clientsWithPromotions.length,
         promotionsItemsCount,
+        promotionsSumTotal,
         topByBrand: {
           Kapous: topByBrand('Kapous', true),
           EPICA: topByBrand('EPICA', true),

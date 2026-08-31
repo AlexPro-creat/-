@@ -15,7 +15,7 @@ const state = {
   supervisorMeetings: [],
   view: 'dashboard',
   stats: null,
-  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, showClosed: false, search: '' },
+  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', promo: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, showClosed: false, search: '' },
   clientSort: { key: null, dir: -1 },
   taskTagFilter: new Set(),
   waitlistTagFilter: new Set(),
@@ -24,7 +24,9 @@ const state = {
   clientBulkSelected: new Set(),
   taskBulkMode: false,
   taskBulkSelected: new Set(),
-  taskTypeView: 'visit'
+  // Правка 31.08.2026 (п.2): по умолчанию открывается первая вкладка после
+  // смены порядка — «Воронка продаж» (была — «Визиты»).
+  taskTypeView: 'sale'
 };
 
 // Единственный "активный" (ещё не завершённый) этап — раньше их было три
@@ -441,9 +443,19 @@ async function renderDashboard(content) {
           <div class="stat-card"><div class="num">${stats.agentDashboard.meetingsToday}</div><div class="label">Встреч сегодня</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.doneTasksToday}</div><div class="label">Выполнено сегодня</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.overdueTasksCount}</div><div class="label">Просрочено</div></div>
-          <div class="stat-card" title="Сумма не считается — в данных по акциям нет цены/суммы по позиции, только описание и количество">
+          <div class="stat-card">
             <div class="num">${stats.agentDashboard.promotionsClientsCount}</div>
-            <div class="label">Клиентов с акциями (${stats.agentDashboard.promotionsItemsCount} поз., сумма не указана в источнике)</div>
+            <div class="label">Клиентов с акциями (${stats.agentDashboard.promotionsItemsCount} поз., на сумму ${fmtMoney(stats.agentDashboard.promotionsSumTotal)})</div>
+          </div>
+          <div class="stat-card" id="sales-all-months-card" title="Сумма из отчётов по реализации за все 7 месяцев, не только текущий">
+            <div class="num">${fmtMoney(stats.agentDashboard.salesTotalAllMonths)}</div>
+            <div class="label">Продано всего (7 мес.) <button type="button" class="link-btn" id="sales-by-client-toggle" style="font-size:12px">по клиентам ▾</button></div>
+          </div>
+        </div>
+        <div id="sales-by-client-panel" class="assort-panel" style="display:none">
+          <div class="muted" style="font-size:12px;margin-bottom:6px">Формат: клиент / сумма за 7 месяцев.</div>
+          <div style="max-height:260px;overflow:auto">
+            ${stats.agentDashboard.salesByClientAllMonths.map((r) => `<div>${escapeHtml(r.clientName)} / ${fmtMoney(r.revenue)}</div>`).join('')}
           </div>
         </div>
         <button type="button" class="assort-btn" id="top-brands-toggle">🏆 Топ-10 по брендам (этот месяц)</button>
@@ -551,9 +563,47 @@ async function renderDashboard(content) {
         </div>
       </div>` : ''}
 
+      ${stats.salesPerformance ? `
+      <div class="panel">
+        <h2>Выполнение плана (сом) <select class="card-agent-filter" id="perf-agent-filter"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select></h2>
+        <div class="agent-metric-grid" id="perf-stat-cards"></div>
+        <div class="table-wrap" style="margin-top:10px">
+          <table>
+            <thead><tr><th>Бренд</th><th>Выручка (этот месяц)</th></tr></thead>
+            <tbody id="perf-brand-tbody"></tbody>
+          </table>
+        </div>
+      </div>` : ''}
+
+      ${stats.promotionsSummary ? `
+      <div class="panel">
+        <h2>🎁 Акции (вся команда)</h2>
+        <div class="agent-metric-grid">
+          <div class="stat-card"><div class="num">${stats.promotionsSummary.clientsCount}</div><div class="label">Клиентов с акциями</div></div>
+          <div class="stat-card"><div class="num">${stats.promotionsSummary.itemsCount}</div><div class="label">Позиций по акциям</div></div>
+          <div class="stat-card"><div class="num">${fmtMoney(stats.promotionsSummary.sumTotal)}</div><div class="label">Сумма по акциям</div></div>
+        </div>
+        <div class="table-wrap" style="margin-top:10px">
+          <table>
+            <thead><tr><th>Агент</th><th>Клиентов с акциями</th><th>Позиций</th><th>Сумма</th></tr></thead>
+            <tbody>
+              ${stats.promotionsSummary.byAgent.map((a) => `
+                <tr>
+                  <td>${agentTag(a.agentId)}</td>
+                  <td>${a.clientsCount}</td>
+                  <td>${a.itemsCount}</td>
+                  <td>${fmtMoney(a.sumTotal)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>` : ''}
+
       ${stats.noTaskThisWeek ? `
       <div class="panel">
-        <h2>Клиенты без задачи на этой неделе <span class="col-sum">· ${stats.noTaskThisWeek.length}</span></h2>
+        <h2>Клиенты без задачи на этой неделе <span class="col-sum">· ${stats.noTaskThisWeek.length}</span> <select class="card-agent-filter" id="notask-agent-filter"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select></h2>
+        <div id="notask-table-wrap">
         ${stats.noTaskThisWeek.length ? `
         <div class="table-wrap">
           <table>
@@ -571,11 +621,13 @@ async function renderDashboard(content) {
         </div>
         ${stats.noTaskThisWeek.length > 30 ? `<div class="muted" style="margin-top:6px;font-size:12px">Показаны первые 30 из ${stats.noTaskThisWeek.length}.</div>` : ''}
         ` : '<div class="empty-state">На всех клиентов с днём визита на этой неделе задачи уже созданы.</div>'}
+        </div>
       </div>` : ''}
 
       ${stats.clientRating ? `
       <div class="panel">
-        <h2>Рейтинг клиентов (выручка / маржа / активные месяцы)</h2>
+        <h2>Рейтинг клиентов (выручка / маржа / активные месяцы) <select class="card-agent-filter" id="rating-agent-filter"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select></h2>
+        <div id="rating-table-wrap">
         ${stats.clientRating.length ? `
         <div class="table-wrap">
           <table>
@@ -596,12 +648,112 @@ async function renderDashboard(content) {
         </div>
         <div class="muted" style="margin-top:6px;font-size:12px">Маржа считается из тех же файлов продаж (себестоимость/стоимость построчно).</div>
         ` : '<div class="empty-state">Пока нет данных о продажах для рейтинга.</div>'}
+        </div>
       </div>` : ''}
     </div>
   `));
 
-  if (stats.agentDashboard) wireToggle('top-brands-toggle', 'top-brands-panel');
+  if (stats.agentDashboard) {
+    wireToggle('top-brands-toggle', 'top-brands-panel');
+    wireToggle('sales-by-client-toggle', 'sales-by-client-panel');
+  }
   if (isStaff()) wireCardAgentFilters(content);
+
+  // ---- Правки 31.08.2026: фильтры по агенту, реагирующие на state.clients уже
+  // загруженный на клиенте (та же логика, что и dashCardValue/wireCardAgentFilters
+  // выше, но для панелей с таблицами, а не одиночных чисел карточки). ----
+
+  function renderPerf() {
+    const sel = document.getElementById('perf-agent-filter');
+    if (!sel) return;
+    const aid = sel.value ? Number(sel.value) : null;
+    const clientsF = aid ? state.clients.filter((c) => c.ownerId === aid) : state.clients;
+    const planTotal = clientsF.reduce((s, c) => s + (c.salesPlan || 0), 0);
+    const actualTotal = clientsF.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
+    const pct = planTotal ? Math.round((actualTotal / planTotal) * 100) : null;
+    document.getElementById('perf-stat-cards').innerHTML = `
+      <div class="stat-card"><div class="num">${fmtMoney(planTotal)}</div><div class="label">План (этот месяц)</div></div>
+      <div class="stat-card"><div class="num">${fmtMoney(actualTotal)}</div><div class="label">Факт (этот месяц)</div></div>
+      <div class="stat-card"><div class="num">${pct === null ? '—' : pct + '%'}</div><div class="label">Выполнение</div></div>
+    `;
+    const byBrandMap = {};
+    clientsF.forEach((c) => {
+      (c.currentMonthItems || []).forEach((it) => {
+        const b = it.brand || 'Прочее';
+        byBrandMap[b] = (byBrandMap[b] || 0) + (it.revenue || 0);
+      });
+    });
+    const rows = Object.entries(byBrandMap).map(([brand, revenue]) => ({ brand, revenue })).sort((a, b) => b.revenue - a.revenue);
+    document.getElementById('perf-brand-tbody').innerHTML = rows.length
+      ? rows.map((r) => `<tr><td>${escapeHtml(r.brand)}</td><td>${fmtMoney(r.revenue)}</td></tr>`).join('')
+      : '<tr><td colspan="2" class="muted">Нет продаж в этом месяце.</td></tr>';
+  }
+  if (stats.salesPerformance) {
+    renderPerf();
+    document.getElementById('perf-agent-filter').addEventListener('change', renderPerf);
+  }
+
+  function renderNoTaskFiltered() {
+    const sel = document.getElementById('notask-agent-filter');
+    if (!sel) return;
+    const aid = sel.value ? Number(sel.value) : null;
+    const list = aid ? stats.noTaskThisWeek.filter((c) => c.ownerId === aid) : stats.noTaskThisWeek;
+    const wrap = document.getElementById('notask-table-wrap');
+    wrap.innerHTML = list.length ? `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Клиент</th><th>День визита</th><th>Ответственный</th></tr></thead>
+          <tbody>
+            ${list.slice(0, 30).map((c) => `
+              <tr>
+                <td>${escapeHtml(c.name)}</td>
+                <td>${escapeHtml(c.visitDay)}</td>
+                <td>${agentTag(c.ownerId)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${list.length > 30 ? `<div class="muted" style="margin-top:6px;font-size:12px">Показаны первые 30 из ${list.length}.</div>` : ''}
+    ` : '<div class="empty-state">На всех клиентов с днём визита на этой неделе задачи уже созданы.</div>';
+  }
+  if (stats.noTaskThisWeek) {
+    document.getElementById('notask-agent-filter').addEventListener('change', renderNoTaskFiltered);
+  }
+
+  function renderRatingFiltered() {
+    const sel = document.getElementById('rating-agent-filter');
+    if (!sel) return;
+    const aid = sel.value ? Number(sel.value) : null;
+    const list = aid ? stats.clientRating.filter((r) => {
+      const c = clientById(r.clientId);
+      return c && c.ownerId === aid;
+    }) : stats.clientRating;
+    const wrap = document.getElementById('rating-table-wrap');
+    wrap.innerHTML = list.length ? `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Клиент</th><th>Агент</th><th>Выручка (7 мес)</th><th>Маржа</th><th>% маржи</th><th>Активных мес.</th></tr></thead>
+          <tbody>
+            ${list.slice(0, 30).map((r) => `
+              <tr>
+                <td>${escapeHtml(r.clientName)}</td>
+                <td>${escapeHtml(r.agentName)}</td>
+                <td>${fmtMoney(r.revenue)}</td>
+                <td>${fmtMoney(r.margin)}</td>
+                <td>${r.marginPct}%</td>
+                <td>${r.activeMonths}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="muted" style="margin-top:6px;font-size:12px">Маржа считается из тех же файлов продаж (себестоимость/стоимость построчно).</div>
+    ` : '<div class="empty-state">Пока нет данных о продажах для рейтинга.</div>';
+  }
+  if (stats.clientRating) {
+    document.getElementById('rating-agent-filter').addEventListener('change', renderRatingFiltered);
+  }
 
   const todayKanban = document.getElementById('today-kanban');
   if (!stats.todayTasks.length) {
@@ -639,6 +791,8 @@ function filteredClients() {
     if (f.onlyShortfall && !riskCount(c)) return false;
     if (f.onlyPromotions && !(c.promotions || []).length) return false;
     if (f.onlyDiscount && !(c.discountTerms || '').trim()) return false;
+    if (f.ownerId && c.ownerId !== Number(f.ownerId)) return false;
+    if (f.promo && !(c.promotions || []).some((p) => p.promo === f.promo)) return false;
     if (f.search) {
       const q = f.search.trim().toLowerCase();
       const hay = `${c.name} ${c.phone || ''} ${c.contactName || ''}`.toLowerCase();
@@ -689,8 +843,9 @@ function exportClientsCsv(list) {
 
 function renderClients(content) {
   const pointTypes = Array.from(new Set(state.clients.map((c) => c.pointType).filter(Boolean))).sort();
+  const promoNames = Array.from(new Set(state.clients.flatMap((c) => (c.promotions || []).map((p) => p.promo)))).sort();
   const f = state.clientFilters;
-  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.onlyPromotions || f.onlyDiscount || f.showClosed || f.search;
+  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.ownerId || f.promo || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.onlyPromotions || f.onlyDiscount || f.showClosed || f.search;
   const bulk = state.clientBulkMode;
   content.appendChild(el(`
     <div>
@@ -720,7 +875,15 @@ function renderClients(content) {
         <label class="filter-check"><input type="checkbox" id="filter-onlyDebt" ${f.onlyDebt ? 'checked' : ''}> Есть задолженность</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyShortfall" ${f.onlyShortfall ? 'checked' : ''}> Не добрал</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyPromotions" ${f.onlyPromotions ? 'checked' : ''}> Есть акции</label>
+        <select id="filter-promo">
+          <option value="">Акция: любая</option>
+          ${promoNames.map((p) => `<option value="${escapeAttr(p)}" ${f.promo === p ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
+        </select>
         <label class="filter-check"><input type="checkbox" id="filter-onlyDiscount" ${f.onlyDiscount ? 'checked' : ''}> Со скидкой/особыми условиями</label>
+        ${isStaff() ? `<select id="filter-ownerId">
+          <option value="">Агент: все</option>
+          ${state.users.filter((u) => u.role === 'agent').map((u) => `<option value="${u.id}" ${String(f.ownerId) === String(u.id) ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
+        </select>` : ''}
         ${isStaff() ? `<label class="filter-check"><input type="checkbox" id="filter-showClosed" ${f.showClosed ? 'checked' : ''}> Показать закрытые</label>` : ''}
         ${filtersActive ? '<button type="button" class="link-btn" id="filter-reset">Сбросить</button>' : ''}
       </div>
@@ -762,12 +925,15 @@ function renderClients(content) {
   document.getElementById('filter-onlyDebt').addEventListener('change', (e) => { state.clientFilters.onlyDebt = e.target.checked; render(); });
   document.getElementById('filter-onlyShortfall').addEventListener('change', (e) => { state.clientFilters.onlyShortfall = e.target.checked; render(); });
   document.getElementById('filter-onlyPromotions').addEventListener('change', (e) => { state.clientFilters.onlyPromotions = e.target.checked; render(); });
+  document.getElementById('filter-promo').addEventListener('change', (e) => { state.clientFilters.promo = e.target.value; render(); });
   document.getElementById('filter-onlyDiscount').addEventListener('change', (e) => { state.clientFilters.onlyDiscount = e.target.checked; render(); });
+  const ownerSel = document.getElementById('filter-ownerId');
+  if (ownerSel) ownerSel.addEventListener('change', (e) => { state.clientFilters.ownerId = e.target.value; render(); });
   const showClosedCb = document.getElementById('filter-showClosed');
   if (showClosedCb) showClosedCb.addEventListener('change', (e) => { state.clientFilters.showClosed = e.target.checked; render(); });
   const resetBtn = document.getElementById('filter-reset');
   if (resetBtn) resetBtn.addEventListener('click', () => {
-    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, showClosed: false, search: '' };
+    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', promo: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, showClosed: false, search: '' };
     render();
   });
   content.querySelectorAll('th.sortable').forEach((th) => {
@@ -1197,9 +1363,9 @@ function renderPromotionsSection(client) {
   const items = client.promotions || [];
   if (!items.length) return '';
   return `
-    <button type="button" class="assort-btn" id="promo-toggle-${client.id}">🎁 Акции (${items.length})</button>
+    <button type="button" class="assort-btn" id="promo-toggle-${client.id}">🎁 Акции (${items.length}, на ${fmtMoney(items.reduce((s, p) => s + (p.sum || 0), 0))})</button>
     <div class="assort-panel" id="promo-panel-${client.id}" style="display:none">
-      ${items.map((p) => `<div class="promo-row"><span>${escapeHtml(p.promo)}</span><span class="promo-qty">${formatQty(p.qty)} шт</span></div>`).join('')}
+      ${items.map((p) => `<div class="promo-row"><span>${escapeHtml(p.promo)}</span><span class="promo-qty">${formatQty(p.qty)} шт · ${fmtMoney(p.sum || 0)}</span></div>`).join('')}
     </div>
   `;
 }
@@ -1376,20 +1542,27 @@ function taskTagBadges(t) {
 
 function renderTasks(content) {
   const bulk = state.taskBulkMode;
-  const typeView = state.taskTypeView || 'visit';
+  // Правка 31.08.2026 (п.2): порядок воронок — продажи → лист ожидания → визиты
+  // (был: визиты → продажи → лист ожидания); по умолчанию открывается первая — продажи.
+  const typeView = state.taskTypeView || 'sale';
   content.appendChild(el(`
     <div>
       <div class="toolbar">
         <h2 style="margin:0">Задачи по клиентам</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${isStaff() && typeView === 'visit' ? `<button type="button" class="btn-secondary ${bulk ? 'active' : ''}" id="task-bulk-mode-btn">${bulk ? 'Отменить выбор' : 'Выбрать несколько'}</button>` : ''}
+          ${isStaff() ? `
+            <a class="btn-secondary" href="/api/tasks/export" download>⬇ Выгрузить задачи в файл</a>
+            <button type="button" class="btn-secondary" id="task-import-btn">⬆ Загрузить задачи из файла</button>
+            <input type="file" id="task-import-input" accept=".json" style="display:none">
+          ` : ''}
           <button class="btn-primary" id="add-task-btn">+ Новая задача</button>
         </div>
       </div>
       <div class="filter-bar">
-        <button type="button" class="btn-secondary ${typeView === 'visit' ? 'active' : ''}" id="task-type-visit-btn">Визиты с супервайзером</button>
         <button type="button" class="btn-secondary ${typeView === 'sale' ? 'active' : ''}" id="task-type-sale-btn">Воронка продаж</button>
         <button type="button" class="btn-secondary ${typeView === 'waitlist' ? 'active' : ''}" id="task-type-waitlist-btn">Лист ожидания</button>
+        <button type="button" class="btn-secondary ${typeView === 'visit' ? 'active' : ''}" id="task-type-visit-btn">Визиты с супервайзером</button>
       </div>
       ${typeView === 'visit' ? `
       <div class="filter-bar">
@@ -1414,6 +1587,42 @@ function renderTasks(content) {
     </div>
   `));
   document.getElementById('add-task-btn').addEventListener('click', () => openTaskModal(null, typeView));
+  // Экспорт/импорт задач файлом (п.11, 31.08.2026) — на случай пересборки проекта,
+  // после которой data/db.json не переносится и все задачи теряются. "Выгрузить" —
+  // просто ссылка на скачивание (сессия и так авторизована через cookie). "Загрузить"
+  // читает выбранный файл на клиенте и шлёт его содержимое на /api/tasks/import —
+  // сервер сам сопоставит клиентов/агентов по имени и пропустит дубли/нераспознанное.
+  const taskImportBtn = document.getElementById('task-import-btn');
+  const taskImportInput = document.getElementById('task-import-input');
+  if (taskImportBtn && taskImportInput) {
+    taskImportBtn.addEventListener('click', () => taskImportInput.click());
+    taskImportInput.addEventListener('change', async () => {
+      const file = taskImportInput.files[0];
+      if (!file) return;
+      let parsed;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch (e) {
+        alert('Не удалось прочитать файл — это не корректный JSON');
+        taskImportInput.value = '';
+        return;
+      }
+      try {
+        const result = await api('POST', '/api/tasks/import', { tasks: parsed.tasks || [] });
+        let msg = `Загружено новых задач: ${result.imported}.\nПропущено (уже есть): ${result.skippedDuplicate}.`;
+        if (result.unresolvedCount) {
+          msg += `\nНе удалось распознать: ${result.unresolvedCount} (клиент не найден в текущей базе) — список в консоли браузера.`;
+          console.log('Не распознано при импорте задач:', result.unresolved);
+        }
+        alert(msg);
+        await loadAll();
+        render();
+      } catch (e) {
+        alert('Ошибка загрузки: ' + e.message);
+      }
+      taskImportInput.value = '';
+    });
+  }
   document.getElementById('task-type-visit-btn').addEventListener('click', () => { state.taskTypeView = 'visit'; render(); });
   document.getElementById('task-type-sale-btn').addEventListener('click', () => { state.taskTypeView = 'sale'; render(); });
   document.getElementById('task-type-waitlist-btn').addEventListener('click', () => { state.taskTypeView = 'waitlist'; render(); });
@@ -1881,18 +2090,19 @@ async function renderReports(content) {
         <select id="reports-agent-filter">
           <option value="">Все агенты</option>
         </select>
-        <select id="reports-month-filter">
-          <option value="all">Все месяцы (7 мес)</option>
-        </select>
       </div>
+      <div id="reports-month-bar" class="assort-brand-filter" style="margin-bottom:10px"></div>
       <div id="reports-brand-bar" class="assort-brand-filter"></div>
       <div id="reports-table" class="report-table-wrap"><div class="muted">Загрузка…</div></div>
 
       <h2 style="margin-top:26px">🎁 Акции</h2>
-      <div class="sub muted" style="margin-bottom:10px">Кто из клиентов и что именно брал по текущим акциям склада/магазина (срез на дату последнего импорта) — с фильтром по агенту.</div>
+      <div class="sub muted" style="margin-bottom:10px">Кто из клиентов и что именно брал по текущим акциям склада/магазина (срез на дату последнего импорта, с суммой в сомах) — с фильтром по агенту и по конкретной акции.</div>
       <div class="filter-bar" style="margin-bottom:10px">
         <select id="promo-report-agent-filter">
           <option value="">Все агенты</option>
+        </select>
+        <select id="promo-report-promo-filter">
+          <option value="">Все акции</option>
         </select>
       </div>
       <div id="promo-report-table" class="report-table-wrap"><div class="muted">Загрузка…</div></div>
@@ -1900,13 +2110,20 @@ async function renderReports(content) {
   `));
 
   let currentBrand = 'all';
+  // Правка 31.08.2026: раньше был select одного месяца, теперь можно выбрать
+  // несколько сразу (чипы, как у фильтра по бренду) — пустой набор = все 7 мес.
+  const selectedMonths = new Set();
+
+  function monthsParam() {
+    return selectedMonths.size ? Array.from(selectedMonths).join(',') : '';
+  }
 
   async function load() {
     const agentId = document.getElementById('reports-agent-filter').value;
-    const month = document.getElementById('reports-month-filter').value;
     const qs = new URLSearchParams();
     if (agentId) qs.set('agentId', agentId);
-    if (month) qs.set('month', month);
+    const mp = monthsParam();
+    if (mp) qs.set('month', mp);
     const res = await api('GET', `/api/reports/assortment-by-agent?${qs.toString()}`);
 
     const agentSel = document.getElementById('reports-agent-filter');
@@ -1916,13 +2133,29 @@ async function renderReports(content) {
       agentSel.value = agentId;
       agentSel.dataset.filled = '1';
     }
-    const monthSel = document.getElementById('reports-month-filter');
-    if (!monthSel.dataset.filled) {
-      monthSel.innerHTML = '<option value="all">Все месяцы (7 мес)</option>' +
-        res.months.map((m) => `<option value="${escapeAttr(m)}">${escapeHtml(m.charAt(0).toUpperCase() + m.slice(1))}</option>`).join('');
-      monthSel.value = month || 'all';
-      monthSel.dataset.filled = '1';
+    const monthBar = document.getElementById('reports-month-bar');
+    if (!monthBar.dataset.filled) {
+      monthBar.innerHTML = `
+        <button type="button" class="brand-chip ${!selectedMonths.size ? 'active' : ''}" data-month="all">Все месяцы (7 мес)</button>
+        ${res.months.map((m) => `<button type="button" class="brand-chip" data-month="${escapeAttr(m)}">${escapeHtml(m.charAt(0).toUpperCase() + m.slice(1))}</button>`).join('')}
+      `;
+      monthBar.dataset.filled = '1';
+      monthBar.querySelectorAll('.brand-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const m = chip.dataset.month;
+          if (m === 'all') {
+            selectedMonths.clear();
+          } else {
+            if (selectedMonths.has(m)) selectedMonths.delete(m); else selectedMonths.add(m);
+          }
+          monthBar.querySelectorAll('.brand-chip').forEach((c) => {
+            c.classList.toggle('active', c.dataset.month === 'all' ? !selectedMonths.size : selectedMonths.has(c.dataset.month));
+          });
+          load();
+        });
+      });
     }
+    const month = mp; // используется ниже только для подписи колонки "Шт"
 
     const bar = document.getElementById('reports-brand-bar');
     bar.innerHTML = `
@@ -1935,7 +2168,7 @@ async function renderReports(content) {
       const rows = !brand || brand === 'all' ? res.rows
         : brand === 'colorants' ? res.rows.filter((r) => r.category === 'Краситель' || r.category === 'Оксид')
         : res.rows.filter((r) => r.brand === brand);
-      const qtyHeader = month && month !== 'all' ? 'Шт (за месяц)' : 'Шт (7 мес)';
+      const qtyHeader = month ? 'Шт (за выбр. месяцы)' : 'Шт (7 мес)';
       document.getElementById('reports-table').innerHTML = rows.length ? `
         <table>
           <thead><tr><th>Агент</th><th>Товар</th><th>Бренд</th><th>${qtyHeader}</th><th>Выручка</th><th>Клиентов</th></tr></thead>
@@ -1967,13 +2200,14 @@ async function renderReports(content) {
   }
 
   document.getElementById('reports-agent-filter').addEventListener('change', load);
-  document.getElementById('reports-month-filter').addEventListener('change', load);
   await load();
 
   async function loadPromoReport() {
     const agentId = document.getElementById('promo-report-agent-filter').value;
+    const promo = document.getElementById('promo-report-promo-filter').value;
     const qs = new URLSearchParams();
     if (agentId) qs.set('agentId', agentId);
+    if (promo) qs.set('promo', promo);
     const res = await api('GET', `/api/reports/promotions?${qs.toString()}`);
     const agentSel = document.getElementById('promo-report-agent-filter');
     if (!agentSel.dataset.filled) {
@@ -1982,9 +2216,16 @@ async function renderReports(content) {
       agentSel.value = agentId;
       agentSel.dataset.filled = '1';
     }
+    const promoSel = document.getElementById('promo-report-promo-filter');
+    if (!promoSel.dataset.filled) {
+      promoSel.innerHTML = '<option value="">Все акции</option>' +
+        res.promos.map((p) => `<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join('');
+      promoSel.value = promo;
+      promoSel.dataset.filled = '1';
+    }
     document.getElementById('promo-report-table').innerHTML = res.rows.length ? `
       <table>
-        <thead><tr><th>Агент</th><th>Клиент</th><th>Акция</th><th>Кол-во</th></tr></thead>
+        <thead><tr><th>Агент</th><th>Клиент</th><th>Акция</th><th>Кол-во</th><th>Сумма</th></tr></thead>
         <tbody>
           ${res.rows.map((r) => `
             <tr>
@@ -1992,13 +2233,16 @@ async function renderReports(content) {
               <td>${escapeHtml(r.clientName)}</td>
               <td>${escapeHtml(r.promo)}</td>
               <td>${formatQty(r.qty)}</td>
+              <td>${fmtMoney(r.sum)}</td>
             </tr>
           `).join('')}
+          <tr><td colspan="4"><strong>Итого</strong></td><td><strong>${fmtMoney(res.totalSum)}</strong></td></tr>
         </tbody>
       </table>
     ` : '<div class="empty-state">По этому фильтру акций нет.</div>';
   }
   document.getElementById('promo-report-agent-filter').addEventListener('change', loadPromoReport);
+  document.getElementById('promo-report-promo-filter').addEventListener('change', loadPromoReport);
   await loadPromoReport();
 }
 
