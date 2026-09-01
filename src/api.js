@@ -7,6 +7,42 @@ const { buildZip } = require('./miniZip');
 const googleSheets = require('./googleSheets');
 const { normalizePhone, MONTH_ORDER } = require('./import');
 
+// ---- Правка 01.09.2026: "протухание" данных за текущий месяц ----
+// currentMonthRevenue/currentMonthItems (продажи "текущего месяца") и promotions
+// (акции) на клиенте считаются из ПОСЛЕДНЕГО присланного реестра — сейчас это
+// август 2026. Раньше эти показатели продолжали показывать цифры августа даже
+// после того, как реальный календарь ушёл в сентябрь и далее — что выглядело
+// как "продажи за этот месяц", хотя по факту это уже прошлый месяц без новых
+// данных. Пользователь явно попросил: пока не пришлют новый реестр за новый
+// месяц, все такие показатели должны быть 0, а не "зависать" на цифрах августа.
+// ВАЖНО: это НЕ относится к остаткам склада и задолженности — они снимок на
+// дату (не "поток за месяц") и по решению пользователя продолжают показывать
+// последнее известное значение, но с явной пометкой "на такое-то число"
+// (см. STOCK_AS_OF ниже и client.debtAsOf, уже существовавшее поле).
+//
+// Обновить при добавлении нового реестра продаж (например, за сентябрь):
+// 1) добавить новый месяц в MONTH_ORDER (src/import.js) и во все MONTHS-списки
+//    python-пайплайна (см. Технические заметки в статус-документе проекта);
+// 2) передвинуть CURRENT_MONTH_DATA_STALE_FROM на 1-е число месяца, СЛЕДУЮЩЕГО
+//    за новым последним месяцем (сейчас: сентябрь 2026 → '2026-10-01').
+const CURRENT_MONTH_DATA_STALE_FROM = new Date('2026-09-01T00:00:00');
+function isCurrentMonthDataFresh() {
+  return new Date() < CURRENT_MONTH_DATA_STALE_FROM;
+}
+// Возвращает список клиентов с обнулёнными currentMonthRevenue/currentMonthItems/
+// promotions, если данные "текущего месяца" устарели (см. выше) — иначе список
+// без изменений. Применять на КАЖДОМ месте, где список клиентов идёт на
+// отображение (дашборд, отчёты, GET /api/clients) — но не там, где клиент
+// используется для записи/бизнес-логики, не связанной с деньгами (задачи и т.п.).
+function withFreshCurrentMonth(clients) {
+  if (isCurrentMonthDataFresh()) return clients;
+  return clients.map((c) => ({ ...c, currentMonthRevenue: 0, currentMonthItems: [], promotions: [] }));
+}
+// Дата среза остатков склада (Фаза 6.1) — сам исходный файл выгрузки дату не
+// содержит, дата задокументирована пользователем при присылке файла. Обновить
+// при следующей выгрузке остатков.
+const STOCK_AS_OF = '25.08.2026';
+
 // Этапы доски задач. "Новая задача" убрана — задача сразу создаётся в "В работе".
 // "Лист ожидания" и "Прогрев" больше не этапы доски, а теги задачи (см. TASK_TAGS) —
 // так их проще сочетать с обычным статусом выполнения.
@@ -297,7 +333,15 @@ function register(router) {
       waitlistTags: WAITLIST_TAGS,
       paymentMethods: PAYMENT_METHODS,
       contractStatuses: CONTRACT_STATUSES,
-      taskTags: TASK_TAGS
+      taskTags: TASK_TAGS,
+      // Правка 01.09.2026: чтобы фронтенд мог показать реальную дату и явно
+      // предупредить, что данные о продажах/акциях за текущий месяц ещё не
+      // загружены (см. withFreshCurrentMonth выше).
+      serverDate: new Date().toISOString(),
+      salesMonths: MONTH_ORDER,
+      latestSalesMonth: MONTH_ORDER[MONTH_ORDER.length - 1],
+      currentMonthDataFresh: isCurrentMonthDataFresh(),
+      stockAsOf: STOCK_AS_OF
     });
   }));
 
@@ -399,7 +443,7 @@ function register(router) {
   // ---- Клиенты (контрагенты) ----
 
   router.get('/api/clients', requireAuth(async (req, res) => {
-    sendJson(res, 200, { clients: scoped(db.all('clients'), req.user, 'ownerId') });
+    sendJson(res, 200, { clients: withFreshCurrentMonth(scoped(db.all('clients'), req.user, 'ownerId')) });
   }));
 
   router.post('/api/clients', requireAuth(async (req, res) => {
@@ -1204,7 +1248,7 @@ function register(router) {
     const promoFilter = params.get('promo'); // правка 31.08.2026: фильтр по конкретной акции
     const agentsById = {};
     db.all('users').forEach((u) => { agentsById[u.id] = u; });
-    let clients = db.all('clients').filter((c) => (c.promotions || []).length);
+    let clients = withFreshCurrentMonth(db.all('clients')).filter((c) => (c.promotions || []).length);
     if (agentIdFilter) clients = clients.filter((c) => c.ownerId === Number(agentIdFilter));
     const rows = [];
     const promoSet = new Set();
@@ -1231,7 +1275,7 @@ function register(router) {
   // ---- Дашборд ----
 
   router.get('/api/stats', requireAuth(async (req, res) => {
-    const clients = scoped(db.all('clients'), req.user, 'ownerId');
+    const clients = withFreshCurrentMonth(scoped(db.all('clients'), req.user, 'ownerId'));
     const tasks = scoped(db.all('tasks'), req.user, 'assigneeId');
     const today = new Date().toISOString().slice(0, 10);
     const overdueTasks = tasks.filter((t) => isActiveStage(t) && t.dueDate && t.dueDate < today);
@@ -1266,7 +1310,7 @@ function register(router) {
     if (isStaff(req.user)) {
       const agents = db.all('users').filter((u) => u.role === 'agent');
       const allTasks = db.all('tasks');
-      const allClients = db.all('clients');
+      const allClients = withFreshCurrentMonth(db.all('clients'));
 
       payload.byAgent = agents.map((agent) => {
         const aTasks = allTasks.filter((t) => t.assigneeId === agent.id);

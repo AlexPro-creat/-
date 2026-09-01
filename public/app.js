@@ -35,23 +35,22 @@ const state = {
 // с доски (см. api.js), остался только "В работе".
 const ACTIVE_STAGES = ['in_progress'];
 
-// Месяцы, за которые есть данные о продажах — фиксированный список (совпадает с
-// MONTH_ORDER в src/import.js/api.js). ВАЖНО (01.09.2026): специально НЕ вычисляется
-// из текущей календарной даты (new Date()) — последний доступный месяц выгрузки
-// остаётся "август", даже когда реальный календарь уже в сентябре и далее, пока
-// пользователь не пришлёт новую выгрузку продаж. Используется в фильтре по месяцам
-// в «Рейтинге клиентов» (см. renderRatingFiltered).
-const SALES_MONTHS = ['февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август'];
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
-// Последний месяц, за который вообще есть данные о продажах. ВСЕ места на
+// Месяцы, за которые есть данные о продажах, и последний из них — приходят с
+// сервера через /api/me (state.salesMonths, заполняется в boot() из MONTH_ORDER,
+// src/import.js) — единственный источник правды, чтобы список месяцев не пришлось
+// синхронизировать руками в двух местах. ВАЖНО (01.09.2026): специально НЕ
+// вычисляется из текущей календарной даты (new Date()) — последний доступный
+// месяц выгрузки остаётся "август", даже когда реальный календарь уже в сентябре
+// и далее, пока пользователь не пришлёт новую выгрузку продаж. Все места на
 // дашборде, подписанные раньше как "(этот месяц)"/"текущий месяц" (карточки
-// "Продано", "Топ по брендам", "Выполнение плана"), на самом деле показывают
-// данные именно за этот месяц — а не за реальный календарный "сейчас" (см.
-// комментарий у SALES_MONTHS выше). Названы явно, чтобы не создавать
-// впечатление "живых" цифр за месяц, который по факту ещё не выгружен
-// (правка 01.09.2026 — уже сентябрь, а данных за него нет и не будет, пока
-// пользователь не пришлёт новую выгрузку).
-const LATEST_SALES_MONTH = SALES_MONTHS[SALES_MONTHS.length - 1];
+// "Продано", "Топ по брендам", "Выполнение плана"), теперь называют месяц явно
+// (через latestSalesMonth()), чтобы не создавать впечатление "живых" цифр за
+// месяц, который по факту ещё не выгружен.
+function latestSalesMonth() {
+  const months = state.salesMonths || [];
+  return months[months.length - 1] || '';
+}
 
 // Воронка "звонок → встреча → сделка/провал" — параллельный тип задач (taskType: 'sale'),
 // не пересекается с обычными визитными задачами. Финальные этапы требуют аудиозаписи
@@ -301,6 +300,14 @@ async function boot() {
     state.paymentMethods = me.paymentMethods;
     state.contractStatuses = me.contractStatuses;
     state.taskTags = me.taskTags || [];
+    // Правка 01.09.2026: реальная текущая дата (для шапки) + признак того, что
+    // данные о продажах/акциях за текущий месяц ещё не загружены (сервер сам
+    // решает это по факту календаря, см. withFreshCurrentMonth в src/api.js).
+    state.serverDate = me.serverDate ? new Date(me.serverDate) : new Date();
+    state.salesMonths = me.salesMonths || [];
+    state.latestSalesMonth = me.latestSalesMonth || '';
+    state.currentMonthDataFresh = me.currentMonthDataFresh !== false;
+    state.stockAsOf = me.stockAsOf || '';
   } catch (e) {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app-screen').style.display = 'none';
@@ -309,6 +316,10 @@ async function boot() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('user-name').textContent = `${state.user.name} (${roleLabel(state.user.role)})`;
+  // Правка 01.09.2026: видимая текущая дата в шапке — чтобы было явно понятно,
+  // на какой момент считаются "текущий месяц"/"на сегодня" показатели.
+  const todayEl = document.getElementById('today-date');
+  if (todayEl) todayEl.textContent = 'Сегодня: ' + new Date().toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
   document.getElementById('team-tab').style.display = isAdmin() ? '' : 'none';
   document.getElementById('myday-tab').style.display = state.user.role === 'agent' ? '' : 'none';
   document.getElementById('reports-tab').style.display = isStaff() ? '' : 'none';
@@ -440,6 +451,13 @@ async function renderDashboard(content) {
   const stats = await api('GET', '/api/stats');
   content.appendChild(el(`
     <div>
+      ${!state.currentMonthDataFresh ? `
+      <div class="notice notice-warn" style="margin-bottom:14px">
+        Нет новых данных о продажах и акциях за текущий месяц — последний присланный реестр за
+        <b>${escapeHtml(capitalize(state.latestSalesMonth))}</b>. Показатели «текущий месяц» ниже (продано,
+        акции, выполнение плана) показывают 0 — это ожидаемо, а не ошибка. Они обновятся, как только
+        придёт новая выгрузка продаж за текущий месяц.
+      </div>` : ''}
       <div class="stat-grid">
         <div class="stat-card"><div class="num">${stats.clientsCount}</div><div class="label">Клиентов</div>${isStaff() ? agentFilterSelectHTML('clientsCount') : ''}</div>
         <div class="stat-card"><div class="num">${stats.todayTasksCount}</div><div class="label">Задач на сегодня</div>${isStaff() ? agentFilterSelectHTML('todayTasksCount') : ''}</div>
@@ -456,7 +474,7 @@ async function renderDashboard(content) {
       <div class="panel">
         <h2>Мои показатели</h2>
         <div class="agent-metric-grid">
-          <div class="stat-card"><div class="num">${fmtMoney(stats.agentDashboard.salesTotalThisMonth)}</div><div class="label">Продано (${capitalize(LATEST_SALES_MONTH)})</div></div>
+          <div class="stat-card"><div class="num">${fmtMoney(stats.agentDashboard.salesTotalThisMonth)}</div><div class="label">Продано (${capitalize(latestSalesMonth())})</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.clientsBoughtThisMonth}/${stats.agentDashboard.clientsNotBoughtThisMonth}</div><div class="label">Купили / не купили в этом месяце</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.callsToday}</div><div class="label">Звонков сегодня</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.meetingsToday}</div><div class="label">Встреч сегодня</div></div>
@@ -477,7 +495,7 @@ async function renderDashboard(content) {
             ${stats.agentDashboard.salesByClientAllMonths.map((r) => `<div>${escapeHtml(r.clientName)} / ${fmtMoney(r.revenue)}</div>`).join('')}
           </div>
         </div>
-        <button type="button" class="assort-btn" id="top-brands-toggle">🏆 Топ-10 по брендам (${capitalize(LATEST_SALES_MONTH)})</button>
+        <button type="button" class="assort-btn" id="top-brands-toggle">🏆 Топ-10 по брендам (${capitalize(latestSalesMonth())})</button>
         <div class="assort-panel" id="top-brands-panel" style="display:none">
           ${renderTopBrandTable('Kapous', stats.agentDashboard.topByBrand.Kapous, true)}
           ${renderTopBrandTable('EPICA', stats.agentDashboard.topByBrand.EPICA, true)}
@@ -588,7 +606,7 @@ async function renderDashboard(content) {
         <div class="agent-metric-grid" id="perf-stat-cards"></div>
         <div class="table-wrap" style="margin-top:10px">
           <table>
-            <thead><tr><th>Бренд</th><th>Выручка (${capitalize(LATEST_SALES_MONTH)})</th></tr></thead>
+            <thead><tr><th>Бренд</th><th>Выручка (${capitalize(latestSalesMonth())})</th></tr></thead>
             <tbody id="perf-brand-tbody"></tbody>
           </table>
         </div>
@@ -648,7 +666,7 @@ async function renderDashboard(content) {
         <h2>Рейтинг клиентов (выручка / маржа / активные месяцы) <select class="card-agent-filter" id="rating-agent-filter"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select></h2>
         <div class="assort-brand-filter" id="rating-month-bar" style="margin-bottom:10px">
           <button type="button" class="brand-chip ${!state.ratingSelectedMonths.size ? 'active' : ''}" data-month="all">Все месяцы (7 мес)</button>
-          ${SALES_MONTHS.map((m) => `<button type="button" class="brand-chip ${state.ratingSelectedMonths.has(m) ? 'active' : ''}" data-month="${escapeAttr(m)}">${escapeHtml(capitalize(m))}</button>`).join('')}
+          ${(state.salesMonths || []).map((m) => `<button type="button" class="brand-chip ${state.ratingSelectedMonths.has(m) ? 'active' : ''}" data-month="${escapeAttr(m)}">${escapeHtml(capitalize(m))}</button>`).join('')}
         </div>
         <div id="rating-table-wrap">
         ${stats.clientRating.length ? `
@@ -695,8 +713,8 @@ async function renderDashboard(content) {
     const actualTotal = clientsF.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
     const pct = planTotal ? Math.round((actualTotal / planTotal) * 100) : null;
     document.getElementById('perf-stat-cards').innerHTML = `
-      <div class="stat-card"><div class="num">${fmtMoney(planTotal)}</div><div class="label">План (${capitalize(LATEST_SALES_MONTH)})</div></div>
-      <div class="stat-card"><div class="num">${fmtMoney(actualTotal)}</div><div class="label">Факт (${capitalize(LATEST_SALES_MONTH)})</div></div>
+      <div class="stat-card"><div class="num">${fmtMoney(planTotal)}</div><div class="label">План (${capitalize(latestSalesMonth())})</div></div>
+      <div class="stat-card"><div class="num">${fmtMoney(actualTotal)}</div><div class="label">Факт (${capitalize(latestSalesMonth())})</div></div>
       <div class="stat-card"><div class="num">${pct === null ? '—' : pct + '%'}</div><div class="label">Выполнение</div></div>
     `;
     const byBrandMap = {};
@@ -881,6 +899,15 @@ function sortArrow(key) {
   return state.clientSort.dir === 1 ? ' ▲' : ' ▼';
 }
 
+// В исходной выгрузке долгов (data/import/debts.json) у части клиентов вместо
+// даты буквально стоит текст "Нет данных" (сама выгрузка так размечена) — для
+// таких показывать "— на Нет данных" бессмысленно, поэтому проверяем, похоже
+// ли значение на настоящую дату (ДД.ММ или ДД.ММ.ГГГГ), прежде чем его показывать.
+function debtAsOfLabel(c) {
+  if (!c.debtAsOf || !/^\d{1,2}[.,]\d{1,2}/.test(c.debtAsOf.trim())) return '';
+  return c.debtAsOf.trim();
+}
+
 function daysOverdueText(c) {
   if (!c.debtOverdue || !c.debtAmount) return '';
   const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec((c.debtAsOf || '').trim());
@@ -1041,7 +1068,7 @@ function renderClients(content) {
           ${c.isOffRoute ? '<span class="badge badge-offroute">вне маршрута</span>' : ''}
           ${(c.promotions || []).length ? '<span class="badge badge-promo" title="Есть акции">🎁 акции</span>' : ''}
         </td>
-        <td>${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${overdueDays}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
+        <td>${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${escapeAttr([overdueDays, debtAsOfLabel(c) ? 'на ' + debtAsOfLabel(c) : ''].filter(Boolean).join(', '))}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
         <td>${risk ? `<span class="badge badge-overdue">${risk} недопродано</span>` : '—'}</td>
         <td>${escapeHtml(c.pointType || '—')}</td>
         <td>${telLink(c.phone)}</td>
@@ -1257,9 +1284,9 @@ async function openClientModal(client) {
         ${fieldRow('Работает по договору', escapeHtml(client.contractStatus), true)}
         ${fieldRow('Способ оплаты', escapeHtml(client.paymentMethod || 'не указан'), true)}
         ${fieldRow('Скидка / условия оплаты', escapeHtml(client.discountTerms || '—'), true)}
-        ${fieldRow('План продаж (мес.)', client.salesPlan ? `${fmtMoney(client.salesPlan)} (факт: ${fmtMoney(client.currentMonthRevenue || 0)})` : '—', true)}
+        ${fieldRow('План продаж (мес.)', client.salesPlan ? `${fmtMoney(client.salesPlan)} (факт за ${capitalize(latestSalesMonth())}: ${fmtMoney(client.currentMonthRevenue || 0)}${!state.currentMonthDataFresh ? ' — нет данных за текущий месяц' : ''})` : '—', true)}
         ${fieldRow('Ответственный', escapeHtml(userName(client.ownerId)), true)}
-        ${fieldRow('Задолженность', client.debtAmount ? fmtMoney(client.debtAmount) + (client.debtOverdue ? ' (просрочка)' : '') : 'нет', true)}
+        ${fieldRow('Задолженность', client.debtAmount ? fmtMoney(client.debtAmount) + (client.debtOverdue ? ' (просрочка)' : '') + (debtAsOfLabel(client) ? ` — на ${escapeHtml(debtAsOfLabel(client))}` : '') : 'нет', true)}
         ${fieldRow('Последний визит', `<span class="${lastVisit.stale ? 'stale-visit' : ''}">${lastVisit.html}</span>`, true)}
         ${fieldRow('Особенности приёма', escapeHtml(client.orderWindow || '—'), true)}
         ${fieldRow('ИНН/БИН', escapeHtml(client.inn || '—'), true)}
@@ -1442,7 +1469,10 @@ function renderPromotionsSection(client) {
 function stockBadgeHtml(p) {
   if (p.stockQty === undefined || p.stockQty === null) return '';
   const low = p.stockQty <= 0;
-  return `<span class="stock-badge${low ? ' stock-badge-empty' : ''}" title="Остаток на складе">📦 ${formatQty(p.stockQty)} ${escapeHtml(p.stockUnit || 'шт')}</span>`;
+  // Правка 01.09.2026: явно показываем дату среза остатков (в отличие от продаж/
+  // акций, остатки НЕ обнуляются при смене месяца — это снимок на дату, а не поток).
+  const asOfTitle = state.stockAsOf ? `Остаток на складе (снято на ${escapeAttr(state.stockAsOf)})` : 'Остаток на складе';
+  return `<span class="stock-badge${low ? ' stock-badge-empty' : ''}" title="${asOfTitle}">📦 ${formatQty(p.stockQty)} ${escapeHtml(p.stockUnit || 'шт')}</span>`;
 }
 function formatQty(n) {
   return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, '');
