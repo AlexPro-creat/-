@@ -26,13 +26,32 @@ const state = {
   taskBulkSelected: new Set(),
   // Правка 31.08.2026 (п.2): по умолчанию открывается первая вкладка после
   // смены порядка — «Воронка продаж» (была — «Визиты»).
-  taskTypeView: 'sale'
+  taskTypeView: 'sale',
+  ratingSelectedMonths: new Set()
 };
 
 // Единственный "активный" (ещё не завершённый) этап — раньше их было три
 // (new/in_progress/waiting), теперь "Новая задача" и "Лист ожидания" убраны
 // с доски (см. api.js), остался только "В работе".
 const ACTIVE_STAGES = ['in_progress'];
+
+// Месяцы, за которые есть данные о продажах — фиксированный список (совпадает с
+// MONTH_ORDER в src/import.js/api.js). ВАЖНО (01.09.2026): специально НЕ вычисляется
+// из текущей календарной даты (new Date()) — последний доступный месяц выгрузки
+// остаётся "август", даже когда реальный календарь уже в сентябре и далее, пока
+// пользователь не пришлёт новую выгрузку продаж. Используется в фильтре по месяцам
+// в «Рейтинге клиентов» (см. renderRatingFiltered).
+const SALES_MONTHS = ['февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август'];
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+// Последний месяц, за который вообще есть данные о продажах. ВСЕ места на
+// дашборде, подписанные раньше как "(этот месяц)"/"текущий месяц" (карточки
+// "Продано", "Топ по брендам", "Выполнение плана"), на самом деле показывают
+// данные именно за этот месяц — а не за реальный календарный "сейчас" (см.
+// комментарий у SALES_MONTHS выше). Названы явно, чтобы не создавать
+// впечатление "живых" цифр за месяц, который по факту ещё не выгружен
+// (правка 01.09.2026 — уже сентябрь, а данных за него нет и не будет, пока
+// пользователь не пришлёт новую выгрузку).
+const LATEST_SALES_MONTH = SALES_MONTHS[SALES_MONTHS.length - 1];
 
 // Воронка "звонок → встреча → сделка/провал" — параллельный тип задач (taskType: 'sale'),
 // не пересекается с обычными визитными задачами. Финальные этапы требуют аудиозаписи
@@ -437,7 +456,7 @@ async function renderDashboard(content) {
       <div class="panel">
         <h2>Мои показатели</h2>
         <div class="agent-metric-grid">
-          <div class="stat-card"><div class="num">${fmtMoney(stats.agentDashboard.salesTotalThisMonth)}</div><div class="label">Продано (этот месяц)</div></div>
+          <div class="stat-card"><div class="num">${fmtMoney(stats.agentDashboard.salesTotalThisMonth)}</div><div class="label">Продано (${capitalize(LATEST_SALES_MONTH)})</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.clientsBoughtThisMonth}/${stats.agentDashboard.clientsNotBoughtThisMonth}</div><div class="label">Купили / не купили в этом месяце</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.callsToday}</div><div class="label">Звонков сегодня</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.meetingsToday}</div><div class="label">Встреч сегодня</div></div>
@@ -458,7 +477,7 @@ async function renderDashboard(content) {
             ${stats.agentDashboard.salesByClientAllMonths.map((r) => `<div>${escapeHtml(r.clientName)} / ${fmtMoney(r.revenue)}</div>`).join('')}
           </div>
         </div>
-        <button type="button" class="assort-btn" id="top-brands-toggle">🏆 Топ-10 по брендам (этот месяц)</button>
+        <button type="button" class="assort-btn" id="top-brands-toggle">🏆 Топ-10 по брендам (${capitalize(LATEST_SALES_MONTH)})</button>
         <div class="assort-panel" id="top-brands-panel" style="display:none">
           ${renderTopBrandTable('Kapous', stats.agentDashboard.topByBrand.Kapous, true)}
           ${renderTopBrandTable('EPICA', stats.agentDashboard.topByBrand.EPICA, true)}
@@ -569,7 +588,7 @@ async function renderDashboard(content) {
         <div class="agent-metric-grid" id="perf-stat-cards"></div>
         <div class="table-wrap" style="margin-top:10px">
           <table>
-            <thead><tr><th>Бренд</th><th>Выручка (этот месяц)</th></tr></thead>
+            <thead><tr><th>Бренд</th><th>Выручка (${capitalize(LATEST_SALES_MONTH)})</th></tr></thead>
             <tbody id="perf-brand-tbody"></tbody>
           </table>
         </div>
@@ -627,6 +646,10 @@ async function renderDashboard(content) {
       ${stats.clientRating ? `
       <div class="panel">
         <h2>Рейтинг клиентов (выручка / маржа / активные месяцы) <select class="card-agent-filter" id="rating-agent-filter"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select></h2>
+        <div class="assort-brand-filter" id="rating-month-bar" style="margin-bottom:10px">
+          <button type="button" class="brand-chip ${!state.ratingSelectedMonths.size ? 'active' : ''}" data-month="all">Все месяцы (7 мес)</button>
+          ${SALES_MONTHS.map((m) => `<button type="button" class="brand-chip ${state.ratingSelectedMonths.has(m) ? 'active' : ''}" data-month="${escapeAttr(m)}">${escapeHtml(capitalize(m))}</button>`).join('')}
+        </div>
         <div id="rating-table-wrap">
         ${stats.clientRating.length ? `
         <div class="table-wrap">
@@ -672,8 +695,8 @@ async function renderDashboard(content) {
     const actualTotal = clientsF.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
     const pct = planTotal ? Math.round((actualTotal / planTotal) * 100) : null;
     document.getElementById('perf-stat-cards').innerHTML = `
-      <div class="stat-card"><div class="num">${fmtMoney(planTotal)}</div><div class="label">План (этот месяц)</div></div>
-      <div class="stat-card"><div class="num">${fmtMoney(actualTotal)}</div><div class="label">Факт (этот месяц)</div></div>
+      <div class="stat-card"><div class="num">${fmtMoney(planTotal)}</div><div class="label">План (${capitalize(LATEST_SALES_MONTH)})</div></div>
+      <div class="stat-card"><div class="num">${fmtMoney(actualTotal)}</div><div class="label">Факт (${capitalize(LATEST_SALES_MONTH)})</div></div>
       <div class="stat-card"><div class="num">${pct === null ? '—' : pct + '%'}</div><div class="label">Выполнение</div></div>
     `;
     const byBrandMap = {};
@@ -721,19 +744,46 @@ async function renderDashboard(content) {
     document.getElementById('notask-agent-filter').addEventListener('change', renderNoTaskFiltered);
   }
 
+  // Правка 01.09.2026 (п.1 надиктованного списка): фильтр по месяцам в «Рейтинге
+  // клиентов». По умолчанию («Все месяцы») — как раньше, берём готовый 7-месячный
+  // расчёт с сервера (stats.clientRating). При выборе одного/нескольких месяцев —
+  // пересчитываем выручку/маржу на клиенте прямо в браузере из client.monthlyAssortment
+  // (те же данные, что уже использует помесячный отчёт в «Отчётах», п.6 Фазы 11) —
+  // без похода на сервер, по аналогии с остальными фильтрами на этом дашборде.
+  // ВАЖНО: у месяца «август» маржа всегда будет 0 — в присланных 31.08.2026 финальных
+  // файлах продаж за август нет себестоимости (см. Фазу 10/11) — это ограничение
+  // исходных данных, не ошибка подсчёта.
+  function computeMonthlyRating(months) {
+    return state.clients.map((c) => {
+      const items = months.flatMap((m) => (c.monthlyAssortment && c.monthlyAssortment[m]) || []);
+      const revenue = items.reduce((s, it) => s + (it.revenue || 0), 0);
+      const margin = items.reduce((s, it) => s + (it.margin || 0), 0);
+      const monthsWithSales = months.filter((m) => ((c.monthlyAssortment && c.monthlyAssortment[m]) || []).length > 0).length;
+      const owner = state.users.find((u) => u.id === c.ownerId);
+      return {
+        clientId: c.id, ownerId: c.ownerId, clientName: c.name, agentName: owner ? owner.name : '',
+        revenue, margin, marginPct: revenue ? Math.round((margin / revenue) * 100) : 0, activeMonths: monthsWithSales
+      };
+    }).filter((r) => r.revenue > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 50);
+  }
+
   function renderRatingFiltered() {
     const sel = document.getElementById('rating-agent-filter');
     if (!sel) return;
     const aid = sel.value ? Number(sel.value) : null;
-    const list = aid ? stats.clientRating.filter((r) => {
-      const c = clientById(r.clientId);
-      return c && c.ownerId === aid;
-    }) : stats.clientRating;
+    const months = Array.from(state.ratingSelectedMonths);
+    const useMonths = months.length > 0;
+    let list = useMonths ? computeMonthlyRating(months) : stats.clientRating;
+    if (aid) {
+      list = list.filter((r) => (useMonths ? r.ownerId === aid : (clientById(r.clientId) && clientById(r.clientId).ownerId === aid)));
+    }
+    const revenueHeader = useMonths ? (months.length === 1 ? `Выручка (${capitalize(months[0])})` : 'Выручка (за выбр. мес.)') : 'Выручка (7 мес)';
+    const activeHeader = useMonths ? 'Мес. с продажами (из выбр.)' : 'Активных мес.';
     const wrap = document.getElementById('rating-table-wrap');
     wrap.innerHTML = list.length ? `
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Клиент</th><th>Агент</th><th>Выручка (7 мес)</th><th>Маржа</th><th>% маржи</th><th>Активных мес.</th></tr></thead>
+          <thead><tr><th>Клиент</th><th>Агент</th><th>${revenueHeader}</th><th>Маржа</th><th>% маржи</th><th>${activeHeader}</th></tr></thead>
           <tbody>
             ${list.slice(0, 30).map((r) => `
               <tr>
@@ -748,11 +798,26 @@ async function renderDashboard(content) {
           </tbody>
         </table>
       </div>
-      <div class="muted" style="margin-top:6px;font-size:12px">Маржа считается из тех же файлов продаж (себестоимость/стоимость построчно).</div>
-    ` : '<div class="empty-state">Пока нет данных о продажах для рейтинга.</div>';
+      ${useMonths && months.includes('август')
+        ? '<div class="muted" style="margin-top:6px;font-size:12px">За август маржа показана как 0 — в присланных файлах продаж за август нет данных о себестоимости (есть только количество и сумма).</div>'
+        : '<div class="muted" style="margin-top:6px;font-size:12px">Маржа считается из тех же файлов продаж (себестоимость/стоимость построчно).</div>'}
+    ` : '<div class="empty-state">Нет данных о продажах за выбранный период.</div>';
   }
   if (stats.clientRating) {
     document.getElementById('rating-agent-filter').addEventListener('change', renderRatingFiltered);
+    const ratingMonthBar = document.getElementById('rating-month-bar');
+    ratingMonthBar.querySelectorAll('.brand-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const m = chip.dataset.month;
+        if (m === 'all') state.ratingSelectedMonths.clear();
+        else if (state.ratingSelectedMonths.has(m)) state.ratingSelectedMonths.delete(m);
+        else state.ratingSelectedMonths.add(m);
+        ratingMonthBar.querySelectorAll('.brand-chip').forEach((c) => {
+          c.classList.toggle('active', c.dataset.month === 'all' ? state.ratingSelectedMonths.size === 0 : state.ratingSelectedMonths.has(c.dataset.month));
+        });
+        renderRatingFiltered();
+      });
+    });
   }
 
   const todayKanban = document.getElementById('today-kanban');
