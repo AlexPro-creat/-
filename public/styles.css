@@ -170,7 +170,11 @@ main#content { padding: 20px; max-width: 1200px; margin: 0 auto; }
 .stat-card .label { color: var(--muted); font-size: 13px; margin-top: 4px; }
 .stat-card-alert { border-color: #f87171; background: rgba(248, 113, 113, 0.1); }
 .stat-card-alert .num { color: #f87171; }
-.card-agent-filter { margin-top: 8px; width: 100%; font-size: 11.5px; padding: 4px 6px; }
+.card-agent-filter, .card-payment-filter { margin-top: 8px; width: 100%; font-size: 11.5px; padding: 4px 6px; }
+/* Правка Фазы 15, п.14: у .card-payment-filter (фильтр "все формы оплаты" в
+   карточке "Общий долг") не было своих стилей вообще — выпадал в дефолтный
+   размер браузера (крупнее и без верхнего отступа), из-за чего рядом со
+   вторым, маленьким .card-agent-filter выглядел непропорционально большим. */
 
 .panel {
   background: var(--surface);

@@ -27,7 +27,10 @@ const state = {
   // Правка 31.08.2026 (п.2): по умолчанию открывается первая вкладка после
   // смены порядка — «Воронка продаж» (была — «Визиты»).
   taskTypeView: 'sale',
-  ratingSelectedMonths: new Set()
+  ratingSelectedMonths: new Set(),
+  // Фаза 15, п.5: фильтр по месяцам для карточки "Продано всего" на дашборде
+  // агента — пусто = все 7 месяцев (как раньше), иначе — выбранные месяцы.
+  salesAllMonthsSelected: new Set()
 };
 
 // Единственный "активный" (ещё не завершённый) этап — раньше их было три
@@ -365,6 +368,19 @@ function mapsLink(address) {
   return `<a class="maps-link" target="_blank" rel="noopener" href="https://2gis.kg/bishkek/search/${encodeURIComponent(address)}" onclick="event.stopPropagation()">📍 Карта</a>`;
 }
 
+// Фаза 15, п.12: поле "Соцсети/WhatsApp" переименовано в "Instagram" (WhatsApp
+// у клиента и так есть автоматически — иконка рядом с телефоном, см. waLink()
+// внутри telLink(), это отдельная фича и её не трогаем). Значение может быть
+// голым username, "@username" или уже готовой ссылкой — приводим к рабочей
+// ссылке на профиль в любом случае, не заставляя пользователя вводить URL самому.
+function instagramLink(value) {
+  const raw = (value || '').trim();
+  if (!raw) return '';
+  let handle = raw.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/+$/, '');
+  const url = /^https?:\/\//i.test(raw) ? raw : `https://instagram.com/${handle}`;
+  return `<a class="maps-link" target="_blank" rel="noopener" href="${escapeAttr(url)}" onclick="event.stopPropagation()">📷 ${escapeHtml(raw)}</a>`;
+}
+
 // ---------- Аватар сотрудника ----------
 
 function initials(name) {
@@ -484,14 +500,18 @@ async function renderDashboard(content) {
             <div class="num">${stats.agentDashboard.promotionsClientsCount}</div>
             <div class="label">Клиентов с акциями (${stats.agentDashboard.promotionsItemsCount} поз., на сумму ${fmtMoney(stats.agentDashboard.promotionsSumTotal)})</div>
           </div>
-          <div class="stat-card" id="sales-all-months-card" title="Сумма из отчётов по реализации за все 7 месяцев, не только текущий">
-            <div class="num">${fmtMoney(stats.agentDashboard.salesTotalAllMonths)}</div>
-            <div class="label">Продано всего (7 мес.) <button type="button" class="link-btn" id="sales-by-client-toggle" style="font-size:12px">по клиентам ▾</button></div>
+          <div class="stat-card" id="sales-all-months-card" title="По умолчанию — сумма за все 7 месяцев; фильтр ниже сужает до выбранных">
+            <div class="num" id="sales-all-months-num">${fmtMoney(stats.agentDashboard.salesTotalAllMonths)}</div>
+            <div class="label" id="sales-all-months-label">Продано всего (7 мес.) <button type="button" class="link-btn" id="sales-by-client-toggle" style="font-size:12px">по клиентам ▾</button></div>
           </div>
         </div>
+        <div class="assort-brand-filter" id="sales-all-months-bar" style="margin:8px 0">
+          <button type="button" class="brand-chip ${!state.salesAllMonthsSelected.size ? 'active' : ''}" data-month="all">Все месяцы (7 мес)</button>
+          ${(state.salesMonths || []).map((m) => `<button type="button" class="brand-chip ${state.salesAllMonthsSelected.has(m) ? 'active' : ''}" data-month="${escapeAttr(m)}">${escapeHtml(capitalize(m))}</button>`).join('')}
+        </div>
         <div id="sales-by-client-panel" class="assort-panel" style="display:none">
-          <div class="muted" style="font-size:12px;margin-bottom:6px">Формат: клиент / сумма за 7 месяцев.</div>
-          <div style="max-height:260px;overflow:auto">
+          <div class="muted" style="font-size:12px;margin-bottom:6px" id="sales-by-client-hint">Формат: клиент / сумма за 7 месяцев.</div>
+          <div style="max-height:260px;overflow:auto" id="sales-by-client-list">
             ${stats.agentDashboard.salesByClientAllMonths.map((r) => `<div>${escapeHtml(r.clientName)} / ${fmtMoney(r.revenue)}</div>`).join('')}
           </div>
         </div>
@@ -700,6 +720,59 @@ async function renderDashboard(content) {
   }
   if (isStaff()) wireCardAgentFilters(content);
 
+  // Фаза 15, п.5: фильтр по месяцам для карточки "Продано всего" — та же
+  // логика/UI, что и в "Рейтинге клиентов" (computeMonthlyRating выше), но
+  // проще (только сумма + разбивка по клиентам, без маржи). При "Все месяцы"
+  // (по умолчанию) используем готовую сумму с сервера (regularAssortment +
+  // testAssortment за все 7 мес., см. salesTotalAllMonths в src/api.js), при
+  // выборе конкретных месяцев считаем из client.monthlyAssortment на клиенте.
+  function computeSalesForMonths(months) {
+    if (!months.length) {
+      return state.clients
+        .map((c) => {
+          const items = [...(c.regularAssortment || []), ...(c.testAssortment || [])];
+          return { clientId: c.id, clientName: c.name, revenue: items.reduce((s, it) => s + (it.revenue || 0), 0) };
+        })
+        .filter((r) => r.revenue > 0)
+        .sort((a, b) => b.revenue - a.revenue);
+    }
+    return state.clients
+      .map((c) => {
+        const items = months.flatMap((m) => (c.monthlyAssortment && c.monthlyAssortment[m]) || []);
+        return { clientId: c.id, clientName: c.name, revenue: items.reduce((s, it) => s + (it.revenue || 0), 0) };
+      })
+      .filter((r) => r.revenue > 0)
+      .sort((a, b) => b.revenue - a.revenue);
+  }
+  function renderSalesAllMonthsPanel() {
+    const bar = document.getElementById('sales-all-months-bar');
+    if (!bar) return;
+    const months = Array.from(state.salesAllMonthsSelected);
+    const rows = computeSalesForMonths(months);
+    const total = rows.reduce((s, r) => s + r.revenue, 0);
+    const label = months.length ? months.map((m) => capitalize(m)).join(' + ') : `${(state.salesMonths || []).length || 7} мес.`;
+    document.getElementById('sales-all-months-num').textContent = fmtMoney(total);
+    document.getElementById('sales-all-months-label').innerHTML = `Продано всего (${label}) <button type="button" class="link-btn" id="sales-by-client-toggle" style="font-size:12px">по клиентам ▾</button>`;
+    document.getElementById('sales-by-client-hint').textContent = `Формат: клиент / сумма за ${months.length ? label.toLowerCase() : 'все 7 месяцев'}.`;
+    document.getElementById('sales-by-client-list').innerHTML = rows.map((r) => `<div>${escapeHtml(r.clientName)} / ${fmtMoney(r.revenue)}</div>`).join('') || '<div class="muted">Нет продаж за выбранный период.</div>';
+    wireToggle('sales-by-client-toggle', 'sales-by-client-panel');
+  }
+  if (stats.agentDashboard) {
+    const salesMonthsBar = document.getElementById('sales-all-months-bar');
+    salesMonthsBar.querySelectorAll('.brand-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const m = chip.dataset.month;
+        if (m === 'all') state.salesAllMonthsSelected.clear();
+        else if (state.salesAllMonthsSelected.has(m)) state.salesAllMonthsSelected.delete(m);
+        else state.salesAllMonthsSelected.add(m);
+        salesMonthsBar.querySelectorAll('.brand-chip').forEach((c) => {
+          c.classList.toggle('active', c.dataset.month === 'all' ? state.salesAllMonthsSelected.size === 0 : state.salesAllMonthsSelected.has(c.dataset.month));
+        });
+        renderSalesAllMonthsPanel();
+      });
+    });
+  }
+
   // ---- Правки 31.08.2026: фильтры по агенту, реагирующие на state.clients уже
   // загруженный на клиенте (та же логика, что и dashCardValue/wireCardAgentFilters
   // выше, но для панелей с таблицами, а не одиночных чисел карточки). ----
@@ -885,11 +958,12 @@ function filteredClients() {
   });
   const { key, dir } = state.clientSort;
   if (key) {
-    list = list.slice().sort((a, b) => {
-      const av = key === 'debt' ? (a.debtAmount || 0) : riskCount(a);
-      const bv = key === 'debt' ? (b.debtAmount || 0) : riskCount(b);
-      return (av - bv) * dir;
-    });
+    const sortVal = (c) => {
+      if (key === 'debt') return c.debtAmount || 0;
+      if (key === 'route') return c.routeNumber == null ? Infinity : c.routeNumber;
+      return riskCount(c);
+    };
+    list = list.slice().sort((a, b) => (sortVal(a) - sortVal(b)) * dir);
   }
   return list;
 }
@@ -919,8 +993,8 @@ function daysOverdueText(c) {
 }
 
 function exportClientsCsv(list) {
-  const headers = ['Название', 'Долг', 'Недопродано', 'Тип точки', 'Телефон', 'Контактное лицо', 'День визита', 'Ответственный'];
-  const rows = list.map((c) => [c.name, c.debtAmount || 0, riskCount(c), c.pointType || '', c.phone || '', c.contactName || '', c.visitDay || '', userName(c.ownerId)]);
+  const headers = ['Название', 'Телефон', 'Адрес', 'Контактное лицо', 'Тип точки', 'Маршрут №', 'План', 'Продано', 'Долг', 'Недопродано', 'День визита', 'Ответственный'];
+  const rows = list.map((c) => [c.name, c.phone || '', c.address || '', c.contactName || '', c.pointType || '', c.routeNumber != null ? c.routeNumber : '', c.salesPlan || 0, c.currentMonthRevenue || 0, c.debtAmount || 0, riskCount(c), c.visitDay || '', userName(c.ownerId)]);
   const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -992,11 +1066,15 @@ function renderClients(content) {
           <thead><tr>
             ${bulk ? '<th></th>' : ''}
             <th class="sticky-col">Название</th>
+            <th>Номер телефона</th>
+            <th>Адрес</th>
+            <th>Контактное лицо</th>
+            <th>Тип точки</th>
+            <th class="sortable" data-sort="route">Маршрут №${sortArrow('route')}</th>
+            <th>План</th>
+            <th>Продано (${escapeHtml(capitalize(latestSalesMonth()))})</th>
             <th class="sortable" data-sort="debt">Долг${sortArrow('debt')}</th>
             <th class="sortable" data-sort="risk">Недопродано${sortArrow('risk')}</th>
-            <th>Тип точки</th>
-            <th>Номер телефона</th>
-            <th>Контактное лицо</th>
           </tr></thead>
           <tbody id="clients-tbody"></tbody>
         </table>
@@ -1051,7 +1129,7 @@ function renderClients(content) {
   const tbody = document.getElementById('clients-tbody');
   const list = filteredClients();
   if (!list.length) {
-    tbody.appendChild(el(`<tr><td colspan="${bulk ? 7 : 6}"><div class="empty-state">${state.clients.length ? 'Ничего не найдено по выбранным фильтрам.' : 'Пока нет клиентов. Добавьте первого.'}</div></td></tr>`));
+    tbody.appendChild(el(`<tr><td colspan="${bulk ? 11 : 10}"><div class="empty-state">${state.clients.length ? 'Ничего не найдено по выбранным фильтрам.' : 'Пока нет клиентов. Добавьте первого.'}</div></td></tr>`));
     return;
   }
   list.forEach((c) => {
@@ -1068,11 +1146,15 @@ function renderClients(content) {
           ${c.isOffRoute ? '<span class="badge badge-offroute">вне маршрута</span>' : ''}
           ${(c.promotions || []).length ? '<span class="badge badge-promo" title="Есть акции">🎁 акции</span>' : ''}
         </td>
+        <td>${telLink(c.phone)}</td>
+        <td>${escapeHtml(c.address || '—')} ${mapsLink(c.address)}</td>
+        <td>${escapeHtml(c.contactName || '—')}</td>
+        <td>${escapeHtml(c.pointType || '—')}</td>
+        <td>${c.routeNumber != null ? escapeHtml(String(c.routeNumber)) : '—'}</td>
+        <td>${c.salesPlan ? fmtMoney(c.salesPlan) : '—'}</td>
+        <td>${c.currentMonthRevenue ? fmtMoney(c.currentMonthRevenue) : '—'}</td>
         <td>${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${escapeAttr([overdueDays, debtAsOfLabel(c) ? 'на ' + debtAsOfLabel(c) : ''].filter(Boolean).join(', '))}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
         <td>${risk ? `<span class="badge badge-overdue">${risk} недопродано</span>` : '—'}</td>
-        <td>${escapeHtml(c.pointType || '—')}</td>
-        <td>${telLink(c.phone)}</td>
-        <td>${escapeHtml(c.contactName || '—')}</td>
       </tr>
     `);
     row.querySelector('.open-client').addEventListener('dblclick', () => openClientModal(c));
@@ -1249,7 +1331,13 @@ function wireClosureBlock(clientId) {
 async function openClientModal(client) {
   const isEdit = !!client;
   const isOwner = isEdit && client.ownerId === state.user.id;
-  const canEditCore = isStaff();
+  // Фаза 15, п.4: раньше полную редактируемую форму видел только админ/
+  // супервайзер, агент — read-only вид (см. ветку ниже). Пользователь явно
+  // попросил дать агентам возможность редактировать ВСЕ поля своих клиентов —
+  // теперь ответственный агент тоже получает полную форму, как и админ/
+  // супервайзер (владелец клиента и так гарантирован API-скоупингом —
+  // агенту в state.clients в принципе попадают только его клиенты).
+  const canEditCore = isStaff() || isOwner;
 
   const ownerOptions = state.users.filter((u) => u.role === 'agent' || u.role === undefined);
 
@@ -1289,8 +1377,8 @@ async function openClientModal(client) {
         ${fieldRow('Задолженность', client.debtAmount ? fmtMoney(client.debtAmount) + (client.debtOverdue ? ' (просрочка)' : '') + (debtAsOfLabel(client) ? ` — на ${escapeHtml(debtAsOfLabel(client))}` : '') : 'нет', true)}
         ${fieldRow('Последний визит', `<span class="${lastVisit.stale ? 'stale-visit' : ''}">${lastVisit.html}</span>`, true)}
         ${fieldRow('Особенности приёма', escapeHtml(client.orderWindow || '—'), true)}
-        ${fieldRow('ИНН/БИН', escapeHtml(client.inn || '—'), true)}
-        ${fieldRow('Соцсети/WhatsApp', escapeHtml(client.socialContact || '—'), true)}
+        ${fieldRow('Номер маршрута', client.routeNumber != null ? String(client.routeNumber) : '—', true)}
+        ${fieldRow('Instagram', client.socialContact ? instagramLink(client.socialContact) : '—', true)}
         ${fieldRow('Удобное время звонка', escapeHtml(client.bestCallTime || '—'), true)}
         ${fieldRow('ФИО ЛПР', escapeHtml(client.decisionMakerName || '—'), true)}
         ${fieldRow('Особые пожелания', escapeHtml(client.specialRequests || '—'), true)}
@@ -1364,8 +1452,8 @@ async function openClientModal(client) {
         <label>Особенности приёма (день/время, только для сведения)</label>
         <input name="orderWindow" value="${client ? escapeAttr(client.orderWindow || '') : ''}" placeholder="Например: заявки только вт/чт, 10:00–13:00">
         <div class="field-row">
-          <div><label>ИНН/БИН</label><input name="inn" value="${client ? escapeAttr(client.inn || '') : ''}"></div>
-          <div><label>Соцсети/WhatsApp</label><input name="socialContact" value="${client ? escapeAttr(client.socialContact || '') : ''}"></div>
+          <div><label>Номер маршрута (для порядка посещения)</label><input type="number" min="0" step="1" name="routeNumber" value="${client && client.routeNumber != null ? client.routeNumber : ''}" placeholder="Например: 3"></div>
+          <div><label>Instagram ${client && client.socialContact ? instagramLink(client.socialContact) : ''}</label><input name="socialContact" value="${client ? escapeAttr(client.socialContact || '') : ''}" placeholder="@handle или ссылка на профиль"></div>
         </div>
         <div class="field-row">
           <div><label>Удобное время звонка</label><input name="bestCallTime" value="${client ? escapeAttr(client.bestCallTime || '') : ''}"></div>
@@ -1482,7 +1570,7 @@ function assortRow(p) {
   return `
     <div class="assort-row">
       <span>${escapeHtml(p.product)} <span class="brand-badge">${escapeHtml(p.brand || 'Прочее')}</span> ${stockBadgeHtml(p)}</span>
-      <span class="freq">${p.monthsCount} из 7 мес · ~${p.avgQty} шт/мес · посл.: ${p.lastMonth}</span>
+      <span class="freq">${p.monthsCount} из 5 посл. мес · ~${p.avgQty} шт/мес · посл.: ${p.lastMonth}</span>
     </div>
   `;
 }
@@ -2350,13 +2438,14 @@ function renderTeam(content) {
       <div class="toolbar">
         <h2 style="margin:0">Команда</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a class="btn-secondary" href="/api/backup" style="text-decoration:none;display:inline-block">Скачать резервную копию</a>
+          <a class="btn-secondary" href="/api/clients/export" download style="text-decoration:none;display:inline-block" title="Ручные поля клиентов (адрес/телефон/контакт/маршрут/договор/заметки и т.п.) — чтобы перенести правки в новую базу при следующей пересборке">⬇ Выгрузить клиентов</a>
+          <a class="btn-secondary" href="/api/backup" style="text-decoration:none;display:inline-block" title="Полный архив: клиенты, задачи, сотрудники, вложения">Скачать резервную копию (всё)</a>
           <button class="btn-primary" id="add-user-btn">+ Сотрудник</button>
         </div>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Аватар</th><th>Имя</th><th>Email</th><th>Роль</th><th>Может менять адрес/телефон/конт.лицо</th><th></th></tr></thead>
+          <thead><tr><th>Аватар</th><th>Имя</th><th>Email</th><th>Роль</th><th></th></tr></thead>
           <tbody id="users-tbody"></tbody>
         </table>
       </div>
@@ -2376,7 +2465,6 @@ function renderTeam(content) {
         <td>${escapeHtml(u.name)}</td>
         <td>${escapeHtml(u.email || '')}</td>
         <td>${roleLabel(u.role)}</td>
-        <td>${u.role === 'agent' ? `<input type="checkbox" class="edit-contact-perm" data-id="${u.id}" ${u.canEditClientContact ? 'checked' : ''}>` : '—'}</td>
         <td>${u.id !== state.user.id ? '<button class="link-btn delete-user">Удалить</button>' : ''}</td>
       </tr>
     `);
@@ -2386,13 +2474,6 @@ function renderTeam(content) {
       await api('DELETE', `/api/users/${u.id}`);
       await loadAll();
       render();
-    });
-    const permCheck = row.querySelector('.edit-contact-perm');
-    if (permCheck) permCheck.addEventListener('change', async () => {
-      try {
-        await api('PUT', `/api/users/${u.id}/permissions`, { canEditClientContact: permCheck.checked });
-        await loadAll();
-      } catch (e) { alert(e.message); permCheck.checked = !permCheck.checked; }
     });
     const avatarInput = row.querySelector('.avatar-input');
     avatarInput.addEventListener('change', async () => {
@@ -2783,6 +2864,11 @@ function setupNotifications() {
 }
 
 // Печать маршрута на неделю (только супервайзер) — простой список по агентам/дням.
+// Правка 01.09.2026 (Фаза 16, п.6/следствие): внутри каждого дня точки теперь
+// сортируются по полю "Номер маршрута" клиента (по возрастанию) — как только у
+// клиента проставлено значение, он встаёт на своё место; у кого номер не
+// проставлен — остаются в конце, в исходном порядке между собой (стабильная
+// сортировка, ничего не перетасовывает лишний раз).
 function renderPrintRoute() {
   const box = document.getElementById('print-route');
   if (!box) return;
@@ -2797,10 +2883,17 @@ function renderPrintRoute() {
       const key = toDateKey(d);
       const dayTasks = tasksOnDate(key).filter((t) => t.assigneeId === agent.id);
       if (!dayTasks.length) return;
+      const sortedTasks = dayTasks.slice().sort((a, b) => {
+        const ca = clientById(a.clientId), cb = clientById(b.clientId);
+        const ra = ca && ca.routeNumber != null ? ca.routeNumber : Infinity;
+        const rb = cb && cb.routeNumber != null ? cb.routeNumber : Infinity;
+        return ra - rb;
+      });
       html += `<h3>${WEEKDAY_LABELS[(d.getDay() + 6) % 7]} ${fmtDateShort(d)}</h3><ul>`;
-      dayTasks.forEach((t) => {
+      sortedTasks.forEach((t) => {
         const c = clientById(t.clientId);
-        html += `<li>${escapeHtml(c ? c.name : t.title)}${c && c.address ? ' — ' + escapeHtml(c.address) : ''}${c && c.phone ? ' — ' + escapeHtml(c.phone) : ''}</li>`;
+        const routeLabel = c && c.routeNumber != null ? `№${escapeHtml(String(c.routeNumber))} — ` : '';
+        html += `<li>${routeLabel}${escapeHtml(c ? c.name : t.title)}${c && c.address ? ' — ' + escapeHtml(c.address) : ''}${c && c.phone ? ' — ' + escapeHtml(c.phone) : ''}</li>`;
       });
       html += '</ul>';
     });

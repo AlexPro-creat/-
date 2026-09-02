@@ -143,8 +143,10 @@ function computeAssortment(rawItems, stockByName) {
   }, stockByName));
 }
 
-// "Тестовый ассортимент" — товары, которые клиент покупал хотя бы раз, но не
-// дотянувшие до регулярного ассортимента (< 4 из 7 месяцев) — разовые/пробные позиции.
+// "Тестовый ассортимент" (Фаза 16, п.11, 01.09.2026) — товары, купленные хотя
+// бы раз в последних 5 месяцах, но с пробелом 3+ месяца подряд без покупки
+// внутри этого окна — не дотягивает до "регулярного" (см. window_classify.py
+// в gdrive-data и crm-mvp-status.md за подробным описанием новой логики).
 function computeTestAssortment(rawItems, stockByName) {
   if (!rawItems || !rawItems.length) return [];
   return rawItems.map((it) => attachStock({

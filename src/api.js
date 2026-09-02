@@ -34,9 +34,24 @@ function isCurrentMonthDataFresh() {
 // без изменений. Применять на КАЖДОМ месте, где список клиентов идёт на
 // отображение (дашборд, отчёты, GET /api/clients) — но не там, где клиент
 // используется для записи/бизнес-логики, не связанной с деньгами (задачи и т.п.).
+// Правка Фазы 15 (01.09.2026, п.10): «Недопродано» (флаг atRisk на позициях
+// regularAssortment — "обычно берёт, но не заказывал в последнем доступном
+// месяце") — тоже сигнал, завязанный на "последний месяц" данных, поэтому
+// тоже обнуляется вместе с продажами/акциями, пока не придёт новый реестр.
+// ВАЖНО: обнуляется только сам флаг atRisk (счётчик "недопродано" становится
+// 0) — сам список regularAssortment/testAssortment НЕ обнуляется и не
+// укорачивается (это историческая статистика по клиенту за 7 месяцев, она
+// остаётся полезной и корректной независимо от календаря, см. п.11 переписки
+// 01.09.2026 и раздел «Что осознанно НЕ обнуляется» выше).
 function withFreshCurrentMonth(clients) {
   if (isCurrentMonthDataFresh()) return clients;
-  return clients.map((c) => ({ ...c, currentMonthRevenue: 0, currentMonthItems: [], promotions: [] }));
+  return clients.map((c) => ({
+    ...c,
+    currentMonthRevenue: 0,
+    currentMonthItems: [],
+    promotions: [],
+    regularAssortment: (c.regularAssortment || []).map((p) => (p.atRisk ? { ...p, atRisk: false } : p))
+  }));
 }
 // Дата среза остатков склада (Фаза 6.1) — сам исходный файл выгрузки дату не
 // содержит, дата задокументирована пользователем при присылке файла. Обновить
@@ -78,7 +93,7 @@ const WAITLIST_STAGES = [
 ];
 const WAITLIST_STAFF_ONLY_STAGES = ['received'];
 const WAITLIST_ACTIVE_STAGES = ['waiting', 'invoiced'];
-const WAITLIST_TAGS = ['Kapous', 'EPICA', 'Чистовье', 'Палитра', 'Каталог', 'Пробники'];
+const WAITLIST_TAGS = ['Kapous', 'Studio', 'EPICA', 'Чистовье', 'Палитра', 'AV/ES/PRO/MS', 'Каталог', 'Пробники'];
 const VISIT_DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 // JS: getDay() воскресенье=0, понедельник=1 ... суббота=6
 const VISIT_DAY_INDEX = { 'Понедельник': 1, 'Вторник': 2, 'Среда': 3, 'Четверг': 4, 'Пятница': 5, 'Суббота': 6 };
@@ -95,7 +110,7 @@ function nextDateForWeekday(weekdayName) {
   return d.toISOString().slice(0, 10);
 }
 
-const TASK_TAGS = ['Kapous', 'EPICA', 'Чистовье', 'новый клиент', 'Технолог', 'Долги'];
+const TASK_TAGS = ['Kapous', 'Studio', 'EPICA', 'Чистовье', 'AV/ES/PRO/MS', 'новый клиент', 'Технолог', 'Долги'];
 const ACTIVE_STAGES = ['in_progress'];
 const SALE_ACTIVE_STAGES = ['call', 'meeting'];
 // Общий помощник: активна ли задача (не закрыта), независимо от её типа (визит/продажа).
@@ -194,6 +209,9 @@ function migrateClientDefaultsBody() {
     if (c.currentMonthRevenue === undefined) patch.currentMonthRevenue = 0;
     if (c.currentMonthItems === undefined) patch.currentMonthItems = [];
     if (c.monthlyAssortment === undefined) patch.monthlyAssortment = {};
+    // Фаза 15, п.6: номер маршрута — ручное поле для последовательности
+    // посещений точек агентом, ни на что автоматически не влияет.
+    if (c.routeNumber === undefined) patch.routeNumber = null;
     // Нормализация телефона (ведущий 0 + без лишних пробелов) — прогоняется
     // при каждом старте безусловно (не через === undefined), но сама функция
     // идемпотентна: уже нормализованный номер не меняется повторным вызовом.
@@ -208,12 +226,22 @@ function migrateClientDefaultsBody() {
 const PAYMENT_METHODS = ['Наличные', 'Безналичные', 'QR'];
 const CONTRACT_STATUSES = ['да', 'нет', 'неизвестно'];
 
-// Поля карточки клиента, которые редактирует ТОЛЬКО администратор
-const CLIENT_ADMIN_ONLY_FIELDS = [
+// Правка Фазы 15 (01.09.2026, п.4): пользователь явно попросил дать агентам
+// возможность редактировать ВСЕ поля карточки своих клиентов (раньше это было
+// только у администратора/супервайзера — агент видел read-only вид с
+// заметками). Все поля из этого списка теперь редактирует и назначенный
+// агент (см. PUT /api/clients/:id — там же снята старая узкая настройка
+// canEditClientContact, полностью ею перекрытая). ownerId (переназначение
+// ответственного) сюда НЕ входит — это административное действие, остаётся
+// только у админа/супервайзера, как и было.
+const CLIENT_FULL_EDIT_FIELDS = [
   'name', 'pointType', 'address', 'phone', 'contactName',
-  'visitDay', 'contractStatus', 'paymentMethod', 'ownerId',
-  'inn', 'socialContact', 'bestCallTime', 'decisionMakerName', 'specialRequests', 'orderWindow', 'discountTerms', 'salesPlan'
+  'visitDay', 'contractStatus', 'paymentMethod',
+  'socialContact', 'bestCallTime', 'decisionMakerName', 'specialRequests', 'orderWindow', 'discountTerms', 'salesPlan',
+  'routeNumber'
 ];
+// Переназначение ответственного агента — только админ/супервайзер.
+const CLIENT_ADMIN_ONLY_FIELDS = ['ownerId'];
 // Поля, которые может редактировать и назначенный агент
 const CLIENT_AGENT_EDITABLE_FIELDS = ['notes'];
 
@@ -489,12 +517,12 @@ function register(router) {
       closureRequestedBy: null,
       contactNotes: [],
       masters: [],
-      inn: body.inn || '',
       socialContact: body.socialContact || '',
       bestCallTime: body.bestCallTime || '',
       decisionMakerName: body.decisionMakerName || '',
       specialRequests: body.specialRequests || '',
       orderWindow: body.orderWindow || '',
+      routeNumber: body.routeNumber ? (Number(body.routeNumber) || null) : null,
       meetingRecords: [],
       createdAt: new Date().toISOString()
     });
@@ -511,31 +539,30 @@ function register(router) {
     try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
 
     const patch = {};
-    // Защищённые поля карточки клиента редактирует администратор ИЛИ супервайзер
-    // (по решению пользователя их права в целом равны для работы с клиентами/задачами;
-    // отдельно от прав на управление самими сотрудниками — это осталось только у админа).
+    // ownerId (переназначение ответственного агента) — административное
+    // действие, только админ/супервайзер, как и pendingApproval/isOffRoute.
     if (isStaff(req.user)) {
-      CLIENT_ADMIN_ONLY_FIELDS.forEach((f) => {
-        if (body[f] === undefined) return;
-        if (f === 'ownerId') { patch.ownerId = Number(body.ownerId); return; }
-        if (f === 'contractStatus' && !CONTRACT_STATUSES.includes(body.contractStatus)) return;
-        if (f === 'paymentMethod' && body.paymentMethod && !PAYMENT_METHODS.includes(body.paymentMethod)) return;
-        if (f === 'salesPlan') { patch.salesPlan = Number(body.salesPlan) || 0; return; }
-        patch[f] = f === 'phone' ? normalizePhone(body.phone) : body[f];
-      });
+      if (body.ownerId !== undefined) patch.ownerId = Number(body.ownerId);
       if (body.pendingApproval !== undefined) patch.pendingApproval = !!body.pendingApproval;
       if (body.isOffRoute !== undefined) patch.isOffRoute = !!body.isOffRoute;
     }
+    // Фаза 15, п.4: остальные поля карточки редактирует и админ/супервайзер, и
+    // назначенный агент (для СВОИХ клиентов — проверка owns/isStaff уже прошла
+    // в самом начале обработчика). Раньше здесь была узкая настройка
+    // canEditClientContact (только адрес/телефон/контакт, только у отдельных
+    // агентов по решению админа) — по прямой просьбе пользователя снята,
+    // теперь полный доступ у любого агента к своим клиентам без переключателя.
+    CLIENT_FULL_EDIT_FIELDS.forEach((f) => {
+      if (body[f] === undefined) return;
+      if (f === 'contractStatus' && !CONTRACT_STATUSES.includes(body.contractStatus)) return;
+      if (f === 'paymentMethod' && body.paymentMethod && !PAYMENT_METHODS.includes(body.paymentMethod)) return;
+      if (f === 'salesPlan') { patch.salesPlan = Number(body.salesPlan) || 0; return; }
+      if (f === 'routeNumber') { patch.routeNumber = body.routeNumber === '' || body.routeNumber === undefined ? null : (Number(body.routeNumber) || null); return; }
+      patch[f] = f === 'phone' ? normalizePhone(body[f]) : body[f];
+    });
     CLIENT_AGENT_EDITABLE_FIELDS.forEach((f) => {
       if (body[f] !== undefined) patch[f] = body[f];
     });
-    // Если у агента включено разрешение (см. /api/users/:id/permissions) — может
-    // редактировать адрес/телефон/контактное лицо у СВОИХ клиентов, как админ/супервайзер.
-    if (!isStaff(req.user) && owns && req.user.canEditClientContact) {
-      ['address', 'phone', 'contactName'].forEach((f) => {
-        if (body[f] !== undefined) patch[f] = f === 'phone' ? normalizePhone(body[f]) : body[f];
-      });
-    }
 
     sendJson(res, 200, { client: db.update('clients', params.id, patch) });
   }));
@@ -1117,6 +1144,57 @@ function register(router) {
     res.end(buf);
   }));
 
+  // Выгрузка клиентов в файл (Фаза 16, добавлено 01.09.2026, заменило собой
+  // прежнюю кнопку "Выгрузить только задачи" на странице "Команда" — она осталась
+  // на вкладке "Задачи", здесь была лишней). Назначение: при пересборке проекта
+  // (новый месяц данных, новый zip) db.json не переносится — контрагенты
+  // создаются заново импортом из исходных файлов с Google Диска, а значит все
+  // ручные правки (адрес/телефон/контактное лицо/номер маршрута/договор/форма
+  // оплаты/заметки/мастера и т.п.), сделанные командой прямо в CRM, потерялись
+  // бы. Этот файл — снимок текущего состояния клиентов ИМЕННО по этим ручным
+  // полям (не выгружаем то, что и так пересчитывается заново из файлов продаж/
+  // долгов при каждой пересборке: ассортимент, долг, продажи текущего месяца,
+  // "постоянный клиент" и т.п.) — при следующей пересборке этот файл можно
+  // использовать, чтобы перенести правки в новую базу вместо того, чтобы
+  // опираться только на исходные экспорты маршрутов из Excel. Агент указан по
+  // имени (не по id) — та же причина, что и у /api/tasks/export: id после
+  // пересборки не гарантированно совпадут.
+  router.get('/api/clients/export', requireAdmin(async (req, res) => {
+    const usersById = {};
+    db.all('users').forEach((u) => { usersById[u.id] = u; });
+    const clients = db.all('clients').map((c) => ({
+      name: c.name,
+      agentName: usersById[c.ownerId] ? usersById[c.ownerId].name : null,
+      phone: c.phone || '',
+      address: c.address || '',
+      contactName: c.contactName || '',
+      pointType: c.pointType || '',
+      visitDay: c.visitDay || '',
+      contractStatus: c.contractStatus || '',
+      paymentMethod: c.paymentMethod || '',
+      socialContact: c.socialContact || '',
+      bestCallTime: c.bestCallTime || '',
+      decisionMakerName: c.decisionMakerName || '',
+      specialRequests: c.specialRequests || '',
+      orderWindow: c.orderWindow || '',
+      discountTerms: c.discountTerms || '',
+      salesPlan: c.salesPlan || 0,
+      routeNumber: c.routeNumber != null ? c.routeNumber : null,
+      notes: c.notes || '',
+      contactNotes: c.contactNotes || '',
+      masters: c.masters || [],
+      isOffRoute: !!c.isOffRoute,
+      closed: !!c.closed
+    }));
+    const buf = Buffer.from(JSON.stringify({ exportedAt: new Date().toISOString(), clients }, null, 2), 'utf8');
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="klienty-${new Date().toISOString().slice(0, 10)}.json"`,
+      'Content-Length': buf.length
+    });
+    res.end(buf);
+  }));
+
   // Обратная загрузка ранее выгруженного файла (после пересборки/передеплоя) —
   // восстанавливает задачи, сопоставляя клиента и агента ПО ИМЕНИ (не по id, см.
   // комментарий выше у /api/tasks/export). Задачи, для которых клиент или агент не
@@ -1230,7 +1308,11 @@ function register(router) {
       });
     });
 
-    const brands = ['Kapous', 'EPICA', 'Чистовье', 'Палитра', 'Прочее'];
+    // Правка Фазы 14 (01.09.2026): добавлены Studio и AV/ES/PRO/MS — новые
+    // бренды после уточнения пользователем расшифровки буквенных префиксов
+    // (см. brand_tagging.py в исходных данных). "Прочее" оставлен — редкий
+    // остаточный хвост нераспознанных названий на латинице (единицы строк).
+    const brands = ['Kapous', 'Studio', 'EPICA', 'Чистовье', 'Палитра', 'AV/ES/PRO/MS', 'Прочее'];
     sendJson(res, 200, {
       rows: rows.sort((a, b) => b.revenue - a.revenue),
       brands,
