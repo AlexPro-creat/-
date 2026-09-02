@@ -252,7 +252,26 @@ function switchView(view) {
   state.view = view;
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   render();
+  updateScrollTopBtnVisibility();
 }
+
+// ---------- Кнопка "Наверх" (дашборд, видна всем ролям, 02.09.2026) ----------
+// Кнопка живёт в index.html вне #content (переживает render()/innerHTML='' на
+// каждой смене вкладки), поэтому вешаем обработчики один раз при загрузке
+// скрипта, а не при каждом renderDashboard(). Показывается только на вкладке
+// "Дашборд" и только после прокрутки вниз, чтобы не мешать на короткой странице.
+function updateScrollTopBtnVisibility() {
+  const btn = document.getElementById('scroll-top-btn');
+  if (!btn) return;
+  const show = state.view === 'dashboard' && window.scrollY > 300;
+  btn.style.display = show ? 'flex' : 'none';
+}
+(function wireScrollTopButton() {
+  const btn = document.getElementById('scroll-top-btn');
+  if (!btn) return;
+  btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  window.addEventListener('scroll', updateScrollTopBtnVisibility);
+})();
 
 // ---------- Загрузка данных ----------
 
@@ -328,6 +347,7 @@ async function boot() {
   document.getElementById('reports-tab').style.display = isStaff() ? '' : 'none';
   await loadAll();
   render();
+  updateScrollTopBtnVisibility();
   setupNotifications();
 }
 
@@ -1577,7 +1597,9 @@ function assortRow(p) {
 
 // Фильтр по бренду/категории — общий для регулярного, тестового и "не добрал"
 // списков, чтобы можно было быстро отделить, скажем, только красители Kapous,
-// когда готовишь коммерческое предложение.
+// когда готовишь коммерческое предложение. Правка 02.09.2026: добавлен отдельный
+// переключатель "Убрать краски/оксиды" — прячет эту группу из списка независимо
+// от того, какой бренд выбран (в т.ч. можно убрать их из "Все" — общего реестра).
 function brandFilterBarHtml(items, groupId) {
   const brands = Array.from(new Set(items.map((p) => p.brand || 'Прочее')));
   return `
@@ -1585,14 +1607,18 @@ function brandFilterBarHtml(items, groupId) {
       <button type="button" class="brand-chip active" data-brand="all">Все</button>
       ${brands.map((b) => `<button type="button" class="brand-chip" data-brand="${escapeAttr(b)}">${escapeHtml(b)}</button>`).join('')}
       <button type="button" class="brand-chip" data-brand="colorants">Красители/оксиды</button>
+      <label class="colorant-exclude-toggle"><input type="checkbox" class="exclude-colorants-cb" data-group="${groupId}"> Убрать краски/оксиды</label>
     </div>
   `;
 }
 
-function filterAssortItems(items, brand) {
-  if (!brand || brand === 'all') return items;
-  if (brand === 'colorants') return items.filter((p) => p.category === 'Краситель' || p.category === 'Оксид');
-  return items.filter((p) => (p.brand || 'Прочее') === brand);
+function filterAssortItems(items, brand, excludeColorants) {
+  let out = items;
+  if (brand && brand !== 'all') {
+    out = brand === 'colorants' ? out.filter(isColorantItem) : out.filter((p) => (p.brand || 'Прочее') === brand);
+  }
+  if (excludeColorants) out = out.filter((p) => !isColorantItem(p));
+  return out;
 }
 
 function renderAssortmentSection(client) {
@@ -1640,8 +1666,8 @@ function renderGroupedAssort(items) {
   `;
 }
 
-function renderAssortBody(items, brand, mode) {
-  const filtered = filterAssortItems(items, brand);
+function renderAssortBody(items, brand, mode, excludeColorants) {
+  const filtered = filterAssortItems(items, brand, excludeColorants);
   if (mode === 'regular') {
     const normal = filtered.filter((p) => !p.atRisk);
     const risky = filtered.filter((p) => p.atRisk);
@@ -1660,14 +1686,24 @@ function wireBrandFilter(groupId, items, bodyElId, mode) {
   const bar = document.querySelector(`.assort-brand-filter[data-group="${groupId}"]`);
   const body = document.getElementById(bodyElId);
   if (!bar || !body) return;
-  body.innerHTML = renderAssortBody(items, 'all', mode);
+  let currentBrand = 'all';
+  const excludeCb = bar.querySelector('.exclude-colorants-cb');
+  body.innerHTML = renderAssortBody(items, currentBrand, mode, false);
   bar.querySelectorAll('.brand-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
+      currentBrand = chip.dataset.brand;
       bar.querySelectorAll('.brand-chip').forEach((c) => c.classList.remove('active'));
       chip.classList.add('active');
-      body.innerHTML = renderAssortBody(items, chip.dataset.brand, mode);
+      body.innerHTML = renderAssortBody(items, currentBrand, mode, excludeCb && excludeCb.checked);
     });
   });
+  // "Убрать краски/оксиды" (02.09.2026) — независимый переключатель, сочетается
+  // с любым выбранным брендом (в т.ч. с "Все" — прячет их из общего реестра).
+  if (excludeCb) {
+    excludeCb.addEventListener('change', () => {
+      body.innerHTML = renderAssortBody(items, currentBrand, mode, excludeCb.checked);
+    });
+  }
 }
 
 // Скрипты, вставленные через innerHTML/template, браузер не выполняет —
@@ -2275,7 +2311,8 @@ async function renderReports(content) {
         </select>
       </div>
       <div id="reports-month-bar" class="assort-brand-filter" style="margin-bottom:10px"></div>
-      <div id="reports-brand-bar" class="assort-brand-filter"></div>
+      <div id="reports-brand-bar" class="assort-brand-filter" style="margin-bottom:6px"></div>
+      <div id="reports-colorant-bar" class="assort-brand-filter"></div>
       <div id="reports-table" class="report-table-wrap"><div class="muted">Загрузка…</div></div>
 
       <h2 style="margin-top:26px">🎁 Акции</h2>
@@ -2292,7 +2329,13 @@ async function renderReports(content) {
     </div>
   `));
 
-  let currentBrand = 'all';
+  // Правка 02.09.2026: фильтр по бренду стал мультивыбором (можно отметить сразу
+  // Kapous+EPICA+Studio и т.п.), а "Красители/оксиды" вынесен в отдельный
+  // трёхпозиционный переключатель, который сочетается с выбором бренда —
+  // "Kapous" + "Только краски/оксиды" покажет краски/оксиды именно Kapous.
+  // "Без красок/оксидов" — обратный фильтр, чтобы убрать их из общего реестра.
+  const selectedBrands = new Set();
+  let colorantMode = 'all'; // 'all' | 'only' | 'exclude'
   // Правка 31.08.2026: раньше был select одного месяца, теперь можно выбрать
   // несколько сразу (чипы, как у фильтра по бренду) — пустой набор = все 7 мес.
   const selectedMonths = new Set();
@@ -2342,15 +2385,21 @@ async function renderReports(content) {
 
     const bar = document.getElementById('reports-brand-bar');
     bar.innerHTML = `
-      <button type="button" class="brand-chip ${currentBrand === 'all' ? 'active' : ''}" data-brand="all">Все</button>
-      ${res.brands.map((b) => `<button type="button" class="brand-chip ${currentBrand === b ? 'active' : ''}" data-brand="${escapeAttr(b)}">${escapeHtml(b)}</button>`).join('')}
-      <button type="button" class="brand-chip ${currentBrand === 'colorants' ? 'active' : ''}" data-brand="colorants">Красители/оксиды</button>
+      <button type="button" class="brand-chip ${!selectedBrands.size ? 'active' : ''}" data-brand="all">Все бренды</button>
+      ${res.brands.map((b) => `<button type="button" class="brand-chip ${selectedBrands.has(b) ? 'active' : ''}" data-brand="${escapeAttr(b)}">${escapeHtml(b)}</button>`).join('')}
+    `;
+    const colorantBar = document.getElementById('reports-colorant-bar');
+    colorantBar.innerHTML = `
+      <button type="button" class="brand-chip ${colorantMode === 'all' ? 'active' : ''}" data-colorant-mode="all">Все категории</button>
+      <button type="button" class="brand-chip ${colorantMode === 'only' ? 'active' : ''}" data-colorant-mode="only">Только краски/оксиды</button>
+      <button type="button" class="brand-chip ${colorantMode === 'exclude' ? 'active' : ''}" data-colorant-mode="exclude">Убрать краски/оксиды</button>
     `;
 
-    function renderTable(brand) {
-      const rows = !brand || brand === 'all' ? res.rows
-        : brand === 'colorants' ? res.rows.filter((r) => r.category === 'Краситель' || r.category === 'Оксид')
-        : res.rows.filter((r) => r.brand === brand);
+    function renderTable() {
+      let rows = res.rows;
+      if (selectedBrands.size) rows = rows.filter((r) => selectedBrands.has(r.brand));
+      if (colorantMode === 'only') rows = rows.filter((r) => r.category === 'Краситель' || r.category === 'Оксид');
+      else if (colorantMode === 'exclude') rows = rows.filter((r) => r.category !== 'Краситель' && r.category !== 'Оксид');
       const qtyHeader = month ? 'Шт (за выбр. месяцы)' : 'Шт (7 мес)';
       document.getElementById('reports-table').innerHTML = rows.length ? `
         <table>
@@ -2371,13 +2420,28 @@ async function renderReports(content) {
         ${rows.length > 300 ? `<div class="muted" style="margin-top:6px;font-size:12px">Показаны первые 300 из ${rows.length} — сузьте фильтр по бренду.</div>` : ''}
       ` : '<div class="empty-state">Нет данных по этому фильтру.</div>';
     }
-    renderTable(currentBrand);
+    renderTable();
+    // Фильтр по бренду — мультивыбор: можно отметить сразу несколько чипов
+    // (Kapous+EPICA+Studio и т.п.), "Все бренды" сбрасывает выбор.
     bar.querySelectorAll('.brand-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
-        currentBrand = chip.dataset.brand;
-        bar.querySelectorAll('.brand-chip').forEach((c) => c.classList.remove('active'));
-        chip.classList.add('active');
-        renderTable(currentBrand);
+        const b = chip.dataset.brand;
+        if (b === 'all') {
+          selectedBrands.clear();
+        } else {
+          if (selectedBrands.has(b)) selectedBrands.delete(b); else selectedBrands.add(b);
+        }
+        bar.querySelectorAll('.brand-chip').forEach((c) => {
+          c.classList.toggle('active', c.dataset.brand === 'all' ? !selectedBrands.size : selectedBrands.has(c.dataset.brand));
+        });
+        renderTable();
+      });
+    });
+    colorantBar.querySelectorAll('.brand-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        colorantMode = chip.dataset.colorantMode;
+        colorantBar.querySelectorAll('.brand-chip').forEach((c) => c.classList.toggle('active', c.dataset.colorantMode === colorantMode));
+        renderTable();
       });
     });
   }
@@ -2439,6 +2503,8 @@ function renderTeam(content) {
         <h2 style="margin:0">Команда</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <a class="btn-secondary" href="/api/clients/export" download style="text-decoration:none;display:inline-block" title="Ручные поля клиентов (адрес/телефон/контакт/маршрут/договор/заметки и т.п.) — чтобы перенести правки в новую базу при следующей пересборке">⬇ Выгрузить клиентов</a>
+          <button type="button" class="btn-secondary" id="client-import-btn" title="Обновить ручные поля уже существующих клиентов из ранее выгруженного файла — по имени и агенту, без дублей">⬆ Загрузить клиентов</button>
+          <input type="file" id="client-import-input" accept=".json" style="display:none">
           <a class="btn-secondary" href="/api/backup" style="text-decoration:none;display:inline-block" title="Полный архив: клиенты, задачи, сотрудники, вложения">Скачать резервную копию (всё)</a>
           <button class="btn-primary" id="add-user-btn">+ Сотрудник</button>
         </div>
@@ -2452,6 +2518,41 @@ function renderTeam(content) {
     </div>
   `));
   document.getElementById('add-user-btn').addEventListener('click', () => openUserModal());
+  // Загрузка ранее выгруженного файла клиентов (пара к "Выгрузить клиентов", 02.09.2026) —
+  // обновляет ручные поля уже существующих клиентов по имени+агенту, без дублей;
+  // тот же паттерн, что и у загрузки задач на вкладке "Задачи".
+  const clientImportBtn = document.getElementById('client-import-btn');
+  const clientImportInput = document.getElementById('client-import-input');
+  if (clientImportBtn && clientImportInput) {
+    clientImportBtn.addEventListener('click', () => clientImportInput.click());
+    clientImportInput.addEventListener('change', async () => {
+      const file = clientImportInput.files[0];
+      if (!file) return;
+      let parsed;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch (e) {
+        alert('Не удалось прочитать файл — это не корректный JSON');
+        clientImportInput.value = '';
+        return;
+      }
+      try {
+        const result = await api('POST', '/api/clients/import', { clients: parsed.clients || [] });
+        let msg = `Обновлено клиентов: ${result.updated}.`;
+        if (result.unresolvedCount) {
+          msg += `\nНе удалось сопоставить: ${result.unresolvedCount} (агент или клиент не найдены в текущей базе) — список в консоли браузера.`;
+          console.log('Не распознано при загрузке клиентов:', result.unresolved);
+        }
+        alert(msg);
+        await loadAll();
+        render();
+      } catch (e) {
+        alert('Ошибка загрузки: ' + e.message);
+      } finally {
+        clientImportInput.value = '';
+      }
+    });
+  }
   const tbody = document.getElementById('users-tbody');
   state.users.forEach((u) => {
     const row = el(`

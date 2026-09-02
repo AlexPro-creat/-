@@ -1195,6 +1195,58 @@ function register(router) {
     res.end(buf);
   }));
 
+  // Обратная загрузка файла клиентов, ранее выгруженного через /api/clients/export
+  // (Фаза 17, 02.09.2026) — пара к этой кнопке, по тому же принципу, что и
+  // /api/tasks/import ниже. Клиент ищется ПО ИМЕНИ И АГЕНТУ (не по id — после
+  // пересборки клиенты создаются заново импортом из исходных Excel-маршрутов, и их
+  // id не совпадут со старыми; сопоставление строго в пределах агента — та же
+  // логика, что и при обычном импорте клиентов в import.js, см. технические
+  // заметки — иначе общие ярлыки вроде "Частное лицо" у разных агентов задвоятся).
+  // Обновляет ТОЛЬКО ручные поля (тот же набор, что выгружается в /api/clients/export)
+  // у уже существующих клиентов — новых клиентов эта загрузка не создаёт: если
+  // клиента с таким именем у этого агента нет (например, его больше нет в свежем
+  // импорте маршрутов), запись пропускается и попадает в unresolved, ничего не
+  // додумываем. Повторная загрузка того же файла безопасна — просто перезапишет
+  // те же поля теми же значениями, дублей не создаст.
+  router.post('/api/clients/import', requireAdmin(async (req, res) => {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const incoming = Array.isArray(body.clients) ? body.clients : [];
+    if (!incoming.length) return sendJson(res, 400, { error: 'Файл пуст или не в ожидаемом формате' });
+
+    const usersByName = {};
+    db.all('users').forEach((u) => { usersByName[norm(u.name)] = u; });
+    const clientsByKey = {};
+    db.all('clients').forEach((c) => { clientsByKey[`${c.ownerId}||${norm(c.name)}`] = c; });
+
+    const MANUAL_FIELDS = [
+      'phone', 'address', 'contactName', 'pointType', 'visitDay', 'contractStatus',
+      'paymentMethod', 'socialContact', 'bestCallTime', 'decisionMakerName', 'specialRequests',
+      'orderWindow', 'discountTerms', 'salesPlan', 'routeNumber', 'notes', 'contactNotes',
+      'masters', 'isOffRoute', 'closed'
+    ];
+
+    let updated = 0;
+    const unresolved = [];
+    db.beginBatch();
+    try {
+      incoming.forEach((c) => {
+        const agent = c.agentName ? usersByName[norm(c.agentName)] : null;
+        if (!agent) { unresolved.push({ reason: 'агент не найден', agentName: c.agentName, clientName: c.name }); return; }
+        const existing = clientsByKey[`${agent.id}||${norm(c.name)}`];
+        if (!existing) { unresolved.push({ reason: 'клиент не найден у этого агента', agentName: c.agentName, clientName: c.name }); return; }
+        const patch = {};
+        MANUAL_FIELDS.forEach((f) => { if (c[f] !== undefined) patch[f] = c[f]; });
+        db.update('clients', existing.id, patch);
+        updated++;
+      });
+    } finally {
+      db.endBatch();
+    }
+
+    sendJson(res, 200, { updated, unresolvedCount: unresolved.length, unresolved });
+  }));
+
   // Обратная загрузка ранее выгруженного файла (после пересборки/передеплоя) —
   // восстанавливает задачи, сопоставляя клиента и агента ПО ИМЕНИ (не по id, см.
   // комментарий выше у /api/tasks/export). Задачи, для которых клиент или агент не
