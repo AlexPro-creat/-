@@ -97,12 +97,23 @@ button {
 
 .topbar {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 8px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   padding: 10px 20px;
-  flex-wrap: wrap;
+}
+
+/* Фаза 20: кнопка «Выйти» должна всегда оставаться рядом с названием
+   приложения, а не уезжать вниз вместе с user-box, когда вкладки навигации
+   переносятся на новую строку на узких экранах — поэтому бренд и user-box
+   вынесены в отдельную строку-«шапку», а вкладки — во вторую, независимую. */
+.topbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap;
 }
 
 .brand {
@@ -114,7 +125,7 @@ button {
   color: transparent;
 }
 
-.tabs { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 
 .tab {
   background: transparent;
@@ -617,6 +628,11 @@ th.sortable:hover { color: var(--text); }
   .field-row { grid-template-columns: 1fr; }
   main#content { padding: 12px; }
   .topbar { padding: 10px 12px; }
+  /* На узких экранах в строке рядом с названием едва хватает места на
+     кнопку «Выйти» — дату и имя пользователя убираем, они и так видны
+     на вкладке «Команда»/в самой карточке пользователя. */
+  #today-date, #user-name { display: none; }
+  .brand { font-size: 15px; }
   .field { flex-direction: column; gap: 2px; }
   .field .v { text-align: left; }
   .attach-row audio { max-width: 100%; }
@@ -641,6 +657,19 @@ th.sortable:hover { color: var(--text); }
 .promo-row { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border); padding: 6px 0; font-size: 13px; }
 .promo-row:last-child { border-bottom: none; }
 .promo-row .promo-qty { color: var(--muted); white-space: nowrap; }
+
+.sku-badge { display: inline-block; font-size: 10.5px; color: var(--muted); font-family: monospace; }
+
+.recent-sale-month { margin-top: 10px; }
+.recent-sale-month:first-of-type { margin-top: 0; }
+.recent-sale-month-heading {
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--gold);
+}
+.recent-sale-month:first-of-type .recent-sale-month-heading { border-top: none; padding-top: 0; }
 .assort-brand-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
 .brand-chip { padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; cursor: pointer; color: #fff; }
 .brand-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }

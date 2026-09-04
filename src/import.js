@@ -120,6 +120,18 @@ function attachStock(item, stockByName) {
   };
 }
 
+// Артикул товара (Фаза 20) — из прайс-листов поставщика (data/import/articles.json,
+// построен из 5 присланных прайсов: Чистовье/EPICA/Kapous(+Studio/HY)/Перчатки/Прочие ТД КМ —
+// см. articles.json и context-brief.md за 04.09.2026). Тот же принцип lookup по
+// точному совпадению нормализованного названия, что и у остатков (attachStock выше);
+// прайса на 5-й бренд (AV/ES/PRO/MS, декоративная косметика) пользователь не прислал,
+// поэтому эти позиции (и часть с обрезанными/неточными названиями) остаются без
+// артикула — покрытие по факту ~83% товарных строк, проверено при подключении.
+function attachSku(item, articlesByName) {
+  const sku = articlesByName[norm(item.product)] || null;
+  return { ...item, sku };
+}
+
 // Регулярный ассортимент (правило с 02.09.2026, Фаза 18): товар куплен в
 // ОБОИХ последних 2 месяцах окна (последних 6 закрытых месяцев из тех, что
 // реально есть в данных — сейчас март-август) И минимум в 4 из этих 6 месяцев.
@@ -132,9 +144,9 @@ function attachStock(item, stockByName) {
 // отдельный поток данных) — так «недопродано» обновляется сразу при
 // подгрузке свежего среза текущего месяца, не дожидаясь пересборки всего
 // ассортимента.
-function computeAssortment(rawItems, stockByName) {
+function computeAssortment(rawItems, stockByName, articlesByName) {
   if (!rawItems || !rawItems.length) return [];
-  return rawItems.map((it) => attachStock({
+  return rawItems.map((it) => attachSku(attachStock({
     product: it.product,
     brand: it.brand || 'Прочее',
     category: it.category || null,
@@ -143,16 +155,16 @@ function computeAssortment(rawItems, stockByName) {
     avgQty: it.avg_qty,
     revenue: it.revenue || 0,
     margin: it.margin || 0
-  }, stockByName));
+  }, stockByName), articlesByName));
 }
 
 // "Тестовый ассортимент" — товары, купленные хотя бы раз в окне последних 6
 // закрытых месяцев, но не прошедшие правило регулярного (не куплен в обоих
 // последних 2 месяцах, либо куплен меньше чем в 4 из 6) — комплементарная
 // часть того же расчёта, см. комментарий у computeAssortment() выше.
-function computeTestAssortment(rawItems, stockByName) {
+function computeTestAssortment(rawItems, stockByName, articlesByName) {
   if (!rawItems || !rawItems.length) return [];
-  return rawItems.map((it) => attachStock({
+  return rawItems.map((it) => attachSku(attachStock({
     product: it.product,
     brand: it.brand || 'Прочее',
     category: it.category || null,
@@ -161,7 +173,7 @@ function computeTestAssortment(rawItems, stockByName) {
     avgQty: it.avg_qty,
     revenue: it.revenue || 0,
     margin: it.margin || 0
-  }, stockByName));
+  }, stockByName), articlesByName));
 }
 
 function runImport() {
@@ -193,6 +205,9 @@ function runImportBody() {
   // stock.json уже хранит ключи в нормализованном виде (см. build_stock в gdrive-data) —
   // достаточно нормализовать название товара при поиске, сам файл не перестраиваем.
   const stockByName = loadJson('stock.json') || {};
+  // Артикул товара (Фаза 20) — уже хранится в articles.json в нормализованном виде
+  // (см. attachSku выше), сам файл не перестраиваем при импорте.
+  const articlesByName = loadJson('articles.json') || {};
   const promotionsMap = loadJson('promotions.json') || {};
   // Список правок после Фазы 6.1: "постоянный клиент" больше не завязан на
   // regularAssortment (конкретный товар в >=4 из 7 мес.) — теперь это "были
@@ -249,7 +264,13 @@ function runImportBody() {
     const owner = agentsByName[norm(c.agent)] || adminUser;
     const activeMonths = activeMonthsByName[key] || [];
     const currentMonth = currentMonthByName[key] || null;
-    const monthlyAssortment = monthlyAssortmentByName[key] || {};
+    // Артикул (Фаза 20) подмешиваем и сюда — тот же lookup, что и в
+    // regular/testAssortment, чтобы раздел "Последние продажи" тоже его показывал.
+    const monthlyAssortmentRaw = monthlyAssortmentByName[key] || {};
+    const monthlyAssortment = {};
+    Object.keys(monthlyAssortmentRaw).forEach((m) => {
+      monthlyAssortment[m] = (monthlyAssortmentRaw[m] || []).map((it) => attachSku(it, articlesByName));
+    });
 
     // Совпадение ищем в пределах ТОГО ЖЕ агента (owner), а не по всей базе —
     // иначе общие для нескольких агентов ярлыки вроде «Частное лицо»/«Частники»
@@ -259,8 +280,8 @@ function runImportBody() {
     let existing = db.all('clients').find((cl) => norm(cl.name) === key && cl.ownerId === ownerId);
 
     const computedFields = {
-      regularAssortment: computeAssortment(assortmentRaw, stockByName),
-      testAssortment: computeTestAssortment(testAssortmentRaw, stockByName),
+      regularAssortment: computeAssortment(assortmentRaw, stockByName, articlesByName),
+      testAssortment: computeTestAssortment(testAssortmentRaw, stockByName, articlesByName),
       debtAmount: debt ? debt.debt_amount : 0,
       debtOverdue: debt ? !!debt.is_overdue : false,
       debtAsOf: debt ? (debt.payment_date || null) : null,

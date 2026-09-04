@@ -1407,6 +1407,7 @@ async function openClientModal(client) {
       ${renderMastersSection(client)}
       ${renderAssortmentSection(client)}
       ${renderTestAssortmentSection(client)}
+      ${renderRecentSalesSection(client)}
       ${renderPromotionsSection(client)}
       ${renderContactNotes(client)}
       <div id="history-section" class="assort-panel"><h3>История визитов</h3><div class="muted">Загрузка…</div></div>
@@ -1486,6 +1487,7 @@ async function openClientModal(client) {
       ${isEdit ? renderMastersSection(client) : ''}
       ${isEdit ? renderAssortmentSection(client) : ''}
       ${isEdit ? renderTestAssortmentSection(client) : ''}
+      ${isEdit ? renderRecentSalesSection(client) : ''}
       ${isEdit ? renderPromotionsSection(client) : ''}
       ${isEdit ? renderContactNotes(client) : ''}
       ${isEdit ? '<div id="history-section" class="assort-panel"><h3>История визитов</h3><div class="muted">Загрузка…</div></div>' : ''}
@@ -1512,6 +1514,9 @@ async function openClientModal(client) {
     closeModal();
     render();
   });
+
+  // Закрытие карточки клиента свайпом вправо (мобильные тач-жесты).
+  wireSwipeToClose(document.querySelector('#modal-root .modal'), closeModal);
 
   const delBtn = document.getElementById('delete-client');
   if (delBtn) delBtn.addEventListener('click', async () => {
@@ -1577,11 +1582,56 @@ function formatQty(n) {
   return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, '');
 }
 
+// Артикул товара (Фаза 20) — из справочника номенклатуры, сопоставляется по
+// названию товара при импорте (см. src/import.js, articleByName). Не у всех
+// товаров он находится (обрезанные/неточные названия в файлах продаж — то же
+// ограничение, что и у сопоставления остатков, см. Фазу 6.1) — тогда бейдж
+// просто не показывается, а не пишется "нет данных" на каждой строке.
+function skuBadgeHtml(p) {
+  if (!p.sku) return '';
+  return `<span class="sku-badge" title="Артикул">#${escapeHtml(p.sku)}</span> `;
+}
+
 function assortRow(p) {
   return `
     <div class="assort-row">
-      <span>${escapeHtml(p.product)} <span class="brand-badge">${escapeHtml(p.brand || 'Прочее')}</span> ${stockBadgeHtml(p)}</span>
+      <span>${skuBadgeHtml(p)}${escapeHtml(p.product)} <span class="brand-badge">${escapeHtml(p.brand || 'Прочее')}</span> ${stockBadgeHtml(p)}</span>
       <span class="freq">${p.monthsCount} из 6 посл. мес · ~${p.avgQty} шт/мес · посл.: ${p.lastMonth}</span>
+    </div>
+  `;
+}
+
+// "Последние продажи" (Фаза 20) — по просьбе пользователя показывает последние
+// поставки клиенту. Настоящих номеров/дат отдельных накладных в исходных данных
+// нет (проверено — только помесячные суммы по товару в client.monthlyAssortment,
+// без разбивки на конкретные документы), поэтому используется согласованный с
+// пользователем аналог: последние 3 месяца из тех, где у клиента были продажи,
+// с товарами/кол-вом/ценой по каждому. Если позже появится реальная выгрузка с
+// номерами/датами документов — эту функцию нужно будет переписать под неё.
+function renderRecentSalesSection(client) {
+  const monthly = client.monthlyAssortment || {};
+  const monthsWithSales = (state.salesMonths || []).filter((m) => (monthly[m] || []).length > 0);
+  const last3 = monthsWithSales.slice(-3).reverse(); // от новых к старым
+  if (!last3.length) return '';
+  return `
+    <button type="button" class="assort-btn" id="recent-sales-toggle-${client.id}">🧾 Последние продажи</button>
+    <div class="assort-panel" id="recent-sales-panel-${client.id}" style="display:none">
+      <div class="muted" style="font-size:12px;margin-bottom:6px">Точных номеров и дат накладных в данных нет — показаны товары за последние ${last3.length} мес. с продажами (не обязательно подряд).</div>
+      ${last3.map((m) => {
+        const items = monthly[m] || [];
+        const total = items.reduce((s, it) => s + (it.revenue || 0), 0);
+        return `
+          <div class="recent-sale-month">
+            <div class="recent-sale-month-heading">${capitalize(m)} — ${fmtMoney(total)}</div>
+            ${items.map((it) => `
+              <div class="assort-row">
+                <span>${skuBadgeHtml(it)}${escapeHtml(it.product)} <span class="brand-badge">${escapeHtml(it.brand || 'Прочее')}</span></span>
+                <span class="freq">${formatQty(it.qty)} шт · ${fmtMoney(it.qty ? it.revenue / it.qty : 0)}/шт · ${fmtMoney(it.revenue || 0)}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }).join('')}
     </div>
   `;
 }
@@ -1712,6 +1762,7 @@ function wireAssortmentToggle(clientId) {
   const client = clientById(clientId);
   wireToggle(`assort-toggle-${clientId}`, `assort-panel-${clientId}`);
   wireToggle(`test-assort-toggle-${clientId}`, `test-assort-panel-${clientId}`);
+  wireToggle(`recent-sales-toggle-${clientId}`, `recent-sales-panel-${clientId}`);
   if (client) {
     wireBrandFilter(`assort-${clientId}`, client.regularAssortment || [], `assort-body-${clientId}`, 'regular');
     wireBrandFilter(`test-assort-${clientId}`, client.testAssortment || [], `test-assort-body-${clientId}`, 'test');
@@ -3096,6 +3147,46 @@ function openModal(innerHtml, onSubmit) {
 
 function closeModal() {
   document.getElementById('modal-root').innerHTML = '';
+}
+
+// Свайп вправо для закрытия модалки (тач-жест, мобильные устройства).
+// Подключается точечно там, где это нужно (сейчас — карточка клиента),
+// а не глобально в openModal(), чтобы не мешать горизонтальному скроллу
+// внутри других модалок (широкие чипы фильтров, недельный календарь и т.п.).
+function wireSwipeToClose(modalEl, onClose) {
+  if (!modalEl) return;
+  const THRESHOLD_PX = 90;
+  const MAX_DURATION_MS = 700;
+  let startX = null;
+  let startY = null;
+  let startTime = 0;
+  let tracking = false;
+  modalEl.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { tracking = false; return; }
+    // Не перехватываем жест, начавшийся на элементах со своим горизонтальным
+    // скроллом (чипы-фильтры, недельный/месячный календарь) — иначе свайп
+    // для прокрутки чипов случайно закрывал бы карточку.
+    if (e.target.closest('.assort-brand-filter, .cal-week-grid, .cal-month-grid, input[type="range"]')) {
+      tracking = false;
+      return;
+    }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+    tracking = true;
+  }, { passive: true });
+  modalEl.addEventListener('touchend', (e) => {
+    if (!tracking || startX === null) return;
+    tracking = false;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const duration = Date.now() - startTime;
+    if (duration <= MAX_DURATION_MS && dx > THRESHOLD_PX && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      onClose();
+    }
+  }, { passive: true });
 }
 
 // ---------- Экранирование ----------

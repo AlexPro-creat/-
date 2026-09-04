@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Задачник для торговых агентов</title>
+<title>CRM Cosmedeca</title>
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 
 <div id="login-screen" class="screen">
   <div class="login-box">
-    <h1>CRM</h1>
+    <h1>CRM Cosmedeca</h1>
     <p class="muted">Вход в систему</p>
     <form id="login-form">
       <label>Email</label>
@@ -25,7 +25,14 @@
 
 <div id="app-screen" class="screen" style="display:none">
   <header class="topbar">
-    <div class="brand">Задачник · Косметика</div>
+    <div class="topbar-row">
+      <div class="brand">CRM Cosmedeca</div>
+      <div class="user-box">
+        <span id="today-date" class="muted" style="margin-right:14px;font-size:13px"></span>
+        <span id="user-name"></span>
+        <button id="logout-btn">Выйти</button>
+      </div>
+    </div>
     <nav class="tabs">
       <button data-view="dashboard" class="tab active">Дашборд</button>
       <button data-view="clients" class="tab">Клиенты<span class="nav-badge" id="badge-clients"></span></button>
@@ -35,11 +42,6 @@
       <button data-view="reports" class="tab" id="reports-tab" style="display:none">Отчёты</button>
       <button data-view="team" class="tab" id="team-tab" style="display:none">Команда</button>
     </nav>
-    <div class="user-box">
-      <span id="today-date" class="muted" style="margin-right:14px;font-size:13px"></span>
-      <span id="user-name"></span>
-      <button id="logout-btn">Выйти</button>
-    </div>
   </header>
 
   <main id="content"></main>
