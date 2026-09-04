@@ -4,8 +4,10 @@ const db = require('./db');
 const auth = require('./auth');
 const { parseMultipart } = require('./multipart');
 const { buildZip } = require('./miniZip');
+const { parseTableFile } = require('./fileTable');
 const googleSheets = require('./googleSheets');
 const { normalizePhone, MONTH_ORDER } = require('./import');
+const IMPORT_DIR = path.join(__dirname, '..', 'data', 'import');
 
 // ---- Правка 01.09.2026: "протухание" данных за текущий месяц ----
 // currentMonthRevenue/currentMonthItems (продажи "текущего месяца") и promotions
@@ -34,29 +36,52 @@ function isCurrentMonthDataFresh() {
 // без изменений. Применять на КАЖДОМ месте, где список клиентов идёт на
 // отображение (дашборд, отчёты, GET /api/clients) — но не там, где клиент
 // используется для записи/бизнес-логики, не связанной с деньгами (задачи и т.п.).
-// Правка Фазы 15 (01.09.2026, п.10): «Недопродано» (флаг atRisk на позициях
-// regularAssortment — "обычно берёт, но не заказывал в последнем доступном
-// месяце") — тоже сигнал, завязанный на "последний месяц" данных, поэтому
-// тоже обнуляется вместе с продажами/акциями, пока не придёт новый реестр.
-// ВАЖНО: обнуляется только сам флаг atRisk (счётчик "недопродано" становится
-// 0) — сам список regularAssortment/testAssortment НЕ обнуляется и не
-// укорачивается (это историческая статистика по клиенту за 7 месяцев, она
-// остаётся полезной и корректной независимо от календаря, см. п.11 переписки
-// 01.09.2026 и раздел «Что осознанно НЕ обнуляется» выше).
+// Правка Фазы 18 (02.09.2026): «Недопродано» (флаг atRisk на позициях
+// regularAssortment) больше не считается один раз при импорте — теперь это
+// "постоянный ассортимент минус продажи текущего месяца" (фокус на допродажу),
+// см. computeAtRisk() ниже. Считаем его здесь же, динамически, при КАЖДОЙ
+// отдаче клиента — это единственное место в API, где регулярный ассортимент
+// сверяется с currentMonthItems, так что менять эту логику нужно только тут.
+// Явный плюс: если прислали свежий срез продаж текущего месяца, но полную
+// 6-месячную классификацию ассортимента ещё не пересобирали — "недопродано"
+// всё равно обновится сразу же, на следующий же запрос, без пересборки.
+//
+// currentMonthItems/currentMonthRevenue/promotions по-прежнему обнуляются,
+// пока не пришёл новый реестр за новый месяц (см. isCurrentMonthDataFresh()
+// выше) — сам список regularAssortment/testAssortment НЕ обнуляется и не
+// укорачивается (историческая статистика, актуальна независимо от календаря).
+// Когда currentMonthItems пуст (неважно, из-за протухания или потому что по
+// текущему месяцу правда ещё не было продаж) — atRisk честно становится true
+// у всей постоянки: это и есть "ничего из постоянного ассортимента ещё не
+// продано в этом месяце", ровно то, что нужно для фокуса на допродажу.
+// norm() уже объявлена ниже в этом же файле (используется и для сверки
+// клиентов при импорте) — JS поднимает объявления function наверх области
+// видимости, так что вызывать её здесь, до текстового объявления, безопасно.
+function computeAtRisk(regularAssortment, currentMonthItems) {
+  const boughtThisMonth = new Set((currentMonthItems || []).map((it) => norm(it.product)));
+  return (regularAssortment || []).map((p) => ({ ...p, atRisk: !boughtThisMonth.has(norm(p.product)) }));
+}
 function withFreshCurrentMonth(clients) {
-  if (isCurrentMonthDataFresh()) return clients;
-  return clients.map((c) => ({
-    ...c,
-    currentMonthRevenue: 0,
-    currentMonthItems: [],
-    promotions: [],
-    regularAssortment: (c.regularAssortment || []).map((p) => (p.atRisk ? { ...p, atRisk: false } : p))
-  }));
+  const fresh = isCurrentMonthDataFresh();
+  return clients.map((c) => {
+    const currentMonthItems = fresh ? (c.currentMonthItems || []) : [];
+    return {
+      ...c,
+      currentMonthRevenue: fresh ? (c.currentMonthRevenue || 0) : 0,
+      currentMonthItems,
+      promotions: fresh ? (c.promotions || []) : [],
+      regularAssortment: computeAtRisk(c.regularAssortment, currentMonthItems)
+    };
+  });
 }
 // Дата среза остатков склада (Фаза 6.1) — сам исходный файл выгрузки дату не
-// содержит, дата задокументирована пользователем при присылке файла. Обновить
-// при следующей выгрузке остатков.
-const STOCK_AS_OF = '25.08.2026';
+// содержит. Раньше была захардкожена ('25.08.2026', задокументирована
+// пользователем при присылке файла) — с Фазы 19 хранится в settings базы и
+// обновляется автоматически датой сервера при каждой загрузке нового файла
+// остатков через панель «Команда» (см. POST /api/stock/import ниже).
+function getStockAsOf() {
+  return db.getSetting('stockAsOf', '25.08.2026');
+}
 
 // Этапы доски задач. "Новая задача" убрана — задача сразу создаётся в "В работе".
 // "Лист ожидания" и "Прогрев" больше не этапы доски, а теги задачи (см. TASK_TAGS) —
@@ -219,12 +244,63 @@ function migrateClientDefaultsBody() {
       const normalized = normalizePhone(c.phone);
       if (normalized !== c.phone) patch.phone = normalized;
     }
+    // Фаза 19: "тип точки" стал выпадающим списком из 8 категорий (раньше —
+    // свободный текст с кучей вариантов написания). Прогоняется безусловно
+    // при каждом старте, как и телефон выше, — сама миграция идемпотентна:
+    // уже канонический текст ("Салон красоты" и т.п.) при повторном прогоне
+    // сам на себя и отобразится (POINT_TYPE_MIGRATION содержит канонические
+    // значения ключами на самих себя), реального обновления не будет.
+    if (c.pointType) {
+      const canonical = POINT_TYPE_MIGRATION[norm(c.pointType)] || 'Другое';
+      if (canonical !== c.pointType) patch.pointType = canonical;
+    }
     if (Object.keys(patch).length) db.update('clients', c.id, patch);
   });
 }
 
 const PAYMENT_METHODS = ['Наличные', 'Безналичные', 'QR'];
 const CONTRACT_STATUSES = ['да', 'нет', 'неизвестно'];
+
+// "Тип точки" (Фаза 19, 04.09.2026) — раньше свободный текст, отсюда 31
+// вариант написания одного и того же (регистр, "Магазин"/"Магазины" и т.п.).
+// Пользователь подтвердил этот канонический список из 8 категорий — редкие
+// варианты (лаборатория, барбершоп, детсад, аптека, оптовый клиент и т.п.)
+// уходят в "Другое".
+const POINT_TYPES = [
+  'Салон красоты', 'Медицинский центр/клиника', 'Стоматология', 'Магазин',
+  'Спа-салон', 'Салон депиляции', 'Массажный салон', 'Другое'
+];
+// Сопоставление старых свободных значений (в нормализованном виде — см.
+// norm() ниже) с канонической категорией — для одноразовой (но идемпотентной,
+// см. migrateClientDefaultsBody) миграции уже существующих клиентов. Значения,
+// которых нет в этой карте, при миграции уходят в "Другое" — не гадаем точнее.
+const POINT_TYPE_MIGRATION = {
+  'салон красоты': 'Салон красоты',
+  'салон': 'Салон красоты',
+  'мед клиника': 'Медицинский центр/клиника',
+  'медицинский центр': 'Медицинский центр/клиника',
+  'медицинский центр/клиника': 'Медицинский центр/клиника',
+  'клиника': 'Медицинский центр/клиника',
+  'стоматология': 'Стоматология',
+  'магазин': 'Магазин',
+  'магазины': 'Магазин',
+  'спа салон': 'Спа-салон',
+  'спа-салон': 'Спа-салон',
+  'спа комплекс': 'Спа-салон',
+  'спа': 'Спа-салон',
+  'салон депиляции': 'Салон депиляции',
+  'депиляция': 'Салон депиляции',
+  'массажный салон': 'Массажный салон',
+  'массаж': 'Массажный салон',
+  'другое': 'Другое',
+  'оптовый клиент': 'Другое',
+  'лаборатория': 'Другое',
+  'детсад': 'Другое',
+  'садик': 'Другое',
+  'академия': 'Другое',
+  'аптека': 'Другое',
+  'барбершоп': 'Другое'
+};
 
 // Правка Фазы 15 (01.09.2026, п.4): пользователь явно попросил дать агентам
 // возможность редактировать ВСЕ поля карточки своих клиентов (раньше это было
@@ -360,6 +436,7 @@ function register(router) {
       waitlistStages: isStaff(req.user) ? WAITLIST_STAGES : WAITLIST_STAGES.filter((s) => !WAITLIST_STAFF_ONLY_STAGES.includes(s.key)),
       waitlistTags: WAITLIST_TAGS,
       paymentMethods: PAYMENT_METHODS,
+      pointTypes: POINT_TYPES,
       contractStatuses: CONTRACT_STATUSES,
       taskTags: TASK_TAGS,
       // Правка 01.09.2026: чтобы фронтенд мог показать реальную дату и явно
@@ -369,7 +446,7 @@ function register(router) {
       salesMonths: MONTH_ORDER,
       latestSalesMonth: MONTH_ORDER[MONTH_ORDER.length - 1],
       currentMonthDataFresh: isCurrentMonthDataFresh(),
-      stockAsOf: STOCK_AS_OF
+      stockAsOf: getStockAsOf()
     });
   }));
 
@@ -494,7 +571,7 @@ function register(router) {
 
     const client = db.insert('clients', {
       name: body.name,
-      pointType: body.pointType || '',
+      pointType: POINT_TYPES.includes(body.pointType) ? body.pointType : '',
       address: body.address || '',
       phone: body.phone || '',
       contactName: body.contactName || '',
@@ -556,6 +633,7 @@ function register(router) {
       if (body[f] === undefined) return;
       if (f === 'contractStatus' && !CONTRACT_STATUSES.includes(body.contractStatus)) return;
       if (f === 'paymentMethod' && body.paymentMethod && !PAYMENT_METHODS.includes(body.paymentMethod)) return;
+      if (f === 'pointType' && body.pointType && !POINT_TYPES.includes(body.pointType)) return;
       if (f === 'salesPlan') { patch.salesPlan = Number(body.salesPlan) || 0; return; }
       if (f === 'routeNumber') { patch.routeNumber = body.routeNumber === '' || body.routeNumber === undefined ? null : (Number(body.routeNumber) || null); return; }
       patch[f] = f === 'phone' ? normalizePhone(body[f]) : body[f];
@@ -1245,6 +1323,186 @@ function register(router) {
     }
 
     sendJson(res, 200, { updated, unresolvedCount: unresolved.length, unresolved });
+  }));
+
+  // Загрузка долгов/остатков прямо через панель, без пересборки zip (Фаза 19,
+  // 04.09.2026) — пользователь явно попросил: данные статичные (снимок на
+  // дату), пересобирать из-за них весь архив не нужно. Файл — .xlsx или .csv
+  // (см. src/fileTable.js — свой ридер без внешних библиотек, LibreOffice на
+  // сервере нет, поэтому старый бинарный .xls этим путём не поддержан, только
+  // новыми экспортами/пересохранениями в .xlsx/.csv). Колонки ищутся по
+  // синонимам заголовка (см. findColumn/*_ALIASES ниже) — не по фиксированной
+  // позиции, т.к. точный набор колонок в реальном файле пользователя ещё не
+  // проверен на практике (в этой сессии не было исходного файла для сверки).
+  // Оба эндпойнта полностью ЗАМЕНЯЮТ прежний снимок (как и обычный
+  // импорт из data/import/debts.json|stock.json) — клиент, которого нет в
+  // новом файле, теряет долг (уходит в 0), это осознанное поведение "снимок
+  // на дату", а не бага.
+  function normHeaderCell(s) {
+    return (s || '').toString().trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
+  }
+  function findColumn(headerRow, aliases) {
+    const normed = headerRow.map(normHeaderCell);
+    for (const alias of aliases) {
+      const idx = normed.findIndex((h) => h === alias || h.includes(alias));
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  }
+  function parseUploadedTable(req) {
+    return parseMultipart(req, 10 * 1024 * 1024).then((parsed) => {
+      const file = parsed.files[0];
+      if (!file) throw new Error('Файл не найден в запросе');
+      let rows;
+      try {
+        rows = parseTableFile(file.filename, file.data);
+      } catch (e) {
+        throw new Error(`Не удалось прочитать файл (.xlsx или .csv): ${e.message}`);
+      }
+      if (!rows.length) throw new Error('Файл пустой');
+      return { header: rows[0], dataRows: rows.slice(1) };
+    });
+  }
+
+  const DEBT_NAME_ALIASES = ['контрагент', 'клиент', 'название клиента', 'наименование клиента', 'название', 'наименование', 'точка'];
+  const DEBT_AMOUNT_ALIASES = ['сумма долга', 'задолженность', 'долг', 'сумма'];
+  const DEBT_DATE_ALIASES = ['дата поставки', 'дата накладной', 'дата платежа', 'дата оплаты', 'дата'];
+  const DEBT_OVERDUE_ALIASES = ['просрочено', 'просрочка', 'overdue'];
+
+  router.post('/api/debts/import', requireAdmin(async (req, res) => {
+    let table;
+    try { table = await parseUploadedTable(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const nameIdx = findColumn(table.header, DEBT_NAME_ALIASES);
+    const amountIdx = findColumn(table.header, DEBT_AMOUNT_ALIASES);
+    const dateIdx = findColumn(table.header, DEBT_DATE_ALIASES);
+    const overdueIdx = findColumn(table.header, DEBT_OVERDUE_ALIASES);
+    if (nameIdx === -1 || amountIdx === -1) {
+      return sendJson(res, 400, {
+        error: 'Не нашёл в заголовках колонки «клиент»/«сумма долга» — переименуйте заголовки в файле или пришлите его мне, поправлю сопоставление',
+        headerFound: table.header
+      });
+    }
+
+    const debts = [];
+    table.dataRows.forEach((r) => {
+      const name = (r[nameIdx] || '').toString().trim();
+      if (!name) return;
+      const amount = parseFloat(String(r[amountIdx] || '0').replace(',', '.')) || 0;
+      const paymentDate = dateIdx !== -1 ? (r[dateIdx] || '').toString().trim() || null : null;
+      let isOverdue;
+      if (overdueIdx !== -1) {
+        const raw = normHeaderCell(r[overdueIdx]);
+        isOverdue = raw === 'да' || raw === 'true' || raw === '1' || raw === 'yes';
+      } else {
+        // Явной колонки "просрочено" нет — считаем просроченным, если дата
+        // платежа/поставки уже в прошлом (по формату ДД.ММ.ГГГГ). Осознанное
+        // предположение, не 100%-но точное — если в реальном файле есть
+        // отдельный признак просрочки под другим названием, лучше пришлите
+        // файл, доработаю сопоставление.
+        const m = paymentDate ? /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(paymentDate) : null;
+        isOverdue = m ? (new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime() < Date.now()) : false;
+      }
+      debts.push({ client_name: name, debt_amount: amount, is_overdue: isOverdue, payment_date: paymentDate });
+    });
+    if (!debts.length) return sendJson(res, 400, { error: 'Не нашёл ни одной строки с именем клиента' });
+
+    try {
+      fs.mkdirSync(IMPORT_DIR, { recursive: true });
+      fs.writeFileSync(path.join(IMPORT_DIR, 'debts.json'), JSON.stringify(debts, null, 2), 'utf8');
+    } catch (e) {
+      return sendJson(res, 500, { error: `Файл разобрал, но не смог сохранить на диск: ${e.message}` });
+    }
+
+    // Долг — снимок на дату (как и при обычном runImport()): полностью
+    // заменяем цифры у ВСЕХ клиентов, а не только у совпавших — клиент, для
+    // которого в новом файле долга нет, считается погашенным (0), см.
+    // комментарий выше. Сопоставление — по имени (по решению пользователя, то
+    // же ограничение, что было раньше — без учёта агента).
+    const debtByName = {};
+    debts.forEach((d) => { debtByName[norm(d.client_name)] = d; });
+    let matched = 0;
+    db.beginBatch();
+    try {
+      db.all('clients').forEach((c) => {
+        const d = debtByName[norm(c.name)];
+        if (d) matched++;
+        db.update('clients', c.id, {
+          debtAmount: d ? d.debt_amount : 0,
+          debtOverdue: d ? !!d.is_overdue : false,
+          debtAsOf: d ? d.payment_date : null
+        });
+      });
+    } finally {
+      db.endBatch();
+    }
+
+    sendJson(res, 200, { parsedRows: debts.length, matchedClients: matched });
+  }));
+
+  const STOCK_NAME_ALIASES = ['наименование товара', 'название товара', 'наименование', 'название', 'товар', 'номенклатура'];
+  const STOCK_QTY_ALIASES = ['остаток', 'количество', 'кол-во', 'кол'];
+  const STOCK_UNIT_ALIASES = ['ед.изм', 'ед. изм', 'единица измерения', 'единица', 'ед'];
+
+  router.post('/api/stock/import', requireAdmin(async (req, res) => {
+    let table;
+    try { table = await parseUploadedTable(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const nameIdx = findColumn(table.header, STOCK_NAME_ALIASES);
+    const qtyIdx = findColumn(table.header, STOCK_QTY_ALIASES);
+    const unitIdx = findColumn(table.header, STOCK_UNIT_ALIASES);
+    if (nameIdx === -1 || qtyIdx === -1) {
+      return sendJson(res, 400, {
+        error: 'Не нашёл в заголовках колонки «наименование»/«остаток» — переименуйте заголовки в файле или пришлите его мне, поправлю сопоставление',
+        headerFound: table.header
+      });
+    }
+
+    const stockByName = {};
+    let parsedRows = 0;
+    table.dataRows.forEach((r) => {
+      const name = (r[nameIdx] || '').toString().trim();
+      if (!name) return;
+      const qty = parseFloat(String(r[qtyIdx] || '0').replace(',', '.')) || 0;
+      const unit = unitIdx !== -1 ? ((r[unitIdx] || '').toString().trim() || 'шт') : 'шт';
+      stockByName[norm(name)] = { name, unit, qty };
+      parsedRows++;
+    });
+    if (!parsedRows) return sendJson(res, 400, { error: 'Не нашёл ни одной строки с товаром' });
+
+    try {
+      fs.mkdirSync(IMPORT_DIR, { recursive: true });
+      fs.writeFileSync(path.join(IMPORT_DIR, 'stock.json'), JSON.stringify(stockByName, null, 2), 'utf8');
+    } catch (e) {
+      return sendJson(res, 500, { error: `Файл разобрал, но не смог сохранить на диск: ${e.message}` });
+    }
+
+    // Пересчитываем stockQty/stockUnit прямо на уже сохранённых позициях
+    // ассортимента у всех клиентов (без полного реимпорта — сам ассортимент
+    // не пересчитывается, только остаток на позициях, точно так же, как
+    // attachStock() делает при обычном runImport() в import.js).
+    function reattach(items) {
+      return (items || []).map((it) => {
+        const hit = stockByName[norm(it.product)];
+        return { ...it, stockQty: hit ? hit.qty : null, stockUnit: hit ? hit.unit : null };
+      });
+    }
+    db.beginBatch();
+    try {
+      db.all('clients').forEach((c) => {
+        const patch = {};
+        if (c.regularAssortment && c.regularAssortment.length) patch.regularAssortment = reattach(c.regularAssortment);
+        if (c.testAssortment && c.testAssortment.length) patch.testAssortment = reattach(c.testAssortment);
+        if (Object.keys(patch).length) db.update('clients', c.id, patch);
+      });
+    } finally {
+      db.endBatch();
+    }
+
+    const today = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const stockAsOf = `${pad(today.getDate())}.${pad(today.getMonth() + 1)}.${today.getFullYear()}`;
+    db.setSetting('stockAsOf', stockAsOf);
+
+    sendJson(res, 200, { parsedRows, stockAsOf });
   }));
 
   // Обратная загрузка ранее выгруженного файла (после пересборки/передеплоя) —

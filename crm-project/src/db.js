@@ -15,7 +15,10 @@ function emptyState() {
     clients: [],
     tasks: [],
     supervisorMeetings: [],
-    sessions: {}
+    sessions: {},
+    // Мелкие одиночные настройки (не коллекция записей) — например, дата
+    // "снято на" для остатков склада после загрузки через панель (Фаза 19).
+    settings: {}
   };
 }
 
@@ -117,6 +120,19 @@ function remove(collection, id) {
   return true;
 }
 
+// ---- Мелкие одиночные настройки (settings) ----
+
+function getSetting(key, fallback) {
+  ensureLoaded();
+  return Object.prototype.hasOwnProperty.call(state.settings, key) ? state.settings[key] : fallback;
+}
+
+function setSetting(key, value) {
+  ensureLoaded();
+  state.settings[key] = value;
+  persist();
+}
+
 // ---- Сессии (хранятся в базе, чтобы переживать перезапуск сервера) ----
 
 function createSession(token, userId, expiresAt) {
@@ -156,5 +172,7 @@ module.exports = {
   getSession,
   deleteSession,
   beginBatch,
-  endBatch
+  endBatch,
+  getSetting,
+  setSetting
 };

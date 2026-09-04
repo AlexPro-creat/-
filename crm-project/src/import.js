@@ -120,13 +120,20 @@ function attachStock(item, stockByName) {
   };
 }
 
+// Регулярный ассортимент (правило с 02.09.2026, Фаза 18): товар куплен в
+// ОБОИХ последних 2 месяцах окна (последних 6 закрытых месяцев из тех, что
+// реально есть в данных — сейчас март-август) И минимум в 4 из этих 6 месяцев.
+// Готовые списки (data/import/regular_assortment.json / test_assortment.json)
+// уже посчитаны по этому правилу заранее (см. crm-mvp-status.md/Фаза 18) —
+// здесь только подмешиваем остаток склада. atRisk («недопродано») сюда
+// больше НЕ прибивается гвоздями при импорте — считается динамически при
+// каждой отдаче клиента (см. computeAtRisk() в api.js), сверяя этот же
+// список regularAssortment с currentMonthItems («продажи текущего месяца»,
+// отдельный поток данных) — так «недопродано» обновляется сразу при
+// подгрузке свежего среза текущего месяца, не дожидаясь пересборки всего
+// ассортимента.
 function computeAssortment(rawItems, stockByName) {
   if (!rawItems || !rawItems.length) return [];
-  const latestMonth = rawItems.reduce((latest, it) => {
-    const li = MONTH_ORDER.indexOf(latest);
-    const ci = MONTH_ORDER.indexOf(it.last_month);
-    return ci > li ? it.last_month : latest;
-  }, rawItems[0].last_month);
   return rawItems.map((it) => attachStock({
     product: it.product,
     brand: it.brand || 'Прочее',
@@ -135,18 +142,14 @@ function computeAssortment(rawItems, stockByName) {
     lastMonth: it.last_month,
     avgQty: it.avg_qty,
     revenue: it.revenue || 0,
-    margin: it.margin || 0,
-    // Товар был регулярным, но в последнем доступном месяце его не покупали — риск "отвала".
-    // Ограничение: данные о продажах помесячные, а не по датам, поэтому это приближение
-    // к правилу «не заказывал 14+ дней», а не точный расчёт по дням.
-    atRisk: it.last_month !== latestMonth
+    margin: it.margin || 0
   }, stockByName));
 }
 
-// "Тестовый ассортимент" (Фаза 16, п.11, 01.09.2026) — товары, купленные хотя
-// бы раз в последних 5 месяцах, но с пробелом 3+ месяца подряд без покупки
-// внутри этого окна — не дотягивает до "регулярного" (см. window_classify.py
-// в gdrive-data и crm-mvp-status.md за подробным описанием новой логики).
+// "Тестовый ассортимент" — товары, купленные хотя бы раз в окне последних 6
+// закрытых месяцев, но не прошедшие правило регулярного (не куплен в обоих
+// последних 2 месяцах, либо куплен меньше чем в 4 из 6) — комплементарная
+// часть того же расчёта, см. комментарий у computeAssortment() выше.
 function computeTestAssortment(rawItems, stockByName) {
   if (!rawItems || !rawItems.length) return [];
   return rawItems.map((it) => attachStock({

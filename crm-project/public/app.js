@@ -9,6 +9,7 @@ const state = {
   taskTags: [],
   paymentMethods: [],
   contractStatuses: [],
+  pointTypes: [],
   clients: [],
   tasks: [],
   users: [],
@@ -252,26 +253,7 @@ function switchView(view) {
   state.view = view;
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   render();
-  updateScrollTopBtnVisibility();
 }
-
-// ---------- Кнопка "Наверх" (дашборд, видна всем ролям, 02.09.2026) ----------
-// Кнопка живёт в index.html вне #content (переживает render()/innerHTML='' на
-// каждой смене вкладки), поэтому вешаем обработчики один раз при загрузке
-// скрипта, а не при каждом renderDashboard(). Показывается только на вкладке
-// "Дашборд" и только после прокрутки вниз, чтобы не мешать на короткой странице.
-function updateScrollTopBtnVisibility() {
-  const btn = document.getElementById('scroll-top-btn');
-  if (!btn) return;
-  const show = state.view === 'dashboard' && window.scrollY > 300;
-  btn.style.display = show ? 'flex' : 'none';
-}
-(function wireScrollTopButton() {
-  const btn = document.getElementById('scroll-top-btn');
-  if (!btn) return;
-  btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-  window.addEventListener('scroll', updateScrollTopBtnVisibility);
-})();
 
 // ---------- Загрузка данных ----------
 
@@ -321,6 +303,7 @@ async function boot() {
     state.waitlistTags = me.waitlistTags || [];
     state.paymentMethods = me.paymentMethods;
     state.contractStatuses = me.contractStatuses;
+    state.pointTypes = me.pointTypes || [];
     state.taskTags = me.taskTags || [];
     // Правка 01.09.2026: реальная текущая дата (для шапки) + признак того, что
     // данные о продажах/акциях за текущий месяц ещё не загружены (сервер сам
@@ -347,7 +330,6 @@ async function boot() {
   document.getElementById('reports-tab').style.display = isStaff() ? '' : 'none';
   await loadAll();
   render();
-  updateScrollTopBtnVisibility();
   setupNotifications();
 }
 
@@ -1028,7 +1010,11 @@ function exportClientsCsv(list) {
 }
 
 function renderClients(content) {
-  const pointTypes = Array.from(new Set(state.clients.map((c) => c.pointType).filter(Boolean))).sort();
+  // Фаза 19: "тип точки" стал фиксированным списком из 8 категорий (см.
+  // state.pointTypes, приходит с сервера через /api/me) — раньше здесь
+  // вычислялся динамический список из фактических значений клиентов,
+  // но теперь после миграции значения и так только из этого набора.
+  const pointTypes = state.pointTypes;
   const promoNames = Array.from(new Set(state.clients.flatMap((c) => (c.promotions || []).map((p) => p.promo)))).sort();
   const f = state.clientFilters;
   const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.ownerId || f.promo || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.onlyPromotions || f.onlyDiscount || f.showClosed || f.search;
@@ -1433,7 +1419,12 @@ async function openClientModal(client) {
         <label>Название *</label>
         <input name="name" required value="${client ? escapeAttr(client.name) : ''}">
         <div class="field-row">
-          <div><label>Тип точки</label><input name="pointType" value="${client ? escapeAttr(client.pointType) : ''}" placeholder="Салон красоты, мед.клиника..."></div>
+          <div><label>Тип точки</label>
+            <select name="pointType">
+              <option value="">не указан</option>
+              ${state.pointTypes.map((p) => `<option value="${escapeAttr(p)}" ${client && client.pointType === p ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
+            </select>
+          </div>
           <div><label>День визита</label>
             <select name="visitDay">
               <option value="">—</option>
@@ -1590,7 +1581,7 @@ function assortRow(p) {
   return `
     <div class="assort-row">
       <span>${escapeHtml(p.product)} <span class="brand-badge">${escapeHtml(p.brand || 'Прочее')}</span> ${stockBadgeHtml(p)}</span>
-      <span class="freq">${p.monthsCount} из 5 посл. мес · ~${p.avgQty} шт/мес · посл.: ${p.lastMonth}</span>
+      <span class="freq">${p.monthsCount} из 6 посл. мес · ~${p.avgQty} шт/мес · посл.: ${p.lastMonth}</span>
     </div>
   `;
 }
@@ -1674,7 +1665,7 @@ function renderAssortBody(items, brand, mode, excludeColorants) {
     return `
       ${normal.length ? renderGroupedAssort(normal) : '<div class="muted" style="font-size:13px;padding:4px 0">Нет позиций по этому фильтру.</div>'}
       ${risky.length ? `
-        <div class="assort-risk-heading">⚠️ Недопродано — не заказывали в последнем доступном месяце</div>
+        <div class="assort-risk-heading">⚠️ Недопродано — ещё не покупали в текущем месяце</div>
         ${risky.map(assortRow).join('')}
       ` : ''}
     `;
@@ -2067,7 +2058,8 @@ function openTaskModal(task, forceType, presetClientId) {
     ${isEdit && isStaff() ? `<div class="muted" style="font-size:12px;margin-bottom:8px">Создано: ${fmtDateTime(task.createdAt)} · ${escapeHtml(userName(task.createdBy))}</div>` : ''}
     <form id="task-form">
       <label>Клиент *</label>
-      <select name="clientId" required ${isEdit ? 'disabled' : ''}>
+      ${!isEdit ? '<input type="text" id="task-client-search" placeholder="Поиск клиента по названию..." autocomplete="off" style="margin-bottom:6px">' : ''}
+      <select name="clientId" id="task-client-select" required ${isEdit ? 'disabled' : ''}>
         ${myClients.map((c) => `<option value="${c.id}" ${(task && task.clientId === c.id) || (!isEdit && presetClientId && Number(presetClientId) === c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
       ${isEdit && taskClient && taskClient.phone ? `<div class="muted" style="font-size:13px;margin:-6px 0 10px">📞 ${telLink(taskClient.phone)}</div>` : ''}
@@ -2130,6 +2122,32 @@ function openTaskModal(task, forceType, presetClientId) {
   if (isEdit) wireAttachments(task);
   if (isEdit) wireDateChangeSection(task);
   if (isEdit && isSale) wireMeetingRecordSection(task);
+  if (!isEdit) wireTaskClientSearch(myClients, presetClientId);
+}
+
+// Поиск клиента в модалке создания задачи (в очереди с 02.09.2026, реализовано
+// в Фазе 18) — при сотнях клиентов у агента обычный <select> одним длинным
+// списком неудобен. Решение: текстовое поле над <select> живьём перестраивает
+// список опций по подстроке в названии клиента (без учёта регистра) — сам
+// <select> остаётся источником истины для отправки формы (clientId всегда
+// валиден), просто его опции сужаются на лету. Поле поиска есть только при
+// создании новой задачи — при редактировании клиент задачи заблокирован
+// (disabled select), искать нечего.
+function wireTaskClientSearch(myClients, presetClientId) {
+  const searchInput = document.getElementById('task-client-search');
+  const select = document.getElementById('task-client-select');
+  if (!searchInput || !select) return;
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    const currentValue = select.value;
+    const filtered = q ? myClients.filter((c) => (c.name || '').toLowerCase().includes(q)) : myClients;
+    select.innerHTML = filtered.map((c) => `<option value="${c.id}" ${String(c.id) === currentValue ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+    // Если текущий выбор отфильтрован — выбираем первый в списке (select
+    // required не пропустит пустое значение при отправке формы).
+    if (!filtered.some((c) => String(c.id) === currentValue) && filtered.length) {
+      select.value = String(filtered[0].id);
+    }
+  });
 }
 
 // ---------- Заявка на перенос даты задачи ----------
@@ -2505,6 +2523,10 @@ function renderTeam(content) {
           <a class="btn-secondary" href="/api/clients/export" download style="text-decoration:none;display:inline-block" title="Ручные поля клиентов (адрес/телефон/контакт/маршрут/договор/заметки и т.п.) — чтобы перенести правки в новую базу при следующей пересборке">⬇ Выгрузить клиентов</a>
           <button type="button" class="btn-secondary" id="client-import-btn" title="Обновить ручные поля уже существующих клиентов из ранее выгруженного файла — по имени и агенту, без дублей">⬆ Загрузить клиентов</button>
           <input type="file" id="client-import-input" accept=".json" style="display:none">
+          <button type="button" class="btn-secondary" id="debts-import-btn" title="Обновить задолженность по всем клиентам из файла .xlsx/.csv — без пересборки архива. Полностью заменяет прежний снимок долгов (клиент, которого нет в новом файле, — долг 0).">⬆ Загрузить долги</button>
+          <input type="file" id="debts-import-input" accept=".xlsx,.csv" style="display:none">
+          <button type="button" class="btn-secondary" id="stock-import-btn" title="Обновить остаток на складе по позициям ассортимента из файла .xlsx/.csv — без пересборки архива. Полностью заменяет прежний снимок остатков.">⬆ Загрузить остатки</button>
+          <input type="file" id="stock-import-input" accept=".xlsx,.csv" style="display:none">
           <a class="btn-secondary" href="/api/backup" style="text-decoration:none;display:inline-block" title="Полный архив: клиенты, задачи, сотрудники, вложения">Скачать резервную копию (всё)</a>
           <button class="btn-primary" id="add-user-btn">+ Сотрудник</button>
         </div>
@@ -2553,6 +2575,43 @@ function renderTeam(content) {
       }
     });
   }
+  // Загрузка долгов/остатков напрямую через панель (Фаза 19, 04.09.2026) —
+  // без пересборки архива, файл .xlsx или .csv. Оба эндпойнта полностью
+  // заменяют прежний снимок (см. пояснение в src/api.js) — предупреждаем об
+  // этом в подтверждении перед отправкой.
+  function wireTableUploadButton(btnId, inputId, endpoint, confirmText, successMsg) {
+    const btn = document.getElementById(btnId);
+    const input = document.getElementById(inputId);
+    if (!btn || !input) return;
+    btn.addEventListener('click', () => input.click());
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return;
+      if (!confirm(confirmText)) { input.value = ''; return; }
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const result = await apiUpload(endpoint, fd);
+        alert(successMsg(result));
+        await loadAll();
+        render();
+      } catch (e) {
+        alert('Ошибка загрузки: ' + e.message);
+      } finally {
+        input.value = '';
+      }
+    });
+  }
+  wireTableUploadButton(
+    'debts-import-btn', 'debts-import-input', '/api/debts/import',
+    'Это полностью заменит текущие данные о долгах у всех клиентов (клиент, которого нет в новом файле, останется с долгом 0). Продолжить?',
+    (r) => `Готово. Строк в файле: ${r.parsedRows}, сопоставлено с клиентами: ${r.matchedClients}.`
+  );
+  wireTableUploadButton(
+    'stock-import-btn', 'stock-import-input', '/api/stock/import',
+    'Это полностью заменит текущие остатки склада на позициях ассортимента у всех клиентов. Продолжить?',
+    (r) => `Готово. Товарных строк в файле: ${r.parsedRows}. Дата "снято на" обновлена: ${r.stockAsOf}.`
+  );
   const tbody = document.getElementById('users-tbody');
   state.users.forEach((u) => {
     const row = el(`
