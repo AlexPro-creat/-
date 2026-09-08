@@ -248,6 +248,42 @@ function migrateDocumentsStatus() {
   }
 }
 
+// Общая логика перевода задачи со СТАРЫХ (более не существующих) этапов на
+// актуальную схему — используется и в migrateLegacyTaskStages() ниже (для уже
+// хранящихся в базе задач, на каждом старте сервера), и в /api/tasks/import
+// (см. ниже) — для задач, приходящих из файла резервной выгрузки, который мог
+// быть сделан ДО обновления кода (Фаза 22, найдено 08.09.2026: пользователь
+// загрузил файл с задачами-продажами на старом этапе "call" — они успешно
+// вставлялись в базу, но не появлялись на доске, т.к. новая доска знает только
+// TASK_STAGES/in_progress-done-not_done-archive, а миграция при старте сервера
+// применяется только к уже хранящимся записям, не к тем, что приходят через
+// импорт уже ПОСЛЕ старта). Принимает { taskType, stage, tags, report, explanation }
+// (не обязательно полный объект задачи — подходит и для "сырых" данных из файла
+// импорта, у которых ещё нет id), возвращает { stage, tags, report } — то, что
+// нужно применить (report возвращается только если его стоит переписать).
+function normalizeLegacyTaskStage({ taskType, stage, tags, report, explanation }) {
+  const result = { stage, tags: Array.isArray(tags) ? tags.slice() : [] };
+  if (stage === 'waiting' || stage === 'failed') {
+    const tagToAdd = stage === 'waiting' ? 'Лист ожидания' : 'Прогрев';
+    if (!result.tags.includes(tagToAdd)) result.tags.push(tagToAdd);
+    result.stage = 'in_progress';
+  }
+  // Фаза 22 (08.09.2026): у 'sale' была отдельная воронка со своими этапами
+  // (звонок/call, встреча/meeting, сделка/deal, провал/fail) — переводим старые
+  // задачи на новую общую схему TASK_STAGES: call/meeting (ещё не закрыта) →
+  // in_progress, deal (успех) → done, fail (провал) → not_done. Старое
+  // пояснение (explanation) отдельного поля для 'sale' в интерфейсе больше нет —
+  // переносим его содержимое в report, если сам report ещё пустой, чтобы не
+  // потерять уже записанные пояснения по старым сделкам/звонкам.
+  if (taskType === 'sale' && ['call', 'meeting', 'deal', 'fail'].includes(result.stage)) {
+    result.stage = (result.stage === 'deal') ? 'done' : (result.stage === 'fail') ? 'not_done' : 'in_progress';
+    if (!String(report || '').trim() && String(explanation || '').trim()) {
+      result.report = explanation;
+    }
+  }
+  return result;
+}
+
 function migrateLegacyTaskStages() {
   db.beginBatch();
   try {
@@ -257,27 +293,11 @@ function migrateLegacyTaskStages() {
         db.remove('tasks', t.id);
         return;
       }
+      const norm = normalizeLegacyTaskStage(t);
       const patch = {};
-      if (t.stage === 'waiting' || t.stage === 'failed') {
-        const tagToAdd = t.stage === 'waiting' ? 'Лист ожидания' : 'Прогрев';
-        const tags = Array.isArray(t.tags) ? t.tags.slice() : [];
-        if (!tags.includes(tagToAdd)) tags.push(tagToAdd);
-        patch.stage = 'in_progress';
-        patch.tags = tags;
-      }
-      // Фаза 22 (08.09.2026): у 'sale' была отдельная воронка со своими этапами
-      // (звонок/call, встреча/meeting, сделка/deal, провал/fail) — переводим старые
-      // задачи на новую общую схему TASK_STAGES: call/meeting (ещё не закрыта) →
-      // in_progress, deal (успех) → done, fail (провал) → not_done. Старое
-      // пояснение (explanation) отдельного поля для 'sale' в интерфейсе больше нет —
-      // переносим его содержимое в report, если сам report ещё пустой, чтобы не
-      // потерять уже записанные пояснения по старым сделкам/звонкам.
-      if (t.taskType === 'sale' && ['call', 'meeting', 'deal', 'fail'].includes(t.stage)) {
-        patch.stage = (t.stage === 'deal') ? 'done' : (t.stage === 'fail') ? 'not_done' : 'in_progress';
-        if (!String(t.report || '').trim() && String(t.explanation || '').trim()) {
-          patch.report = t.explanation;
-        }
-      }
+      if (norm.stage !== t.stage) patch.stage = norm.stage;
+      if (norm.report !== undefined) patch.report = norm.report;
+      if ((t.tags || []).join('|') !== norm.tags.join('|')) patch.tags = norm.tags;
       if (t.report === undefined) patch.report = '';
       if (t.taskType === undefined) patch.taskType = 'visit';
       if (t.dateChangeRequest === undefined) patch.dateChangeRequest = null;
@@ -1649,17 +1669,28 @@ function register(router) {
       const key = [norm(client.name), t.title, t.dueDate, t.createdAt].join('||');
       if (existingKeys.has(key)) { skippedDuplicate++; return; }
       const creator = t.createdByName ? usersByName[norm(t.createdByName)] : null;
+      // Файл резервной выгрузки может быть сделан ДО обновления кода и содержать
+      // уже отменённые значения stage ("call"/"meeting"/"deal"/"fail"/"waiting"/
+      // "failed") — без этой нормализации задача вставится "как есть" и станет
+      // невидимой на доске (текущие колонки знают только актуальные ключи
+      // TASK_STAGES/WAITLIST_STAGES), т.к. миграция при старте сервера применяется
+      // только к уже хранящимся записям, а не к тем, что приходят через импорт
+      // уже после старта (см. normalizeLegacyTaskStage выше — Фаза 22, 08.09.2026).
+      const taskType = t.taskType === 'sale' ? 'sale' : (t.taskType === 'waitlist' ? 'waitlist' : 'visit');
+      const legacyNorm = normalizeLegacyTaskStage({
+        taskType, stage: t.stage || 'in_progress', tags: t.tags, report: t.report, explanation: t.explanation
+      });
       db.insert('tasks', {
         clientId: client.id,
-        taskType: t.taskType === 'sale' ? 'sale' : (t.taskType === 'waitlist' ? 'waitlist' : 'visit'),
+        taskType,
         title: t.title || '',
         description: t.description || '',
         dueDate: t.dueDate,
         visitTime: t.visitTime || '',
-        stage: t.stage || 'in_progress',
-        tags: Array.isArray(t.tags) ? t.tags : [],
+        stage: legacyNorm.stage,
+        tags: legacyNorm.tags,
         comment: t.comment || '',
-        report: t.report || '',
+        report: legacyNorm.report !== undefined ? legacyNorm.report : (t.report || ''),
         explanation: t.explanation || '',
         dateChangeRequest: null,
         attachments: [],
