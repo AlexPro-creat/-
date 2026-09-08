@@ -11,23 +11,35 @@ const IMPORT_DIR = path.join(__dirname, '..', 'data', 'import');
 
 // ---- Правка 01.09.2026: "протухание" данных за текущий месяц ----
 // currentMonthRevenue/currentMonthItems (продажи "текущего месяца") и promotions
-// (акции) на клиенте считаются из ПОСЛЕДНЕГО присланного реестра — сейчас это
-// август 2026. Раньше эти показатели продолжали показывать цифры августа даже
-// после того, как реальный календарь ушёл в сентябрь и далее — что выглядело
-// как "продажи за этот месяц", хотя по факту это уже прошлый месяц без новых
-// данных. Пользователь явно попросил: пока не пришлют новый реестр за новый
-// месяц, все такие показатели должны быть 0, а не "зависать" на цифрах августа.
+// (акции) на клиенте считаются из ПОСЛЕДНЕГО присланного реестра. Раньше эти
+// показатели продолжали показывать цифры прошлого месяца даже после того, как
+// реальный календарь ушёл дальше — что выглядело как "продажи за этот месяц",
+// хотя по факту это уже прошлый месяц без новых данных. Пользователь явно
+// попросил: пока не пришлют новый реестр за новый месяц, все такие показатели
+// должны быть 0, а не "зависать" на цифрах прошлого месяца.
 // ВАЖНО: это НЕ относится к остаткам склада и задолженности — они снимок на
 // дату (не "поток за месяц") и по решению пользователя продолжают показывать
 // последнее известное значение, но с явной пометкой "на такое-то число"
 // (см. STOCK_AS_OF ниже и client.debtAsOf, уже существовавшее поле).
 //
-// Обновить при добавлении нового реестра продаж (например, за сентябрь):
+// Фаза 22 (08.09.2026): загружен срез продаж за 01.09–07.09.26 (частичная
+// неделя, не полный месяц — пользователь явно выбрал загрузить как срез, а не
+// ждать закрытия сентября) — `data/import/current_month_sales.json` заменён
+// содержимым за сентябрь (было — август), `CURRENT_MONTH_DATA_STALE_FROM`
+// передвинут на 1-е октября. Как и всегда с этим показателем — это именно
+// "продано в текущем месяце НА СЕГОДНЯ", растущий по ходу месяца снимок, а не
+// прогноз на весь месяц; когда придёт более полная выгрузка за сентябрь —
+// заменить файл ещё раз тем же способом, дату протухания не трогать (она уже
+// верна до конца сентября).
+//
+// Обновить при добавлении нового реестра продаж (например, за октябрь):
 // 1) добавить новый месяц в MONTH_ORDER (src/import.js) и во все MONTHS-списки
-//    python-пайплайна (см. Технические заметки в статус-документе проекта);
+//    python-пайплайна (см. Технические заметки в статус-документе проекта) —
+//    ТОЛЬКО когда сентябрь закроется целиком и станет частью 7-месячного окна
+//    регулярного ассортимента, не раньше;
 // 2) передвинуть CURRENT_MONTH_DATA_STALE_FROM на 1-е число месяца, СЛЕДУЮЩЕГО
-//    за новым последним месяцем (сейчас: сентябрь 2026 → '2026-10-01').
-const CURRENT_MONTH_DATA_STALE_FROM = new Date('2026-09-01T00:00:00');
+//    за новым последним месяцем (сейчас: сентябрь 2026 → '2026-10-01', уже сделано).
+const CURRENT_MONTH_DATA_STALE_FROM = new Date('2026-10-01T00:00:00');
 function isCurrentMonthDataFresh() {
   return new Date() < CURRENT_MONTH_DATA_STALE_FROM;
 }
@@ -97,16 +109,18 @@ const TASK_STAGES = [
 
 const STAFF_ONLY_STAGES = ['archive'];
 
-// Воронка активной продажи (звонок → встреча → сделка/провал) — отдельный тип
-// задачи (taskType: 'sale'), со своим набором этапов, независимым от обычных
-// визитных задач (taskType: 'visit', тип по умолчанию для всех старых задач).
-const SALE_STAGES = [
-  { key: 'call', label: 'Звонок' },
-  { key: 'meeting', label: 'Встреча' },
-  { key: 'deal', label: 'Сделка' },
-  { key: 'fail', label: 'Провал' }
-];
-const SALE_FINAL_STAGES = ['deal', 'fail']; // требуют аудио+пояснение встречи перед переходом
+// "Продажа" (taskType: 'sale') — до Фазы 22 была отдельной воронкой со своими
+// этапами (звонок → встреча → сделка/провал), обязательным пояснением перед
+// закрытием и отдельным разделом аудиозаписи встречи. Пользователь явно
+// попросил переделать её в "односложную задачу по клиенту без этапов, просто
+// задача" — с Фазы 22 задача типа 'sale' технически устроена ТОЧНО ТАК ЖЕ, как
+// обычный визит (использует TASK_STAGES/ACTIVE_STAGES, отчёт при закрытии в
+// "Выполнена" обязателен так же, как у визита), различается только своим
+// собственным набором тегов (SALE_TAGS ниже — бренды + "Договор") и заголовком
+// формы/списком в интерфейсе, чтобы сохранить отдельную вкладку для фильтрации.
+// Старые задачи на прежних этапах (call/meeting/deal/fail) мигрируются в новую
+// схему в migrateLegacyTaskStages() (см. ниже) при каждом старте сервера.
+const SALE_TAGS = ['Kapous', 'Studio', 'EPICA', 'Чистовье', 'Палитра', 'AV/ES/PRO/MS', 'Договор'];
 
 // Воронка "Лист ожидания" (клиент ждёт товар, которого сейчас нет в наличии) —
 // отдельный тип задачи (taskType: 'waitlist'). Финальный этап "получена" закрывает
@@ -137,10 +151,10 @@ function nextDateForWeekday(weekdayName) {
 
 const TASK_TAGS = ['Kapous', 'Studio', 'EPICA', 'Чистовье', 'AV/ES/PRO/MS', 'новый клиент', 'Технолог', 'Долги'];
 const ACTIVE_STAGES = ['in_progress'];
-const SALE_ACTIVE_STAGES = ['call', 'meeting'];
-// Общий помощник: активна ли задача (не закрыта), независимо от её типа (визит/продажа).
+// Общий помощник: активна ли задача (не закрыта), независимо от её типа. С Фазы
+// 22 'sale' по этапам устроена так же, как 'visit' (общий ACTIVE_STAGES) — своя
+// ветка осталась только у 'waitlist', у которой этапы по-прежнему другие.
 function isActiveStage(task) {
-  if (task.taskType === 'sale') return SALE_ACTIVE_STAGES.includes(task.stage);
   if (task.taskType === 'waitlist') return WAITLIST_ACTIVE_STAGES.includes(task.stage);
   return ACTIVE_STAGES.includes(task.stage);
 }
@@ -157,6 +171,83 @@ function isActiveStage(task) {
 // эти миграции проходят по ВСЕМ записям и почти для каждой вызывают db.update —
 // без пакетного режима это O(n²) от размера базы (полная запись файла на диск
 // на каждый вызов) и на реальном объёме данных ощутимо задерживает старт сервера.
+// Фаза 22 (08.09.2026): агента "Анастасия" переименовали в "Бегимай" — логин
+// (anastasia@cosmedica.local) и пароль остались прежними, поменялось только
+// отображаемое имя. На чистой установке ensureExtraAgents() (import.js) уже
+// создаёт пользователя сразу с именем "Бегимай", но на уже развёрнутой у
+// пользователя базе (Render) запись создана раньше под старым именем
+// "Анастасия" — эта миграция переименовывает её по email, идемпотентно.
+//
+// ВАЖНО — порядок вызова: должна выполняться ДО runImport() (server.js), а не
+// вместе с остальными миграциями после него. agents_clients.json теперь хранит
+// "agent": "Бегимай" у всех её точек; runImport() сопоставляет владельца клиента
+// с пользователем по ИМЕНИ (agentUserMap() в import.js), используя ИМЯ, каким
+// оно было в базе на момент запуска импорта. Если бы эта миграция выполнялась
+// после runImport() (как остальные), на не-чистой установке импорт увидел бы
+// ещё старое имя "Анастасия" в базе, не нашёл бы совпадения с "Бегимай" из
+// agents_clients.json и создал бы 131 дублирующего клиента под администратором
+// вместо того, чтобы обновить существующие записи агента — воспроизведено и
+// проверено вручную на копии базы со старым именем перед тем, как это исправить.
+function migrateAgentRenames() {
+  db.beginBatch();
+  try {
+    const begimai = db.all('users').find((u) => u.email === 'anastasia@cosmedica.local' && u.role === 'agent');
+    if (begimai && begimai.name !== 'Бегимай') db.update('users', begimai.id, { name: 'Бегимай' });
+  } finally {
+    db.endBatch();
+  }
+}
+
+// Фаза 22 (08.09.2026): пользователь прислал файл "Клиенты по документам.xlsx"
+// (211 строк: № + название клиента, без заголовка) с просьбой отметить этих
+// клиентов в карточке в поле "работают по документам". Это тот же концептуально
+// признак, что уже был в карточке под названием contractStatus/«работает по
+// договору» (см. CONTRACT_STATUSES выше, введено в более ранней фазе — файл
+// был прислан повторно, структура совпадает почти полностью, просто выросла база
+// клиентов) — решено не заводить отдельное поле, а расширить существующее.
+//
+// Сопоставление имён из файла с базой (816 клиентов) сделано вне сервера —
+// нормализация + сначала подстрока, затем пересечение "отличительных" слов
+// (без родовых "ип"/"осоо"/"магазин"/"салон" и т.п.) минимум по двум словам —
+// результат сохранён в data/import/documents_status.json (82 клиента, agent —
+// имя владельца на момент сопоставления, "Бегимай" уже после переименования).
+// Совпадения на один-единственный отличительный токен (28 шт.) и полностью
+// не сопоставленные (69 шт.) сознательно НЕ включены — среди них при ручной
+// проверке нашлись ложные срабатывания на самом деле общих слов (название
+// улицы, "больница", "институт", распространённое имя) — решили не гадать
+// (см. правило "не гадать" в работе с этим пользователем) и оставить как есть,
+// не отмечая «да» без достаточной уверенности; это НЕ ошибка/недоделка, а
+// сознательное решение о пороге уверенности, задокументированное здесь и в
+// статус-документе проекта. Как и переименование агента, contractStatus у уже
+// существующих клиентов НЕ обновляется автоматически при обычном импорте (see
+// runImport() — computedFields не включает contractStatus для уже существующих
+// записей, он выставляется только при создании), поэтому нужна отдельная
+// идемпотентная миграция здесь. Апгрейдим только с "неизвестно" — если админ
+// уже вручную поставил "да" или явно "нет", не трогаем (уважаем ручную правку).
+function migrateDocumentsStatus() {
+  let list;
+  try {
+    list = JSON.parse(fs.readFileSync(path.join(IMPORT_DIR, 'documents_status.json'), 'utf8'));
+  } catch (e) {
+    return;
+  }
+  const usersByName = {};
+  db.all('users').forEach((u) => { usersByName[norm(u.name)] = u; });
+  db.beginBatch();
+  try {
+    list.forEach((row) => {
+      const owner = usersByName[norm(row.agent)];
+      if (!owner) return;
+      const client = db.all('clients').find((c) => norm(c.name) === norm(row.name) && c.ownerId === owner.id);
+      if (client && client.contractStatus === 'неизвестно') {
+        db.update('clients', client.id, { contractStatus: 'да' });
+      }
+    });
+  } finally {
+    db.endBatch();
+  }
+}
+
 function migrateLegacyTaskStages() {
   db.beginBatch();
   try {
@@ -173,6 +264,19 @@ function migrateLegacyTaskStages() {
         if (!tags.includes(tagToAdd)) tags.push(tagToAdd);
         patch.stage = 'in_progress';
         patch.tags = tags;
+      }
+      // Фаза 22 (08.09.2026): у 'sale' была отдельная воронка со своими этапами
+      // (звонок/call, встреча/meeting, сделка/deal, провал/fail) — переводим старые
+      // задачи на новую общую схему TASK_STAGES: call/meeting (ещё не закрыта) →
+      // in_progress, deal (успех) → done, fail (провал) → not_done. Старое
+      // пояснение (explanation) отдельного поля для 'sale' в интерфейсе больше нет —
+      // переносим его содержимое в report, если сам report ещё пустой, чтобы не
+      // потерять уже записанные пояснения по старым сделкам/звонкам.
+      if (t.taskType === 'sale' && ['call', 'meeting', 'deal', 'fail'].includes(t.stage)) {
+        patch.stage = (t.stage === 'deal') ? 'done' : (t.stage === 'fail') ? 'not_done' : 'in_progress';
+        if (!String(t.report || '').trim() && String(t.explanation || '').trim()) {
+          patch.report = t.explanation;
+        }
       }
       if (t.report === undefined) patch.report = '';
       if (t.taskType === undefined) patch.taskType = 'visit';
@@ -432,9 +536,9 @@ function register(router) {
     sendJson(res, 200, {
       user: publicUser(req.user),
       stages: isStaff(req.user) ? TASK_STAGES : TASK_STAGES.filter((s) => !STAFF_ONLY_STAGES.includes(s.key)),
-      saleStages: SALE_STAGES,
       waitlistStages: isStaff(req.user) ? WAITLIST_STAGES : WAITLIST_STAGES.filter((s) => !WAITLIST_STAFF_ONLY_STAGES.includes(s.key)),
       waitlistTags: WAITLIST_TAGS,
+      saleTags: SALE_TAGS,
       paymentMethods: PAYMENT_METHODS,
       pointTypes: POINT_TYPES,
       contractStatuses: CONTRACT_STATUSES,
@@ -793,9 +897,9 @@ function register(router) {
     sendJson(res, 200, {
       tasks: scoped(db.all('tasks'), req.user, 'assigneeId'),
       stages: isStaff(req.user) ? TASK_STAGES : TASK_STAGES.filter((s) => !STAFF_ONLY_STAGES.includes(s.key)),
-      saleStages: SALE_STAGES,
       waitlistStages: isStaff(req.user) ? WAITLIST_STAGES : WAITLIST_STAGES.filter((s) => !WAITLIST_STAFF_ONLY_STAGES.includes(s.key)),
-      waitlistTags: WAITLIST_TAGS
+      waitlistTags: WAITLIST_TAGS,
+      saleTags: SALE_TAGS
     });
   }));
 
@@ -828,19 +932,22 @@ function register(router) {
     }
     const assigneeId = isStaff(req.user) && body.assigneeId ? Number(body.assigneeId) : (req.user.role === 'agent' ? req.user.id : client.ownerId);
     const taskType = body.taskType === 'sale' ? 'sale' : (body.taskType === 'waitlist' ? 'waitlist' : 'visit');
-    const tags = Array.isArray(body.tags) ? body.tags.filter((t) => (taskType === 'waitlist' ? WAITLIST_TAGS : TASK_TAGS).includes(t)) : [];
+    const allowedTagsForType = taskType === 'waitlist' ? WAITLIST_TAGS : (taskType === 'sale' ? SALE_TAGS : TASK_TAGS);
+    const tags = Array.isArray(body.tags) ? body.tags.filter((t) => allowedTagsForType.includes(t)) : [];
+    // С Фазы 22 'sale' — односложная задача без собственных этапов (см. комментарий
+    // у SALE_TAGS выше): создаётся сразу в "in_progress", как и визит, только с
+    // другим заголовком по умолчанию и своим набором тегов (бренды + "Договор").
     const task = db.insert('tasks', {
       clientId: Number(body.clientId),
       taskType,
-      title: body.title || (taskType === 'sale' ? `Звонок: ${client.name}` : taskType === 'waitlist' ? `Ожидание товара: ${client.name}` : `Посетить: ${client.name}`),
+      title: body.title || (taskType === 'sale' ? `Продажа: ${client.name}` : taskType === 'waitlist' ? `Ожидание товара: ${client.name}` : `Посетить: ${client.name}`),
       description: body.description || '',
       dueDate: body.dueDate,
       visitTime: taskType === 'visit' ? (body.visitTime || '') : '',
-      stage: taskType === 'sale' ? 'call' : (taskType === 'waitlist' ? 'waiting' : 'in_progress'),
+      stage: taskType === 'waitlist' ? 'waiting' : 'in_progress',
       tags,
       comment: '',
       report: '',
-      explanation: '',
       dateChangeRequest: null,
       attachments: [],
       assigneeId,
@@ -868,19 +975,18 @@ function register(router) {
     }
 
     const patch = { updatedAt: new Date().toISOString() };
-    ['title', 'description', 'dueDate', 'visitTime', 'comment', 'report', 'explanation'].forEach((f) => {
+    ['title', 'description', 'dueDate', 'visitTime', 'comment', 'report'].forEach((f) => {
       if (body[f] !== undefined) patch[f] = body[f];
     });
-    const isSale = task.taskType === 'sale';
     const isWaitlist = task.taskType === 'waitlist';
+    // С Фазы 22 'sale' по тегам и этапам ведёт себя как обычная задача (visit) —
+    // своя ветка тегов осталась только у 'waitlist'.
     if (body.tags !== undefined) {
-      const allowedTags = isWaitlist ? WAITLIST_TAGS : TASK_TAGS;
+      const allowedTags = isWaitlist ? WAITLIST_TAGS : (task.taskType === 'sale' ? SALE_TAGS : TASK_TAGS);
       patch.tags = Array.isArray(body.tags) ? body.tags.filter((t) => allowedTags.includes(t)) : [];
     }
     if (body.stage !== undefined) {
-      if (isSale) {
-        if (SALE_STAGES.some((s) => s.key === body.stage)) patch.stage = body.stage;
-      } else if (isWaitlist) {
+      if (isWaitlist) {
         if (WAITLIST_STAGES.some((s) => s.key === body.stage)) {
           // "Товар получен клиентом" (закрытая) — подтверждает только админ/супервайзер, как «Архив» у визитов.
           if (WAITLIST_STAFF_ONLY_STAGES.includes(body.stage) && !isStaff(req.user)) {
@@ -889,7 +995,7 @@ function register(router) {
           patch.stage = body.stage;
         }
       } else if (TASK_STAGES.some((s) => s.key === body.stage)) {
-        // "Архив" — только админ/супервайзер подтверждают выполненный визит и переносят туда сами.
+        // "Архив" — только админ/супервайзер подтверждают выполненную задачу и переносят туда сами.
         if (STAFF_ONLY_STAGES.includes(body.stage) && !isStaff(req.user)) {
           return sendJson(res, 403, { error: 'Перевести задачу в архив может только администратор или супервайзер' });
         }
@@ -899,21 +1005,13 @@ function register(router) {
 
     const finalStage = patch.stage !== undefined ? patch.stage : task.stage;
     const finalReport = patch.report !== undefined ? patch.report : task.report;
-    const finalExplanation = patch.explanation !== undefined ? patch.explanation : task.explanation;
 
-    // Нельзя перевести визитную задачу в "Выполнена" без заполненного отчёта.
-    if (!isSale && finalStage === 'done' && !String(finalReport || '').trim()) {
+    // Нельзя перевести задачу в "Выполнена" без заполненного отчёта — с Фазы 22
+    // действует и для 'sale' тоже (раньше у неё было отдельное обязательное
+    // "пояснение" перед закрытием в "Сделка"/"Провал"; своих этапов больше нет,
+    // так что действует общее правило отчёта, как у визита/листа ожидания).
+    if (!isWaitlist && finalStage === 'done' && !String(finalReport || '').trim()) {
       return sendJson(res, 400, { error: 'Заполните отчёт по задаче — без него нельзя перевести в «Выполнена»' });
-    }
-
-    // Задачу воронки продажи нельзя закрыть в "Сделка"/"Провал" без короткого
-    // пояснения (аудиозапись встречи раньше тоже была обязательна — убрано по
-    // решению пользователя 28.08.2026; загрузка записи осталась доступна
-    // добровольно в разделе "Записи встреч" у клиента).
-    if (isSale && SALE_FINAL_STAGES.includes(finalStage) && task.stage !== finalStage) {
-      if (!String(finalExplanation || '').trim()) {
-        return sendJson(res, 400, { error: 'Добавьте короткое пояснение — без него нельзя закрыть в «Сделка»/«Провал»' });
-      }
     }
 
     if (isStaff(req.user)) {
@@ -960,9 +1058,12 @@ function register(router) {
       }
     }
 
-    // Провал в воронке продажи — автоматически выгружаем строку в Google Таблицу
-    // (для анализа ситуации), без блокировки ответа пользователю.
-    if (isSale && finalStage === 'fail' && task.stage !== 'fail') {
+    // Несостоявшаяся продажа — автоматически выгружаем строку в Google Таблицу
+    // (для анализа ситуации), без блокировки ответа пользователю. С Фазы 22 у
+    // 'sale' нет отдельного этапа "Провал" — ближайший аналог в общей схеме
+    // TASK_STAGES это "Не выполнена" (not_done); в качестве пояснения берём отчёт
+    // по задаче (report), который теперь обязателен при закрытии.
+    if (task.taskType === 'sale' && finalStage === 'not_done' && task.stage !== 'not_done') {
       const client = db.find('clients', updated.clientId);
       const agent = db.find('users', updated.assigneeId);
       googleSheets.appendRow([
@@ -970,7 +1071,7 @@ function register(router) {
         client ? client.name : '',
         agent ? agent.name : '',
         updated.title,
-        updated.explanation || '',
+        updated.report || '',
         updated.dueDate || ''
       ]).catch(() => {});
     }
@@ -1016,7 +1117,12 @@ function register(router) {
   }));
 
   // ---- Записи встреч (аудио + пояснение), привязаны к клиенту и к конкретной задаче ----
-
+  //
+  // Фаза 22 (08.09.2026): интерфейс больше не показывает эту секцию у задач
+  // "Продажа" (упрощена в обычную задачу без обязательной аудиозаписи встречи
+  // перед закрытием) — эндпоинт оставлен нетронутым (не вызывается фронтендом),
+  // чтобы не терять уже сохранённые записи у существующих клиентов и на случай,
+  // если функцию решат вернуть.
   router.post('/api/tasks/:id/meeting-record', requireAuth(async (req, res, params) => {
     const task = db.find('tasks', params.id);
     if (!task) return sendJson(res, 404, { error: 'Не найдено' });
@@ -1161,12 +1267,14 @@ function register(router) {
   // Экспорт проваленных задач воронки продажи в CSV (работает уже сейчас, без
   // настройки Google Таблицы — можно скачать и залить на Диск вручную).
   router.get('/api/tasks/failed-export', requireStaff(async (req, res) => {
-    const failed = db.all('tasks').filter((t) => t.taskType === 'sale' && t.stage === 'fail');
-    const rows = [['Дата', 'Клиент', 'Агент', 'Задача', 'Пояснение', 'Срок']];
+    // С Фазы 22 у 'sale' нет отдельного этапа "Провал" — берём задачи типа "Продажа"
+    // в этапе "Не выполнена" (not_done), это ближайший аналог в общей схеме TASK_STAGES.
+    const failed = db.all('tasks').filter((t) => t.taskType === 'sale' && t.stage === 'not_done');
+    const rows = [['Дата', 'Клиент', 'Агент', 'Задача', 'Отчёт', 'Срок']];
     failed.forEach((t) => {
       const client = db.find('clients', t.clientId);
       const agent = db.find('users', t.assigneeId);
-      rows.push([t.updatedAt || t.createdAt, client ? client.name : '', agent ? agent.name : '', t.title, t.explanation || '', t.dueDate || '']);
+      rows.push([t.updatedAt || t.createdAt, client ? client.name : '', agent ? agent.name : '', t.title, t.report || '', t.dueDate || '']);
     });
     const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const buf = Buffer.from('﻿' + csv, 'utf8'); // BOM — чтобы Excel корректно показал кириллицу
@@ -1679,7 +1787,10 @@ function register(router) {
     const byStage = TASK_STAGES.map((s) => ({
       key: s.key, label: s.label, count: tasks.filter((t) => t.taskType !== 'sale' && t.stage === s.key).length
     }));
-    const byStageSale = SALE_STAGES.map((s) => ({
+    // С Фазы 22 у 'sale' те же этапы, что и у визита (TASK_STAGES) — отдельного
+    // SALE_STAGES больше нет, но разбивку по продажам оставляем отдельным блоком
+    // (у неё своя вкладка в интерфейсе).
+    const byStageSale = TASK_STAGES.map((s) => ({
       key: s.key, label: s.label, count: tasks.filter((t) => t.taskType === 'sale' && t.stage === s.key).length
     }));
 
@@ -1892,9 +2003,11 @@ function register(router) {
           Чистовье: topByBrand('Чистовье', false)
         },
         atRiskClientsCount: atRiskClients.length,
-        callsToday: saleTasksToday.filter((t) => t.stage === 'call').length,
-        meetingsToday: saleTasksToday.filter((t) => t.stage === 'meeting').length,
-        doneTasksToday: tasks.filter((t) => t.dueDate === today && (t.stage === 'done' || t.stage === 'deal')).length,
+        // С Фазы 22 у 'sale' нет отдельных этапов "звонок"/"встреча" — вместо них
+        // считаем задачи "Продажа" на сегодня (всего/закрыто), см. saleTasksToday выше.
+        salesToday: saleTasksToday.length,
+        salesDoneToday: saleTasksToday.filter((t) => t.stage === 'done').length,
+        doneTasksToday: tasks.filter((t) => t.dueDate === today && t.stage === 'done').length,
         overdueTasksCount: overdueTasks.length
       };
     }
@@ -1903,4 +2016,4 @@ function register(router) {
   }));
 }
 
-module.exports = { register, migrateLegacyTaskStages, migrateClientDefaults, migrateUserDefaults, TASK_STAGES, TASK_TAGS, PAYMENT_METHODS, CONTRACT_STATUSES, sendJson, UPLOADS_DIR };
+module.exports = { register, migrateAgentRenames, migrateDocumentsStatus, migrateLegacyTaskStages, migrateClientDefaults, migrateUserDefaults, TASK_STAGES, TASK_TAGS, PAYMENT_METHODS, CONTRACT_STATUSES, sendJson, UPLOADS_DIR };

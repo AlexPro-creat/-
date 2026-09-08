@@ -1,0 +1,494 @@
+[
+  {
+    "name": "Клиника Иметкуловой",
+    "agent": "Татьяна",
+    "sourceName": "«Клиника Иметкуловой» ИП Иметкулова Жаныл Болотбековна",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Aruu Store Джал ИП Асылбек улуу  Калыс",
+    "agent": "Жанара",
+    "sourceName": "Aruu Store Джал ИП Асылбек уулу Калыс",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Dr.Batraliev clinic ИП Батралиев Н.Ш",
+    "agent": "Татьяна",
+    "sourceName": "Dr.Batraliev clinic, ИП Батралиев Нордибек Шухратжанович",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Магазин Ак-Куш Сеул ИП Абасов",
+    "agent": "Жанара",
+    "sourceName": "АК КУШ Сеул ИП Абасов Гягжали Гади-Оглы Филиал",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Бьюти Шоурум Ала Арча (ИП Бабаджанов Адылжан.)",
+    "agent": "Жанара",
+    "sourceName": "Бьюти шоурум  ТРЦ Ала Арча Бабаджанов Адылжан Сабиржанович",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Бьюти Шоурум Глобус (ИП Бабаджанов Алымжан.)",
+    "agent": "Жанара",
+    "sourceName": "Бьюти шоурум ГЛОБУС склад №1 павильон ИП Бабаджанов Алымжан Адылжанович",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Бьюти Шоурум  Исанова (ИП Пак И.)",
+    "agent": "Жанара",
+    "sourceName": "Бьюти шоурум Исанова ИП ПАК Ирина Константиновна",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Бьюти Шоурум Ред Центр (ИП Бабаджанова Адиля.)",
+    "agent": "Жанара",
+    "sourceName": "Бьюти шоурум ТЦ РЕд-Центр ИП Бабаджанова Адиля Адылжановна",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Золотое яблоко ИП Ильина",
+    "agent": "Альбина",
+    "sourceName": "Золотое яблоко ИП Ильина Анна Сергеевна",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ЦУМ В2 Ирина (Алдамжарова Ирина)",
+    "agent": "Жанара",
+    "sourceName": "ИП  Алдамжарова Ирина Сергеевна ТЦ ЦУМ 2B14",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Мега косметикс",
+    "agent": "Жанара",
+    "sourceName": "ИП Алымкул кызы Бурулай (Мега Косметикс)",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Стоматология Облака Антонова А.В.",
+    "agent": "Татьяна",
+    "sourceName": "ИП Антонова А.В. Стоматология Облака",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Магазин Фен М.Гвардия ИП Асанова",
+    "agent": "Жанара",
+    "sourceName": "ИП Асанова А.К.(Фен М.Гвардия)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Магазин Арзан Сити ИП Даминов",
+    "agent": "Жанара",
+    "sourceName": "ИП Даминов Эмирлан Азизбекович Магазин «Арзан» Ортосайский р-к",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "ТЦ Весна бут.А1 Чолпон",
+    "agent": "Жанара",
+    "sourceName": "ИП Зарылбек кызы Чолпон  (ТЦ Весна бут. А1)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Prof podologia ИП Захаров",
+    "agent": "Татьяна",
+    "sourceName": "ИП Захаров В.В \"Prof Podologia\" (Проф подология)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Салон эпиляции Бархат ИП Ильина",
+    "agent": "Нагима",
+    "sourceName": "ИП Ильина Анна Сергеевна  Салон Бархат 2,  ул. Токомбаева 23/3Б",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Мюнхен Шоп ИП Камардинова",
+    "agent": "Жанара",
+    "sourceName": "ИП Камардинова М.Т.(Мюнхен-Шоп)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Тиан Де Лиля ИП Кирдибаева Лилиагуль",
+    "agent": "Жанара",
+    "sourceName": "ИП Кирдибаева Лилиагуль Ишеновна ТРЦ «Вефа» 2 этаж ТИАН ДЕ",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Студия Сахарок ИП Коробейников А.И.",
+    "agent": "Нагима",
+    "sourceName": "ИП Коробейников Андрей Ильясович(Сахарок)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Ди Стор ИП Лигай Даяна",
+    "agent": "Жанара",
+    "sourceName": "ИП Лигай Даяна Геннадьевна (ул.Медерова Di Store)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "SPA Garden Оморов Э.А.",
+    "agent": "Альбина",
+    "sourceName": "ИП Оморов Эркин Аблобекович  \"Spa Garden\"",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "VIVA Clinic Оспанова Н",
+    "agent": "Нагима",
+    "sourceName": "ИП Оспанова Нургуль Адильхановна  VIVA Clinic",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Магазин K-Beauty Сарсембекова Айжан Н",
+    "agent": "Жанара",
+    "sourceName": "ИП Сарсембекова Айжан Нурсультановна  Магазин K_Beauty",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Магазин Бонус Сатыбалдиева",
+    "agent": "Жанара",
+    "sourceName": "ИП Сатыбалдиева А.Т.(маг.Бонус)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Студия Тазагул (ИП Сыдыкова)",
+    "agent": "Жанара",
+    "sourceName": "ИП Сыдыкова Тазагүл Маликовна (Студия Тазагул)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Лайф клиник ИП Цой Т.Р",
+    "agent": "Татьяна",
+    "sourceName": "ИП Цой Татьяна Рудольфовна(Лайф Клиник)Life Clinic",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Косметология Царевна",
+    "agent": "Нагима",
+    "sourceName": "ИП Шокарева Наталья Николаевна (Косметология Царевна)",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Кондитерская фабрика Ширин",
+    "agent": "Татьяна",
+    "sourceName": "Кондитерская фабрика Ширин",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Магазин Фен Боконбаева ( ИП Асанова)",
+    "agent": "Жанара",
+    "sourceName": "Магазин Фен (ИП Асанова) Боконбаева",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "МЦ Unimed Clinic ОсОО Диамед Л.Т.Д.",
+    "agent": "Бегимай",
+    "sourceName": "МЦ Unimed clinic ОсОО \"Диамед Л.Т.Д.\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "МЦ Интромед ОсОО Грандмед Диагностик",
+    "agent": "Татьяна",
+    "sourceName": "МЦ Интромед ОсОО Грандмед Диагностик",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Магазин Оптовые цены Ахунбаева Конокбаева",
+    "agent": "Жанара",
+    "sourceName": "Опт цены Ахунбаева ИП Конокбаева Нурила Ташкенбаевна Ахунбаева",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Магазин Оптовые Цены Дуйшеева (ИП Токтосунова)",
+    "agent": "Жанара",
+    "sourceName": "ОптоЦены ИП Токтосунова Асель  Токонбаева/Дуйшеева",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Магазин Оптовые Цены Гражданская Токтосунова",
+    "agent": "Жанара",
+    "sourceName": "ОптоЦены ИП Токтосунова Асель Гражданская",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Магазин Оптовые Цены Киевская Токтосунова",
+    "agent": "Жанара",
+    "sourceName": "ОптоЦены ИП Токтосунова Асель Киевская",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "ОсОО МЦ Элкрит",
+    "agent": "Бегимай",
+    "sourceName": "ОсОО  «МЦ Элкрит»",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Skin Clinic JC Group(Скин Клиник)",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО  Skin Clinic JC Group \"Скин Клиник Джей Си Групп\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Диагностическая лаборатория Human",
+    "agent": "Альбина",
+    "sourceName": "ОсОО \"Diagnostic Laboratory \"HUMAN\" (Диагностическая лаборатория \"ХУМАН\")",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "ОсОО Анкалайф",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"Анкалайф\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "3 мкр, Банур Медикал",
+    "agent": "Нагима",
+    "sourceName": "ОсОО \"Банур Медикал\"",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "ОсОО Гемотест КГ",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"ГЕМОТЕСТ КГ\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Мц Medartis ( ОсОО ДжСА)",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"ДжСА\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Завод имплантации Все на Четверых",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"Завод Имплантации Все на Четырех\"",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "ОсОО Инновэйн",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"ИННОВЭЙН\" Инновационный Флебологический Центр Бишкек",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Институт пластической хирургии и гинекологии",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"Институт пластической хирургии и гинекологии\" (Неолумо)",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Интелмед",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"Интелмед\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Интерлизинг",
+    "agent": "Бегимай",
+    "sourceName": "ОсОО \"Интерлизинг\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "кант узи кабинет",
+    "agent": "Батаева",
+    "sourceName": "ОсОО \"К+13\" г.Кант УЗИ Кабинет",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Клиника Лазмед",
+    "agent": "Альбина",
+    "sourceName": "ОсОО \"Клиника Лазмед\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Педиатрическая служба",
+    "agent": "Альбина",
+    "sourceName": "ОсОО \"Круглосуточная педиатрическая служба\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Лазмик",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"Лазмик Про +\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Остео Клиник Токонбаева 23/4",
+    "agent": "Альбина",
+    "sourceName": "ОсОО \"Остео\"  (ул. Токонбаева 23/4)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "ОсОО \"Офтальмологический Лазерный Центр\"",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"Офтальмологический Лазерный Центр\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Медикал Профи (ОсОО \"РТР - Медикал профи\")",
+    "agent": "Бегимай",
+    "sourceName": "ОсОО \"РТР - Медикал профи\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Медицинский центр Систем СИСТЕМ ОЗЕЛ ТЫББИ ЙАТЫРЫ",
+    "agent": "Нагима",
+    "sourceName": "ОсОО \"СИСТЕМ ОЗЕЛ ТЫББИ ЙАТЫРЫМЛАР ВЕ ТИДЖАРЕТ\" (Мед. центр Систем)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Стоматолог и Я",
+    "agent": "Бегимай",
+    "sourceName": "ОсОО \"СТОМАТОЛОГ и Я\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Фарм Альянс( Разакова)",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"Фарм-Альянс\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Флеминг Центр",
+    "agent": "Нагима",
+    "sourceName": "ОсОО \"Флеминг Центр\"  Мед центр Прайм Клиник",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Элдик Фемели медисин клиник",
+    "agent": "Нагима",
+    "sourceName": "ОсОО \"Элдик Фемили медисин клиник\"",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "ОсОО Юнит Реактив Фарма (Юрфа)",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"Юнит-Реактив-Фарма\" ЮРФА",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО «Диво-Эффект»",
+    "agent": "Альбина",
+    "sourceName": "ОсОО «Диво-Эффект»",
+    "matchTier": "substring"
+  },
+  {
+    "name": "МЦ Дордой-Офтальмик Сервис",
+    "agent": "Бегимай",
+    "sourceName": "ОсОО «Дордой офтальмик сервис»",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Медицинский центр Меди(ОсОО «МЕДИ лтд»)",
+    "agent": "Бегимай",
+    "sourceName": "ОсОО «МЕДИ лтд»",
+    "matchTier": "substring"
+  },
+  {
+    "name": "PM Market (ОсОО ПМ Маркет)",
+    "agent": "Бегимай",
+    "sourceName": "ОсОО «ПМ Маркет»,",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ННЦОМ и Д (ОсОО Фамеко)",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО «Фамеко»",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Ю клиник",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО «Ю Клиник»",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Лаборатория Евролаб",
+    "agent": "Бегимай",
+    "sourceName": "ОсОО Лаборатория Евролаб",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Mirey clinic (Мирэй клиник)",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО Мирэй Клиник (Mirey clinic)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Реабилитационный центр \"STIMUL\" ИП Усенбаев Н.У",
+    "agent": "Бегимай",
+    "sourceName": "Реабилитационный центр «STIMUL»  ИП Усенбаев Нуртилек Усенбаевич",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "ОсОО DSCA",
+    "agent": "Татьяна",
+    "sourceName": "Стоматология Кайрос ОсОО \"DSCA\" (ди эс си эй)",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Клиника пласт.хирург Сагынбаевой ИП Буланбекова",
+    "agent": "Бегимай",
+    "sourceName": "Буланбеков Т.Т. (Клб пласт.хирургии Сагынбаевой ИП Буланбекова)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Стоматология Аврора (ИП Урманаева)",
+    "agent": "Татьяна",
+    "sourceName": "ИП Урманаева Раиса Султановна (Стоматология Аврора)",
+    "matchTier": "multi-token"
+  },
+  {
+    "name": "Чакра Спа Jannat",
+    "agent": "Альбина",
+    "sourceName": "ОсОО \"Чакра Спа\" Jannat, ул.Аалы Токомбаева,21/2",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Элит спа",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"Элит СПА\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Avanta Laser (Дерма Лазер)",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"Дерма Лазер\" (Avanta Laser (Дерма Лазер))",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Medcenter.kg ( МедCтар)",
+    "agent": "Татьяна",
+    "sourceName": "ОсОО \"МедСтар\" (Medcenter.kg ( МедCтар))",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО \"Орион Хотелс\"",
+    "agent": "Бегимай",
+    "sourceName": "ОсОО \"Орион Хотелс\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Sokolov dental clinic (ОсОО Тринити-Концепт)",
+    "agent": "Бегимай",
+    "sourceName": "ОсОО \"ТРИНИТИ-КОНЦЕПТ\"",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Azuu Dent",
+    "agent": "Альбина",
+    "sourceName": "ОсОО «АЗУУ ДЕНТ» (Azuu Dent)",
+    "matchTier": "substring"
+  },
+  {
+    "name": "ОсОО Дельта клиник КГ",
+    "agent": "Нагима",
+    "sourceName": "ОсОО «Дельта Клиник КГ»",
+    "matchTier": "substring"
+  },
+  {
+    "name": "Имарат спорт энд Велнес",
+    "agent": "Нагима",
+    "sourceName": "ОсОО «Имарат Спортс энд Велнес»",
+    "matchTier": "multi-token"
+  }
+]

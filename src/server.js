@@ -75,6 +75,11 @@ function serveUpload(req, res, pathname) {
 
 db.ensureLoaded();
 
+// Переименования агентов — ОБЯЗАТЕЛЬНО до runImport() (см. комментарий у
+// migrateAgentRenames() в api.js): иначе сопоставление владельца клиента по
+// имени внутри runImport() использует ещё не переименованную запись.
+api.migrateAgentRenames();
+
 // При каждом запуске подтягиваем/обновляем данные из data/import/*.json (контрагенты,
 // регулярный ассортимент, долги) — если файлы есть. Новых контрагентов и пользователей
 // создаём один раз; расчётные поля (ассортимент/долг) обновляем при каждом запуске,
@@ -88,7 +93,7 @@ if (importResult.clientsCreated || importResult.clientsUpdated) {
   console.log(`Импорт данных: новых контрагентов — ${importResult.clientsCreated}, обновлено (ассортимент/долг) — ${importResult.clientsUpdated}.`);
 }
 if (importResult.extraAgentsAdded) {
-  console.log(`Добавлено новых торговых агентов: ${importResult.extraAgentsAdded} (Батаева/Жанара/Анастасия).`);
+  console.log(`Добавлено новых торговых агентов: ${importResult.extraAgentsAdded} (Батаева/Жанара/Бегимай).`);
 }
 
 // Миграция старых данных под новую схему (см. api.js) — безопасно запускать
@@ -96,6 +101,7 @@ if (importResult.extraAgentsAdded) {
 api.migrateLegacyTaskStages();
 api.migrateClientDefaults();
 api.migrateUserDefaults();
+api.migrateDocumentsStatus();
 
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url);

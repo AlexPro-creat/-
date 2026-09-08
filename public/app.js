@@ -3,7 +3,7 @@
 const state = {
   user: null,
   stages: [],
-  saleStages: [],
+  saleTags: [],
   waitlistStages: [],
   waitlistTags: [],
   taskTags: [],
@@ -19,6 +19,7 @@ const state = {
   clientFilters: { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', promo: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, showClosed: false, search: '' },
   clientSort: { key: null, dir: -1 },
   taskTagFilter: new Set(),
+  saleTagFilter: new Set(),
   waitlistTagFilter: new Set(),
   calendar: { mode: 'month', date: new Date() },
   clientBulkMode: false,
@@ -56,16 +57,16 @@ function latestSalesMonth() {
   return months[months.length - 1] || '';
 }
 
-// Воронка "звонок → встреча → сделка/провал" — параллельный тип задач (taskType: 'sale'),
-// не пересекается с обычными визитными задачами. Финальные этапы требуют аудиозаписи
-// встречи + пояснения (проверяется на сервере, тут — только для UI-подсказок).
-const SALE_FINAL_STAGES_CLIENT = ['deal', 'fail'];
-const SALE_ACTIVE_STAGES_CLIENT = ['call', 'meeting'];
+// "Продажа" (taskType: 'sale') — до Фазы 22 была отдельной воронкой "звонок →
+// встреча → сделка/провал" со своими этапами. С Фазы 22 технически устроена так
+// же, как обычная задача-визит (те же этапы — state.stages/ACTIVE_STAGES, тот же
+// общий отчёт при закрытии в "Выполнена"), отличается только своим набором тегов
+// (бренды + "Договор" — приходят с сервера в state.saleTags) и заголовком/вкладкой
+// в интерфейсе, чтобы сохранить отдельную фильтрацию.
 const WAITLIST_ACTIVE_STAGES_CLIENT = ['waiting', 'invoiced'];
 // Активна ли задача (не закрыта), независимо от типа воронки — используется
 // для клиентского пересчёта карточек дашборда при фильтре по агенту (см. dashCardValue).
 function isTaskActiveClient(t) {
-  if (t.taskType === 'sale') return SALE_ACTIVE_STAGES_CLIENT.includes(t.stage);
   if (t.taskType === 'waitlist') return WAITLIST_ACTIVE_STAGES_CLIENT.includes(t.stage);
   return ACTIVE_STAGES.includes(t.stage);
 }
@@ -268,7 +269,7 @@ async function loadAll() {
   state.clients = clientsRes.clients;
   state.tasks = tasksRes.tasks;
   state.stages = tasksRes.stages;
-  state.saleStages = tasksRes.saleStages || [];
+  state.saleTags = tasksRes.saleTags || [];
   state.waitlistStages = tasksRes.waitlistStages || [];
   state.waitlistTags = tasksRes.waitlistTags || state.waitlistTags;
   state.users = usersRes.users;
@@ -298,7 +299,7 @@ async function boot() {
     const me = await api('GET', '/api/me');
     state.user = me.user;
     state.stages = me.stages;
-    state.saleStages = me.saleStages || [];
+    state.saleTags = me.saleTags || [];
     state.waitlistStages = me.waitlistStages || [];
     state.waitlistTags = me.waitlistTags || [];
     state.paymentMethods = me.paymentMethods;
@@ -494,8 +495,8 @@ async function renderDashboard(content) {
         <div class="agent-metric-grid">
           <div class="stat-card"><div class="num">${fmtMoney(stats.agentDashboard.salesTotalThisMonth)}</div><div class="label">Продано (${capitalize(latestSalesMonth())})</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.clientsBoughtThisMonth}/${stats.agentDashboard.clientsNotBoughtThisMonth}</div><div class="label">Купили / не купили в этом месяце</div></div>
-          <div class="stat-card"><div class="num">${stats.agentDashboard.callsToday}</div><div class="label">Звонков сегодня</div></div>
-          <div class="stat-card"><div class="num">${stats.agentDashboard.meetingsToday}</div><div class="label">Встреч сегодня</div></div>
+          <div class="stat-card"><div class="num">${stats.agentDashboard.salesToday}</div><div class="label">Продаж сегодня</div></div>
+          <div class="stat-card"><div class="num">${stats.agentDashboard.salesDoneToday}</div><div class="label">Из них закрыто</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.doneTasksToday}</div><div class="label">Выполнено сегодня</div></div>
           <div class="stat-card"><div class="num">${stats.agentDashboard.overdueTasksCount}</div><div class="label">Просрочено</div></div>
           <div class="stat-card">
@@ -1093,7 +1094,22 @@ function renderClients(content) {
   const bulkModeBtn = document.getElementById('bulk-mode-btn');
   if (bulkModeBtn) bulkModeBtn.addEventListener('click', () => { state.clientBulkMode = !state.clientBulkMode; state.clientBulkSelected = new Set(); render(); });
 
-  document.getElementById('filter-search').addEventListener('input', (e) => { state.clientFilters.search = e.target.value; render(); });
+  // Фаза 21 (07.09.2026, исправление бага): полный render() на каждое нажатие
+  // клавиши пересоздаёт DOM всей страницы «Клиенты», включая сам этот <input>
+  // — новый элемент не в фокусе, поэтому раньше можно было ввести только одну
+  // букву за раз (после каждой буквы приходилось кликать в поле заново).
+  // Фикс: запоминаем позицию курсора перед перерисовкой и сразу после нее
+  // возвращаем фокус и курсор на новый (пересозданный) элемент с тем же id.
+  document.getElementById('filter-search').addEventListener('input', (e) => {
+    const cursorPos = e.target.selectionStart;
+    state.clientFilters.search = e.target.value;
+    render();
+    const refreshed = document.getElementById('filter-search');
+    if (refreshed) {
+      refreshed.focus();
+      refreshed.setSelectionRange(cursorPos, cursorPos);
+    }
+  });
   document.getElementById('filter-visitDay').addEventListener('change', (e) => { state.clientFilters.visitDay = e.target.value; render(); });
   document.getElementById('filter-pointType').addEventListener('change', (e) => { state.clientFilters.pointType = e.target.value; render(); });
   document.getElementById('filter-paymentMethod').addEventListener('change', (e) => { state.clientFilters.paymentMethod = e.target.value; render(); });
@@ -1831,7 +1847,11 @@ function renderTasks(content) {
         ${state.taskTags.map((tag) => `<button type="button" class="tag-filter-btn ${state.taskTagFilter.has(tag) ? 'active' : ''}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}
         ${state.taskTagFilter.size ? '<button type="button" class="link-btn" id="tag-filter-reset">Сбросить</button>' : ''}
       </div>` : typeView === 'sale' ? `
-      <div class="sub muted" style="margin-bottom:6px">Звонок (узнать когда на месте) → Встреча (дата/время, показать ассортимент) → Сделка / Провал (нельзя закрыть без пояснения).</div>
+      <div class="filter-bar">
+        <span class="muted" style="font-size:13px">Фильтр по тегам:</span>
+        ${state.saleTags.map((tag) => `<button type="button" class="tag-filter-btn sale-tag-filter-btn ${state.saleTagFilter.has(tag) ? 'active' : ''}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}
+        ${state.saleTagFilter.size ? '<button type="button" class="link-btn" id="sale-tag-filter-reset">Сбросить</button>' : ''}
+      </div>
       ` : `
       <div class="sub muted" style="margin-bottom:6px">Клиент ждёт товар → Накладная оформлена → Товар получен клиентом (закрытая — подтверждает администратор/супервайзер).</div>
       <div class="filter-bar">
@@ -1911,6 +1931,17 @@ function renderTasks(content) {
   const tagResetBtn = document.getElementById('tag-filter-reset');
   if (tagResetBtn) tagResetBtn.addEventListener('click', () => { state.taskTagFilter = new Set(); render(); });
 
+  content.querySelectorAll('.sale-tag-filter-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tag = btn.dataset.tag;
+      if (state.saleTagFilter.has(tag)) state.saleTagFilter.delete(tag);
+      else state.saleTagFilter.add(tag);
+      render();
+    });
+  });
+  const saleTagResetBtn = document.getElementById('sale-tag-filter-reset');
+  if (saleTagResetBtn) saleTagResetBtn.addEventListener('click', () => { state.saleTagFilter = new Set(); render(); });
+
   content.querySelectorAll('.waitlist-tag-filter-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const tag = btn.dataset.tag;
@@ -1974,31 +2005,36 @@ function renderTasks(content) {
   });
 }
 
-// ---------- Воронка продаж: звонок → встреча → сделка/провал ----------
+// ---------- Продажа: с Фазы 22 — обычная односложная задача по клиенту (без
+// отдельных этапов "звонок/встреча/сделка/провал"), только со своим набором
+// тегов (бренды + "Договор", state.saleTags) — доска устроена так же, как у
+// визитов (state.stages), просто отфильтрована по taskType === 'sale'. ----------
 
 function renderSaleKanban() {
   const kanban = document.getElementById('kanban');
-  const stages = state.saleStages || [];
   const today = new Date().toISOString().slice(0, 10);
-  stages.forEach((stage) => {
-    const inStage = state.tasks.filter((t) => t.taskType === 'sale' && t.stage === stage.key);
+  state.stages.forEach((stage) => {
+    let inStage = state.tasks.filter((t) => t.taskType === 'sale' && t.stage === stage.key);
+    if (state.saleTagFilter.size) {
+      inStage = inStage.filter((t) => (t.tags || []).some((tag) => state.saleTagFilter.has(tag)));
+    }
     const col = el(`
-      <div class="sale-col" data-stage="${stage.key}">
-        <h3>${escapeHtml(stage.label)} · ${inStage.length}</h3>
+      <div class="kanban-col" data-stage="${stage.key}">
+        <h3>${escapeHtml(stage.label)} <span class="col-sum">· ${inStage.length}</span></h3>
         <div class="col-body"></div>
       </div>
     `);
     const colBody = col.querySelector('.col-body');
     inStage.forEach((t) => {
       const client = clientById(t.clientId);
-      const overdue = t.dueDate && t.dueDate < today;
+      const overdue = t.dueDate && t.dueDate < today && ACTIVE_STAGES.includes(t.stage);
       const card = el(`
         <div class="deal-card" draggable="true" data-id="${t.id}">
           <div class="deal-title">${escapeHtml(t.title)}</div>
           <div class="deal-client">${client ? escapeHtml(client.name) : '—'}</div>
-          <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''}</div>
+          <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''} ${t.report ? '<span class="report-check" title="Отчёт заполнен">✓ отчёт</span>' : ''}</div>
           ${t.dateChangeRequest ? '<div class="badge badge-amber" style="margin-top:4px">заявка на перенос даты</div>' : ''}
-          ${t.explanation ? `<div class="muted" style="font-size:12px;margin-top:4px">${escapeHtml(t.explanation)}</div>` : ''}
+          ${taskTagBadges(t) ? `<div class="card-tags">${taskTagBadges(t)}</div>` : ''}
         </div>
       `);
       card.addEventListener('click', () => openTaskModal(t));
@@ -2010,9 +2046,9 @@ function renderSaleKanban() {
       e.preventDefault();
       const id = e.dataTransfer.getData('text/plain');
       const draggedTask = state.tasks.find((x) => String(x.id) === String(id));
-      // В "Сделку"/"Провал" нельзя перетащить напрямую — нужно короткое пояснение,
-      // поэтому просто открываем карточку задачи, где есть это поле.
-      if (draggedTask && SALE_FINAL_STAGES_CLIENT.includes(stage.key) && draggedTask.stage !== stage.key) {
+      // В "Выполнена" нельзя перетащить без заполненного отчёта — открываем
+      // карточку задачи, где есть это поле, вместо прямого переноса.
+      if (draggedTask && stage.key === 'done' && draggedTask.stage !== 'done' && !String(draggedTask.report || '').trim()) {
         openTaskModal(draggedTask);
         return;
       }
@@ -2093,19 +2129,21 @@ function openTaskModal(task, forceType, presetClientId) {
   const hasAssortment = taskClient && ((taskClient.regularAssortment || []).length || (taskClient.testAssortment || []).length);
   const isSale = isEdit ? task.taskType === 'sale' : forceType === 'sale';
   const isWaitlist = isEdit ? task.taskType === 'waitlist' : forceType === 'waitlist';
-  const stageOptions = isSale ? (state.saleStages || []) : isWaitlist ? (state.waitlistStages || []) : state.stages;
+  // С Фазы 22 у 'sale' те же этапы, что у визита (state.stages) — свои остались
+  // только у 'waitlist'.
+  const stageOptions = isWaitlist ? (state.waitlistStages || []) : state.stages;
 
   const typeSelectBlock = !isEdit ? `
       <label>Тип задачи</label>
       <select name="taskType" id="task-type-select">
         <option value="visit" ${forceType !== 'sale' && forceType !== 'waitlist' ? 'selected' : ''}>Визит</option>
-        <option value="sale" ${forceType === 'sale' ? 'selected' : ''}>Продажа (звонок → встреча → сделка)</option>
+        <option value="sale" ${forceType === 'sale' ? 'selected' : ''}>Продажа</option>
         <option value="waitlist" ${forceType === 'waitlist' ? 'selected' : ''}>Лист ожидания (товар под заказ)</option>
       </select>
   ` : '';
 
   const body = `
-    <h2>${isEdit ? (isSale ? 'Задача воронки продаж' : isWaitlist ? 'Задача листа ожидания' : 'Задача') : 'Новая задача'}</h2>
+    <h2>${isEdit ? (isSale ? 'Задача продажи' : isWaitlist ? 'Задача листа ожидания' : 'Задача') : 'Новая задача'}</h2>
     ${isEdit && isStaff() ? `<div class="muted" style="font-size:12px;margin-bottom:8px">Создано: ${fmtDateTime(task.createdAt)} · ${escapeHtml(userName(task.createdBy))}</div>` : ''}
     <form id="task-form">
       <label>Клиент *</label>
@@ -2116,7 +2154,7 @@ function openTaskModal(task, forceType, presetClientId) {
       ${isEdit && taskClient && taskClient.phone ? `<div class="muted" style="font-size:13px;margin:-6px 0 10px">📞 ${telLink(taskClient.phone)}</div>` : ''}
       ${typeSelectBlock}
       <label>Название</label>
-      <input name="title" value="${task ? escapeAttr(task.title) : ''}" placeholder="${isSale ? 'Звонок клиенту' : isWaitlist ? 'Ожидание товара' : 'Посетить клиента'}">
+      <input name="title" value="${task ? escapeAttr(task.title) : ''}" placeholder="${isSale ? 'Продажа клиенту' : isWaitlist ? 'Ожидание товара' : 'Посетить клиента'}">
       <label>Описание</label>
       <textarea name="description">${task ? escapeHtml(task.description || '') : ''}</textarea>
       <div class="field-row">
@@ -2127,19 +2165,18 @@ function openTaskModal(task, forceType, presetClientId) {
         ${isEdit ? `<div><label>Этап</label><select name="stage">${stageOptions.map((s) => `<option value="${s.key}" ${task.stage === s.key ? 'selected' : ''}>${s.label}</option>`).join('')}</select></div>` : ''}
       </div>
       ${assigneeBlock}
-      ${!isSale && !isWaitlist ? `
+      ${!isWaitlist ? `
       <label>Теги</label>
       <div class="tag-checks">
-        ${state.taskTags.map((tag) => `<label class="tag-check"><input type="checkbox" name="tags" value="${escapeAttr(tag)}" ${task && (task.tags || []).includes(tag) ? 'checked' : ''}> ${escapeHtml(tag)}</label>`).join('')}
+        ${(isSale ? state.saleTags : state.taskTags).map((tag) => `<label class="tag-check"><input type="checkbox" name="tags" value="${escapeAttr(tag)}" ${task && (task.tags || []).includes(tag) ? 'checked' : ''}> ${escapeHtml(tag)}</label>`).join('')}
       </div>` : ''}
       ${isWaitlist ? `
       <label>Бренд товара</label>
       <div class="tag-checks">
         ${(state.waitlistTags || []).map((tag) => `<label class="tag-check"><input type="checkbox" name="tags" value="${escapeAttr(tag)}" ${task && (task.tags || []).includes(tag) ? 'checked' : ''}> ${escapeHtml(tag)}</label>`).join('')}
       </div>` : ''}
-      ${isEdit && !isSale && !isWaitlist ? `<label>Комментарий по визиту</label><textarea name="comment">${escapeHtml(task.comment || '')}</textarea>` : ''}
-      ${isEdit && !isSale && !isWaitlist ? `<label>Отчёт по задаче ${task.stage === 'done' ? '*' : ''}</label><textarea name="report" placeholder="Без отчёта нельзя перевести в «Выполнена»">${escapeHtml(task.report || '')}</textarea>` : ''}
-      ${isEdit && isSale ? `<label>Пояснение${SALE_FINAL_STAGES_CLIENT.includes(task.stage) ? '' : ' (обязательно перед «Сделка»/«Провал»)'}</label><textarea name="explanation" placeholder="Короткое пояснение по итогам звонка/встречи">${escapeHtml(task.explanation || '')}</textarea>` : ''}
+      ${isEdit && !isWaitlist ? `<label>Комментарий${isSale ? '' : ' по визиту'}</label><textarea name="comment">${escapeHtml(task.comment || '')}</textarea>` : ''}
+      ${isEdit && !isWaitlist ? `<label>Отчёт по задаче ${task.stage === 'done' ? '*' : ''}</label><textarea name="report" placeholder="Без отчёта нельзя перевести в «Выполнена»">${escapeHtml(task.report || '')}</textarea>` : ''}
       <div class="modal-actions">
         ${isEdit && isStaff() ? '<button type="button" class="btn-secondary" id="delete-task">Удалить</button>' : ''}
         <button type="button" class="btn-secondary" id="cancel-modal">Отмена</button>
@@ -2147,7 +2184,6 @@ function openTaskModal(task, forceType, presetClientId) {
       </div>
     </form>
     ${isEdit ? renderDateChangeSection(task) : ''}
-    ${isEdit && isSale ? renderMeetingRecordSection(task, taskClient) : ''}
     ${isEdit && hasAssortment ? `<div class="assort-panel"><h3>Ассортимент клиента: ${escapeHtml(taskClient.name)}</h3>${renderAssortmentSection(taskClient)}${renderTestAssortmentSection(taskClient)}</div>` : ''}
     ${isEdit ? renderAttachmentsSection(task) : ''}
   `;
@@ -2172,7 +2208,6 @@ function openTaskModal(task, forceType, presetClientId) {
   if (isEdit && hasAssortment) wireAssortmentToggle(taskClient.id);
   if (isEdit) wireAttachments(task);
   if (isEdit) wireDateChangeSection(task);
-  if (isEdit && isSale) wireMeetingRecordSection(task);
   if (!isEdit) wireTaskClientSearch(myClients, presetClientId);
 }
 
@@ -2268,53 +2303,6 @@ function wireDateChangeSection(task) {
     await loadAll();
     closeModal();
     render();
-  });
-}
-
-// ---------- Записи встреч (воронка продаж): аудио + пояснение ----------
-
-function renderMeetingRecordSection(task) {
-  const client = clientById(task.clientId);
-  const records = ((client && client.meetingRecords) || []).filter((r) => r.taskId === task.id);
-  return `
-    <div class="assort-panel">
-      <h3>Записи встреч</h3>
-      <div class="muted" style="font-size:12.5px;margin-bottom:8px">Аудиозапись + короткое пояснение обязательны перед переводом задачи в «Сделка» или «Провал».</div>
-      <div id="meeting-records-list">
-        ${records.length ? records.map((r) => `
-          <div class="attach-row">
-            <audio controls src="${r.audioUrl}"></audio>
-            <span class="muted">${escapeHtml(r.explanation || '')}</span>
-          </div>
-        `).join('') : '<div class="muted">Пока нет записей</div>'}
-      </div>
-      <label style="margin-top:8px">Аудиофайл встречи</label>
-      <input type="file" id="meeting-audio-input" accept="audio/*">
-      <label>Пояснение к встрече</label>
-      <textarea id="meeting-explanation-input" placeholder="Короткое пояснение по итогам встречи"></textarea>
-      <button type="button" class="btn-secondary" id="upload-meeting-record" style="margin-top:6px">Загрузить запись</button>
-    </div>
-  `;
-}
-
-function wireMeetingRecordSection(task) {
-  const btn = document.getElementById('upload-meeting-record');
-  if (!btn) return;
-  btn.addEventListener('click', async () => {
-    const fileInput = document.getElementById('meeting-audio-input');
-    const explanation = document.getElementById('meeting-explanation-input').value;
-    if (!fileInput.files.length) return alert('Выберите аудиофайл записи встречи');
-    const fd = new FormData();
-    fd.append('file', fileInput.files[0]);
-    fd.append('explanation', explanation);
-    try {
-      await apiUpload(`/api/tasks/${task.id}/meeting-record`, fd);
-      await loadAll();
-      closeModal();
-      const fresh = state.tasks.find((t) => t.id === task.id);
-      render();
-      if (fresh) openTaskModal(fresh);
-    } catch (e) { alert(e.message); }
   });
 }
 

@@ -74,21 +74,32 @@ function ensureTeam() {
 }
 
 // Фаза 6 (доп.): три новых торговых агента (Батаева регион, Жанара (магазины),
-// Анастасия), добавлены после того, как пользователь прислал ссылки на их таблицы
-// на Google Диске. В отличие от ensureTeam() (который создаёт всю команду только
-// на пустой базе), эта функция идемпотентна и безопасна на КАЖДОМ старте сервера —
-// добавляет только тех агентов из списка, которых ещё нет по имени (важно для уже
-// работающих у пользователя деплоев с непустой базой).
+// Анастасия — с Фазы 22 отображается как "Бегимай", логин/почта не менялись),
+// добавлены после того, как пользователь прислал ссылки на их таблицы на Google
+// Диске. В отличие от ensureTeam() (который создаёт всю команду только на пустой
+// базе), эта функция идемпотентна и безопасна на КАЖДОМ старте сервера — добавляет
+// только тех агентов из списка, которых ещё нет.
+//
+// Фаза 22 (08.09.2026): проверка "уже есть?" переведена с имени на email. Раньше
+// сверяли по имени — это ломалось при переименовании агента (см. migrateAgentRenames()
+// в api.js, которая переименовывает "Анастасия" → "Бегимай" на уже развёрнутых
+// базах): если бы сверка на существование здесь всё ещё шла по имени "Бегимай", а
+// миграция переименования почему-либо выполнилась ПОСЛЕ этой функции (порядок сейчас
+// зафиксирован в server.js: migrateAgentRenames() строго до runImport()), сверка не
+// нашла бы совпадения и создала бы вторую, дублирующую запись агента с тем же email.
+// Email — стабильный идентификатор, не меняется при переименовании, поэтому сверка
+// по нему безопасна независимо от порядка миграций — это дополнительная страховка
+// поверх исправленного порядка вызовов, а не замена ему.
 function ensureExtraAgents() {
-  const existingNames = new Set(db.all('users').filter((u) => u.role === 'agent').map((u) => norm(u.name)));
+  const existingEmails = new Set(db.all('users').filter((u) => u.role === 'agent').map((u) => (u.email || '').toLowerCase()));
   const extraAgentDefs = [
     { name: 'Батаева', email: 'bataeva@cosmedica.local' },
     { name: 'Жанара', email: 'zhanara@cosmedica.local' },
-    { name: 'Анастасия', email: 'anastasia@cosmedica.local' }
+    { name: 'Бегимай', email: 'anastasia@cosmedica.local' }
   ];
   let added = 0;
   extraAgentDefs.forEach((a) => {
-    if (existingNames.has(norm(a.name))) return;
+    if (existingEmails.has(a.email.toLowerCase())) return;
     db.insert('users', {
       name: a.name, email: a.email,
       passwordHash: auth.hashPassword('agent123'), role: 'agent', createdAt: new Date().toISOString()
@@ -254,6 +265,9 @@ function runImportBody() {
   let clientsCreated = 0;
   let clientsUpdated = 0;
   const now = new Date().toISOString();
+  // ID клиентов, реально задетых циклом ниже (найдены среди contractors по имени+владельцу,
+  // либо созданы заново) — используется дальше для очистки "осиротевших" карточек.
+  const touchedClientIds = new Set();
 
   contractors.forEach((c) => {
     const key = norm(c.name);
@@ -301,7 +315,7 @@ function runImportBody() {
     };
 
     if (!existing) {
-      db.insert('clients', {
+      const inserted = db.insert('clients', {
         name: c.name,
         pointType: c.point_type || '',
         address: c.address || '',
@@ -320,11 +334,37 @@ function runImportBody() {
         ...computedFields
       });
       clientsCreated++;
+      touchedClientIds.add(inserted.id);
     } else {
       db.update('clients', existing.id, computedFields);
       clientsUpdated++;
+      touchedClientIds.add(existing.id);
     }
   });
+
+  // Обнуляем currentMonthRevenue/currentMonthItems у карточек, которых цикл выше НЕ
+  // затронул ("осиротевшие" клиенты — не входят в agents_clients.json вообще: созданы
+  // вручную через UI либо остались от ручных сверок прошлых фаз, например Фазы 10/11).
+  // Важно: сверяем по touchedClientIds (реально обновлённые записи), а НЕ по имени —
+  // currentMonthByName матчит только по имени без учёта владельца, поэтому у карточки
+  // с тем же именем, что и у чужого контрагента (например общее "Частное лицо" у
+  // нескольких агентов), currentMonthByName[key] был бы непустым, хотя ЭТУ конкретную
+  // карточку (другой ownerId) цикл выше не трогал — обнуление по имени такую карточку
+  // бы пропустило. Раньше баг был незаметен, потому что withFreshCurrentMonth() обнулял
+  // currentMonth* у ВСЕХ клиентов в ответах API, пока CURRENT_MONTH_DATA_STALE_FROM не
+  // наступил; как только флаг "протухания" снимается, такие карточки показывают чужие
+  // устаревшие суммы как текущие. Найдено и исправлено при загрузке среза за
+  // 01.09-07.09.26 (Фаза 22).
+  db.beginBatch();
+  try {
+    db.all('clients').forEach((c) => {
+      if (!touchedClientIds.has(c.id) && ((c.currentMonthRevenue || 0) !== 0 || (c.currentMonthItems || []).length)) {
+        db.update('clients', c.id, { currentMonthRevenue: 0, currentMonthItems: [] });
+      }
+    });
+  } finally {
+    db.endBatch();
+  }
 
   return { usersCreated, extraAgentsAdded, clientsCreated, clientsUpdated };
 }
