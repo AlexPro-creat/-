@@ -16,11 +16,17 @@ const state = {
   supervisorMeetings: [],
   view: 'dashboard',
   stats: null,
-  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', promo: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, showClosed: false, search: '' },
+  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', promo: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, onlyPendingApproval: false, showClosed: false, search: '' },
   clientSort: { key: null, dir: -1 },
   taskTagFilter: new Set(),
   saleTagFilter: new Set(),
   waitlistTagFilter: new Set(),
+  // П.8 бэклога (08.09.2026): фильтр «есть заявка на перенос даты», общий для
+  // всех трёх воронок задач (поле dateChangeRequest не завязано на taskType).
+  onlyDateChangeRequest: false,
+  // П.2 бэклога (08.09.2026): поиск клиента на странице «Задачи» — по образцу
+  // поиска на странице «Клиенты» (filter-search).
+  taskClientSearch: '',
   calendar: { mode: 'month', date: new Date() },
   clientBulkMode: false,
   clientBulkSelected: new Set(),
@@ -950,6 +956,7 @@ function filteredClients() {
     if (f.onlyShortfall && !riskCount(c)) return false;
     if (f.onlyPromotions && !(c.promotions || []).length) return false;
     if (f.onlyDiscount && !(c.discountTerms || '').trim()) return false;
+    if (f.onlyPendingApproval && !c.pendingApproval) return false;
     if (f.ownerId && c.ownerId !== Number(f.ownerId)) return false;
     if (f.promo && !(c.promotions || []).some((p) => p.promo === f.promo)) return false;
     if (f.search) {
@@ -1018,7 +1025,7 @@ function renderClients(content) {
   const pointTypes = state.pointTypes;
   const promoNames = Array.from(new Set(state.clients.flatMap((c) => (c.promotions || []).map((p) => p.promo)))).sort();
   const f = state.clientFilters;
-  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.ownerId || f.promo || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.onlyPromotions || f.onlyDiscount || f.showClosed || f.search;
+  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.ownerId || f.promo || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.onlyPromotions || f.onlyDiscount || f.onlyPendingApproval || f.showClosed || f.search;
   const bulk = state.clientBulkMode;
   content.appendChild(el(`
     <div>
@@ -1053,6 +1060,7 @@ function renderClients(content) {
           ${promoNames.map((p) => `<option value="${escapeAttr(p)}" ${f.promo === p ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
         </select>
         <label class="filter-check"><input type="checkbox" id="filter-onlyDiscount" ${f.onlyDiscount ? 'checked' : ''}> Со скидкой/особыми условиями</label>
+        ${isStaff() ? `<label class="filter-check"><input type="checkbox" id="filter-onlyPendingApproval" ${f.onlyPendingApproval ? 'checked' : ''}> На согласовании</label>` : ''}
         ${isStaff() ? `<select id="filter-ownerId">
           <option value="">Агент: все</option>
           ${state.users.filter((u) => u.role === 'agent').map((u) => `<option value="${u.id}" ${String(f.ownerId) === String(u.id) ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
@@ -1119,13 +1127,15 @@ function renderClients(content) {
   document.getElementById('filter-onlyPromotions').addEventListener('change', (e) => { state.clientFilters.onlyPromotions = e.target.checked; render(); });
   document.getElementById('filter-promo').addEventListener('change', (e) => { state.clientFilters.promo = e.target.value; render(); });
   document.getElementById('filter-onlyDiscount').addEventListener('change', (e) => { state.clientFilters.onlyDiscount = e.target.checked; render(); });
+  const onlyPendingApprovalCb = document.getElementById('filter-onlyPendingApproval');
+  if (onlyPendingApprovalCb) onlyPendingApprovalCb.addEventListener('change', (e) => { state.clientFilters.onlyPendingApproval = e.target.checked; render(); });
   const ownerSel = document.getElementById('filter-ownerId');
   if (ownerSel) ownerSel.addEventListener('change', (e) => { state.clientFilters.ownerId = e.target.value; render(); });
   const showClosedCb = document.getElementById('filter-showClosed');
   if (showClosedCb) showClosedCb.addEventListener('change', (e) => { state.clientFilters.showClosed = e.target.checked; render(); });
   const resetBtn = document.getElementById('filter-reset');
   if (resetBtn) resetBtn.addEventListener('click', () => {
-    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', promo: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, showClosed: false, search: '' };
+    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', promo: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyPromotions: false, onlyDiscount: false, onlyPendingApproval: false, showClosed: false, search: '' };
     render();
   });
   content.querySelectorAll('th.sortable').forEach((th) => {
@@ -1806,9 +1816,32 @@ async function loadClientHistory(clientId) {
   }
 }
 
+// П.3 бэклога (08.09.2026): время визита — диапазон «от–до» вместо одного
+// значения (visitTime — «от», visitTimeTo — «до», см. src/api.js). Задачи,
+// созданные до этой правки, могут иметь только visitTime (без visitTimeTo) —
+// показываем как есть, без тире.
+function visitTimeLabel(t) {
+  if (!t.visitTime) return '';
+  return t.visitTimeTo ? `${t.visitTime}–${t.visitTimeTo}` : t.visitTime;
+}
+
 function stageLabel(key) {
   const s = state.stages.find((s) => s.key === key);
   return s ? s.label : key;
+}
+
+// Общий для всех трёх воронок задач (визиты/продажи/лист ожидания) фильтр —
+// поиск клиента (п.2 бэклога) и «есть заявка на перенос даты» (п.8 бэклога).
+// Вынесено в отдельную функцию, чтобы не дублировать в трёх render*Kanban().
+function matchesTaskListFilters(t) {
+  if (state.onlyDateChangeRequest && !t.dateChangeRequest) return false;
+  const q = (state.taskClientSearch || '').trim().toLowerCase();
+  if (q) {
+    const client = clientById(t.clientId);
+    const hay = `${client ? client.name : ''} ${client ? (client.phone || '') : ''} ${t.title || ''}`.toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  return true;
 }
 
 // ---------- Задачи (доска) ----------
@@ -1840,6 +1873,11 @@ function renderTasks(content) {
         <button type="button" class="btn-secondary ${typeView === 'sale' ? 'active' : ''}" id="task-type-sale-btn">Воронка продаж</button>
         <button type="button" class="btn-secondary ${typeView === 'waitlist' ? 'active' : ''}" id="task-type-waitlist-btn">Лист ожидания</button>
         <button type="button" class="btn-secondary ${typeView === 'visit' ? 'active' : ''}" id="task-type-visit-btn">Визиты с супервайзером</button>
+        <button type="button" class="btn-secondary ${typeView === 'agent' ? 'active' : ''}" id="task-type-agent-btn">Задачи агенту</button>
+      </div>
+      <div class="filter-bar">
+        <input type="text" id="task-client-filter" placeholder="Поиск клиента по названию, телефону..." value="${escapeAttr(state.taskClientSearch || '')}" style="max-width:260px">
+        <label class="filter-check"><input type="checkbox" id="filter-onlyDateChangeRequest" ${state.onlyDateChangeRequest ? 'checked' : ''}> Есть заявка на перенос даты</label>
       </div>
       ${typeView === 'visit' ? `
       <div class="filter-bar">
@@ -1852,13 +1890,15 @@ function renderTasks(content) {
         ${state.saleTags.map((tag) => `<button type="button" class="tag-filter-btn sale-tag-filter-btn ${state.saleTagFilter.has(tag) ? 'active' : ''}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}
         ${state.saleTagFilter.size ? '<button type="button" class="link-btn" id="sale-tag-filter-reset">Сбросить</button>' : ''}
       </div>
-      ` : `
+      ` : typeView === 'waitlist' ? `
       <div class="sub muted" style="margin-bottom:6px">Клиент ждёт товар → Накладная оформлена → Товар получен клиентом (закрытая — подтверждает администратор/супервайзер).</div>
       <div class="filter-bar">
         <span class="muted" style="font-size:13px">Фильтр по тегам:</span>
         ${(state.waitlistTags || []).map((tag) => `<button type="button" class="tag-filter-btn waitlist-tag-filter-btn ${state.waitlistTagFilter.has(tag) ? 'active' : ''}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}
         ${state.waitlistTagFilter.size ? '<button type="button" class="link-btn" id="waitlist-tag-filter-reset">Сбросить</button>' : ''}
       </div>
+      ` : `
+      <div class="sub muted" style="margin-bottom:6px">Задачи, не привязанные к клиенту — напоминания и поручения агенту напрямую (например, сдать отчёт, забрать образцы и т.п.).</div>
       `}
       ${bulk && typeView === 'visit' ? `<div class="filter-bar">
         <span class="muted" style="font-size:13px">Выбрано: <span id="task-bulk-count">0</span></span>
@@ -1904,9 +1944,25 @@ function renderTasks(content) {
       taskImportInput.value = '';
     });
   }
+  // Поиск клиента на странице «Задачи» (п.2 бэклога) — тот же паттерн сохранения
+  // курсора при перерисовке, что и у поиска на странице «Клиенты» (см. renderClients).
+  const taskClientFilterInput = document.getElementById('task-client-filter');
+  if (taskClientFilterInput) taskClientFilterInput.addEventListener('input', (e) => {
+    const cursorPos = e.target.selectionStart;
+    state.taskClientSearch = e.target.value;
+    render();
+    const refreshed = document.getElementById('task-client-filter');
+    if (refreshed) {
+      refreshed.focus();
+      refreshed.setSelectionRange(cursorPos, cursorPos);
+    }
+  });
+  const dateChangeFilterCb = document.getElementById('filter-onlyDateChangeRequest');
+  if (dateChangeFilterCb) dateChangeFilterCb.addEventListener('change', (e) => { state.onlyDateChangeRequest = e.target.checked; render(); });
   document.getElementById('task-type-visit-btn').addEventListener('click', () => { state.taskTypeView = 'visit'; render(); });
   document.getElementById('task-type-sale-btn').addEventListener('click', () => { state.taskTypeView = 'sale'; render(); });
   document.getElementById('task-type-waitlist-btn').addEventListener('click', () => { state.taskTypeView = 'waitlist'; render(); });
+  document.getElementById('task-type-agent-btn').addEventListener('click', () => { state.taskTypeView = 'agent'; render(); });
   const taskBulkModeBtn = document.getElementById('task-bulk-mode-btn');
   if (taskBulkModeBtn) taskBulkModeBtn.addEventListener('click', () => { state.taskBulkMode = !state.taskBulkMode; state.taskBulkSelected = new Set(); render(); });
   const taskBulkDeleteBtn = document.getElementById('task-bulk-delete-btn');
@@ -1955,6 +2011,7 @@ function renderTasks(content) {
 
   if (typeView === 'sale') { renderSaleKanban(); return; }
   if (typeView === 'waitlist') { renderWaitlistKanban(); return; }
+  if (typeView === 'agent') { renderAgentTasksKanban(); return; }
 
   const today = new Date().toISOString().slice(0, 10);
   const kanban = document.getElementById('kanban');
@@ -1963,6 +2020,7 @@ function renderTasks(content) {
     if (state.taskTagFilter.size) {
       inStage = inStage.filter((t) => (t.tags || []).some((tag) => state.taskTagFilter.has(tag)));
     }
+    inStage = inStage.filter(matchesTaskListFilters);
     const col = el(`
       <div class="kanban-col" data-stage="${stage.key}">
         <h3>${stage.label} <span class="col-sum">· ${inStage.length}</span></h3>
@@ -1978,7 +2036,8 @@ function renderTasks(content) {
           ${bulk ? `<input type="checkbox" class="bulk-check task-bulk-check" data-id="${t.id}" ${state.taskBulkSelected.has(t.id) ? 'checked' : ''} onclick="event.stopPropagation()">` : ''}
           <div class="deal-title">${escapeHtml(t.title)}</div>
           <div class="deal-client">${client ? escapeHtml(client.name) : '—'}</div>
-          <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''}${t.visitTime ? ' · ' + escapeHtml(t.visitTime) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''} ${t.report ? '<span class="report-check" title="Отчёт заполнен">✓ отчёт</span>' : ''}</div>
+          <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''}${visitTimeLabel(t) ? ' · ' + escapeHtml(visitTimeLabel(t)) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''} ${t.report ? '<span class="report-check" title="Отчёт заполнен">✓ отчёт</span>' : ''}</div>
+          ${t.dateChangeRequest ? '<div class="badge badge-amber" style="margin-top:4px">заявка на перенос даты</div>' : ''}
           ${taskTagBadges(t) ? `<div class="card-tags">${taskTagBadges(t)}</div>` : ''}
           ${(t.attachments || []).length ? `<div class="muted">📎 ${t.attachments.length}</div>` : ''}
         </div>
@@ -2018,6 +2077,7 @@ function renderSaleKanban() {
     if (state.saleTagFilter.size) {
       inStage = inStage.filter((t) => (t.tags || []).some((tag) => state.saleTagFilter.has(tag)));
     }
+    inStage = inStage.filter(matchesTaskListFilters);
     const col = el(`
       <div class="kanban-col" data-stage="${stage.key}">
         <h3>${escapeHtml(stage.label)} <span class="col-sum">· ${inStage.length}</span></h3>
@@ -2073,6 +2133,7 @@ function renderWaitlistKanban() {
     if (state.waitlistTagFilter.size) {
       inStage = inStage.filter((t) => (t.tags || []).some((tag) => state.waitlistTagFilter.has(tag)));
     }
+    inStage = inStage.filter(matchesTaskListFilters);
     const col = el(`
       <div class="kanban-col" data-stage="${stage.key}">
         <h3>${escapeHtml(stage.label)} <span class="col-sum">· ${inStage.length}</span></h3>
@@ -2088,6 +2149,7 @@ function renderWaitlistKanban() {
           <div class="deal-title">${escapeHtml(t.title)}</div>
           <div class="deal-client">${client ? escapeHtml(client.name) : '—'}</div>
           <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''}</div>
+          ${t.dateChangeRequest ? '<div class="badge badge-amber" style="margin-top:4px">заявка на перенос даты</div>' : ''}
           ${taskTagBadges(t) ? `<div class="card-tags">${taskTagBadges(t)}</div>` : ''}
         </div>
       `);
@@ -2109,9 +2171,63 @@ function renderWaitlistKanban() {
   });
 }
 
+// ---------- Воронка "Задачи агенту" (п.6 бэклога, 08.09.2026): задачи без
+// привязки к клиенту (taskType === 'agent', clientId === null) — напоминания
+// и поручения агенту напрямую. Использует общие этапы TASK_STAGES (state.stages),
+// как и визиты, но без клиента/времени визита/тегов. ----------
+
+function renderAgentTasksKanban() {
+  const kanban = document.getElementById('kanban');
+  const today = new Date().toISOString().slice(0, 10);
+  state.stages.forEach((stage) => {
+    let inStage = state.tasks.filter((t) => t.taskType === 'agent' && t.stage === stage.key);
+    inStage = inStage.filter(matchesTaskListFilters);
+    const col = el(`
+      <div class="kanban-col" data-stage="${stage.key}">
+        <h3>${escapeHtml(stage.label)} <span class="col-sum">· ${inStage.length}</span></h3>
+        <div class="col-body"></div>
+      </div>
+    `);
+    const colBody = col.querySelector('.col-body');
+    inStage.forEach((t) => {
+      const overdue = t.dueDate && t.dueDate < today && ACTIVE_STAGES.includes(t.stage);
+      const card = el(`
+        <div class="deal-card" draggable="true" data-id="${t.id}">
+          <div class="deal-title">${escapeHtml(t.title)}</div>
+          <div class="deal-client">${agentTag(t.assigneeId)} ${t.dueDate ? '· ' + fmtDate(t.dueDate) : ''} ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''} ${t.report ? '<span class="report-check" title="Отчёт заполнен">✓ отчёт</span>' : ''}</div>
+          ${t.dateChangeRequest ? '<div class="badge badge-amber" style="margin-top:4px">заявка на перенос даты</div>' : ''}
+          ${(t.attachments || []).length ? `<div class="muted">📎 ${t.attachments.length}</div>` : ''}
+        </div>
+      `);
+      card.addEventListener('click', () => openTaskModal(t));
+      card.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', t.id));
+      colBody.appendChild(card);
+    });
+    col.addEventListener('dragover', (e) => e.preventDefault());
+    col.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const id = e.dataTransfer.getData('text/plain');
+      const draggedTask = state.tasks.find((x) => String(x.id) === String(id));
+      if (draggedTask && stage.key === 'done' && draggedTask.stage !== 'done' && !String(draggedTask.report || '').trim()) {
+        openTaskModal(draggedTask);
+        return;
+      }
+      try {
+        await api('PUT', `/api/tasks/${id}`, { stage: stage.key });
+        await loadAll();
+        render();
+      } catch (err) { alert(err.message); }
+    });
+    kanban.appendChild(col);
+  });
+}
+
 function openTaskModal(task, forceType, presetClientId) {
   const isEdit = !!task;
-  if (!state.clients.length) {
+  // "Задачи агенту" (п.6 бэклога) не привязаны к клиенту — единственный тип
+  // задачи, который можно создать, даже если в системе ещё нет ни одного клиента.
+  const willBeAgentTask = isEdit ? task.taskType === 'agent' : forceType === 'agent';
+  if (!state.clients.length && !willBeAgentTask) {
     alert('Сначала добавьте хотя бы одного клиента во вкладке «Клиенты».');
     return;
   }
@@ -2129,43 +2245,58 @@ function openTaskModal(task, forceType, presetClientId) {
   const hasAssortment = taskClient && ((taskClient.regularAssortment || []).length || (taskClient.testAssortment || []).length);
   const isSale = isEdit ? task.taskType === 'sale' : forceType === 'sale';
   const isWaitlist = isEdit ? task.taskType === 'waitlist' : forceType === 'waitlist';
+  // П.6 бэклога (08.09.2026): отдельная воронка "Задачи агенту" — задача без
+  // привязки к клиенту (taskType === 'agent', clientId === null).
+  const isAgentTask = isEdit ? task.taskType === 'agent' : forceType === 'agent';
   // С Фазы 22 у 'sale' те же этапы, что у визита (state.stages) — свои остались
-  // только у 'waitlist'.
+  // только у 'waitlist'. У 'agent' тоже общие этапы TASK_STAGES (state.stages).
   const stageOptions = isWaitlist ? (state.waitlistStages || []) : state.stages;
 
   const typeSelectBlock = !isEdit ? `
       <label>Тип задачи</label>
       <select name="taskType" id="task-type-select">
-        <option value="visit" ${forceType !== 'sale' && forceType !== 'waitlist' ? 'selected' : ''}>Визит</option>
+        <option value="visit" ${forceType !== 'sale' && forceType !== 'waitlist' && forceType !== 'agent' ? 'selected' : ''}>Визит</option>
         <option value="sale" ${forceType === 'sale' ? 'selected' : ''}>Продажа</option>
         <option value="waitlist" ${forceType === 'waitlist' ? 'selected' : ''}>Лист ожидания (товар под заказ)</option>
+        <option value="agent" ${forceType === 'agent' ? 'selected' : ''}>Задача агенту (без клиента)</option>
       </select>
   ` : '';
 
   const body = `
-    <h2>${isEdit ? (isSale ? 'Задача продажи' : isWaitlist ? 'Задача листа ожидания' : 'Задача') : 'Новая задача'}</h2>
+    <h2>${isEdit ? (isSale ? 'Задача продажи' : isWaitlist ? 'Задача листа ожидания' : isAgentTask ? 'Задача агенту' : 'Задача') : 'Новая задача'}</h2>
     ${isEdit && isStaff() ? `<div class="muted" style="font-size:12px;margin-bottom:8px">Создано: ${fmtDateTime(task.createdAt)} · ${escapeHtml(userName(task.createdBy))}</div>` : ''}
+    ${isEdit && isStaff() && task.taskType !== 'agent' ? `
+    <label>Воронка (тип задачи)</label>
+    <select id="task-type-change-select">
+      <option value="visit" ${task.taskType !== 'sale' && task.taskType !== 'waitlist' ? 'selected' : ''}>Визит</option>
+      <option value="sale" ${task.taskType === 'sale' ? 'selected' : ''}>Продажа</option>
+      <option value="waitlist" ${task.taskType === 'waitlist' ? 'selected' : ''}>Лист ожидания (товар под заказ)</option>
+    </select>
+    <div class="muted" style="font-size:12px;margin:-6px 0 10px">При смене воронки этап и теги, недопустимые в новой воронке, будут сброшены. Задачи агенту (без клиента) сюда не входят — у них своя отдельная воронка.</div>
+    ` : ''}
     <form id="task-form">
+      ${!isAgentTask ? `
       <label>Клиент *</label>
       ${!isEdit ? '<input type="text" id="task-client-search" placeholder="Поиск клиента по названию..." autocomplete="off" style="margin-bottom:6px">' : ''}
       <select name="clientId" id="task-client-select" required ${isEdit ? 'disabled' : ''}>
         ${myClients.map((c) => `<option value="${c.id}" ${(task && task.clientId === c.id) || (!isEdit && presetClientId && Number(presetClientId) === c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
       ${isEdit && taskClient && taskClient.phone ? `<div class="muted" style="font-size:13px;margin:-6px 0 10px">📞 ${telLink(taskClient.phone)}</div>` : ''}
+      ` : ''}
       ${typeSelectBlock}
       <label>Название</label>
-      <input name="title" value="${task ? escapeAttr(task.title) : ''}" placeholder="${isSale ? 'Продажа клиенту' : isWaitlist ? 'Ожидание товара' : 'Посетить клиента'}">
+      <input name="title" value="${task ? escapeAttr(task.title) : ''}" placeholder="${isSale ? 'Продажа клиенту' : isWaitlist ? 'Ожидание товара' : isAgentTask ? 'Например: Сдать отчёт по остаткам' : 'Посетить клиента'}">
       <label>Описание</label>
       <textarea name="description">${task ? escapeHtml(task.description || '') : ''}</textarea>
       <div class="field-row">
         <div><label>Срок *${dateLocked ? ' <span class="lock" title="Обратитесь к супервайзеру">🔒</span>' : ''}</label>
           ${dateFieldHTML({ name: 'dueDate', value: task ? task.dueDate : '', required: true, disabled: dateLocked })}
         </div>
-        ${!isSale && !isWaitlist ? `<div><label>Время визита</label><input type="time" name="visitTime" value="${task ? escapeAttr(task.visitTime || '') : ''}"></div>` : ''}
+        ${!isSale && !isWaitlist && !isAgentTask ? `<div><label>Время визита (от–до)</label><div style="display:flex;gap:6px"><input type="time" name="visitTime" value="${task ? escapeAttr(task.visitTime || '') : ''}"><input type="time" name="visitTimeTo" value="${task ? escapeAttr(task.visitTimeTo || '') : ''}"></div></div>` : ''}
         ${isEdit ? `<div><label>Этап</label><select name="stage">${stageOptions.map((s) => `<option value="${s.key}" ${task.stage === s.key ? 'selected' : ''}>${s.label}</option>`).join('')}</select></div>` : ''}
       </div>
       ${assigneeBlock}
-      ${!isWaitlist ? `
+      ${!isWaitlist && !isAgentTask ? `
       <label>Теги</label>
       <div class="tag-checks">
         ${(isSale ? state.saleTags : state.taskTags).map((tag) => `<label class="tag-check"><input type="checkbox" name="tags" value="${escapeAttr(tag)}" ${task && (task.tags || []).includes(tag) ? 'checked' : ''}> ${escapeHtml(tag)}</label>`).join('')}
@@ -2175,7 +2306,7 @@ function openTaskModal(task, forceType, presetClientId) {
       <div class="tag-checks">
         ${(state.waitlistTags || []).map((tag) => `<label class="tag-check"><input type="checkbox" name="tags" value="${escapeAttr(tag)}" ${task && (task.tags || []).includes(tag) ? 'checked' : ''}> ${escapeHtml(tag)}</label>`).join('')}
       </div>` : ''}
-      ${isEdit && !isWaitlist ? `<label>Комментарий${isSale ? '' : ' по визиту'}</label><textarea name="comment">${escapeHtml(task.comment || '')}</textarea>` : ''}
+      ${isEdit && !isWaitlist ? `<label>Комментарий${isSale ? '' : isAgentTask ? '' : ' по визиту'}</label><textarea name="comment">${escapeHtml(task.comment || '')}</textarea>` : ''}
       ${isEdit && !isWaitlist ? `<label>Отчёт по задаче ${task.stage === 'done' ? '*' : ''}</label><textarea name="report" placeholder="Без отчёта нельзя перевести в «Выполнена»">${escapeHtml(task.report || '')}</textarea>` : ''}
       <div class="modal-actions">
         ${isEdit && isStaff() ? '<button type="button" class="btn-secondary" id="delete-task">Удалить</button>' : ''}
@@ -2204,6 +2335,29 @@ function openTaskModal(task, forceType, presetClientId) {
     await loadAll();
     closeModal();
     render();
+  });
+  // П.4 бэклога (08.09.2026): смена воронки применяется сразу отдельным запросом
+  // (не вместе с формой) — состав полей (теги/этапы/время визита) отличается
+  // между воронками, проще сразу перезагрузить и переоткрыть карточку в новом
+  // виде, чем на лету пересобирать форму под новый тип.
+  const typeChangeSelect = document.getElementById('task-type-change-select');
+  if (typeChangeSelect) typeChangeSelect.addEventListener('change', async (e) => {
+    const newType = e.target.value;
+    if (newType === task.taskType) return;
+    if (!confirm('Сменить воронку задачи? Этап и теги, недопустимые в новой воронке, будут сброшены.')) {
+      e.target.value = task.taskType || 'visit';
+      return;
+    }
+    try {
+      await api('PUT', `/api/tasks/${task.id}`, { taskType: newType });
+      await loadAll();
+      closeModal();
+      const updated = state.tasks.find((x) => x.id === task.id);
+      if (updated) openTaskModal(updated);
+      render();
+    } catch (err) {
+      alert(err.message);
+    }
   });
   if (isEdit && hasAssortment) wireAssortmentToggle(taskClient.id);
   if (isEdit) wireAttachments(task);

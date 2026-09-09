@@ -303,6 +303,9 @@ function migrateLegacyTaskStages() {
       if (t.dateChangeRequest === undefined) patch.dateChangeRequest = null;
       if (t.explanation === undefined) patch.explanation = '';
       if (t.visitTime === undefined) patch.visitTime = '';
+      // П.3 бэклога (08.09.2026): время визита стало диапазоном «от–до» —
+      // visitTime теперь означает «от», добавлено новое поле visitTimeTo («до»).
+      if (t.visitTimeTo === undefined) patch.visitTimeTo = '';
       if (Object.keys(patch).length) db.update('tasks', t.id, patch);
     });
   } finally {
@@ -943,27 +946,39 @@ function register(router) {
   router.post('/api/tasks', requireAuth(async (req, res) => {
     let body;
     try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
-    if (!body.clientId) return sendJson(res, 400, { error: 'Укажите клиента' });
     if (!body.dueDate) return sendJson(res, 400, { error: 'Укажите срок (дату) задачи' });
-    const client = db.find('clients', body.clientId);
-    if (!client) return sendJson(res, 400, { error: 'Клиент не найден' });
-    if (req.user.role === 'agent' && client.ownerId !== req.user.id) {
-      return sendJson(res, 403, { error: 'Это не ваш клиент' });
+    // П.6 бэклога (08.09.2026): отдельная воронка "Задачи агенту" — задача без
+    // привязки к клиенту (clientId остаётся null). Раньше clientId был обязателен
+    // для ЛЮБОЙ задачи — для этого нового типа проверка явно пропускается, для
+    // всех остальных (visit/sale/waitlist) остаётся как была.
+    const taskType = body.taskType === 'sale' ? 'sale' : (body.taskType === 'waitlist' ? 'waitlist' : (body.taskType === 'agent' ? 'agent' : 'visit'));
+    let client = null;
+    if (taskType !== 'agent') {
+      if (!body.clientId) return sendJson(res, 400, { error: 'Укажите клиента' });
+      client = db.find('clients', body.clientId);
+      if (!client) return sendJson(res, 400, { error: 'Клиент не найден' });
+      if (req.user.role === 'agent' && client.ownerId !== req.user.id) {
+        return sendJson(res, 403, { error: 'Это не ваш клиент' });
+      }
     }
-    const assigneeId = isStaff(req.user) && body.assigneeId ? Number(body.assigneeId) : (req.user.role === 'agent' ? req.user.id : client.ownerId);
-    const taskType = body.taskType === 'sale' ? 'sale' : (body.taskType === 'waitlist' ? 'waitlist' : 'visit');
-    const allowedTagsForType = taskType === 'waitlist' ? WAITLIST_TAGS : (taskType === 'sale' ? SALE_TAGS : TASK_TAGS);
+    const assigneeId = isStaff(req.user) && body.assigneeId ? Number(body.assigneeId) : (req.user.role === 'agent' ? req.user.id : (client ? client.ownerId : null));
+    if (!assigneeId) return sendJson(res, 400, { error: 'Укажите агента' });
+    const allowedTagsForType = taskType === 'waitlist' ? WAITLIST_TAGS : (taskType === 'sale' ? SALE_TAGS : (taskType === 'agent' ? [] : TASK_TAGS));
     const tags = Array.isArray(body.tags) ? body.tags.filter((t) => allowedTagsForType.includes(t)) : [];
     // С Фазы 22 'sale' — односложная задача без собственных этапов (см. комментарий
     // у SALE_TAGS выше): создаётся сразу в "in_progress", как и визит, только с
     // другим заголовком по умолчанию и своим набором тегов (бренды + "Договор").
     const task = db.insert('tasks', {
-      clientId: Number(body.clientId),
+      clientId: client ? client.id : null,
       taskType,
-      title: body.title || (taskType === 'sale' ? `Продажа: ${client.name}` : taskType === 'waitlist' ? `Ожидание товара: ${client.name}` : `Посетить: ${client.name}`),
+      title: body.title || (taskType === 'sale' ? `Продажа: ${client.name}` : taskType === 'waitlist' ? `Ожидание товара: ${client.name}` : taskType === 'agent' ? 'Задача агенту' : `Посетить: ${client.name}`),
       description: body.description || '',
       dueDate: body.dueDate,
       visitTime: taskType === 'visit' ? (body.visitTime || '') : '',
+      // П.3 бэклога (08.09.2026): время визита — диапазон «от–до», а не одно
+      // значение. visitTime — «от» (поле сохранено под старым именем ради
+      // совместимости со старыми резервными выгрузками), visitTimeTo — «до».
+      visitTimeTo: taskType === 'visit' ? (body.visitTimeTo || '') : '',
       stage: taskType === 'waitlist' ? 'waiting' : 'in_progress',
       tags,
       comment: '',
@@ -995,14 +1010,34 @@ function register(router) {
     }
 
     const patch = { updatedAt: new Date().toISOString() };
-    ['title', 'description', 'dueDate', 'visitTime', 'comment', 'report'].forEach((f) => {
+    ['title', 'description', 'dueDate', 'visitTime', 'visitTimeTo', 'comment', 'report'].forEach((f) => {
       if (body[f] !== undefined) patch[f] = body[f];
     });
-    const isWaitlist = task.taskType === 'waitlist';
+
+    // П.4 бэклога (08.09.2026): смена воронки (taskType) у уже созданной задачи —
+    // раньше это можно было указать только при создании, если ошиблись при
+    // выборе воронки — приходилось удалять и создавать заново. Доступно только
+    // администратору/супервайзеру (структурная правка, меняющая доску/права).
+    // Этап и теги, допустимые в старой воронке, могут быть недопустимы в новой
+    // (у 'waitlist' свой набор этапов WAITLIST_STAGES и тегов WAITLIST_TAGS) —
+    // если новые этап/теги не переданы этим же запросом явно, сбрасываем их на
+    // дефолт новой воронки, а не оставляем потенциально невалидное значение.
+    let effectiveTaskType = task.taskType;
+    if (isStaff(req.user) && body.taskType !== undefined) {
+      const newType = body.taskType === 'sale' ? 'sale' : (body.taskType === 'waitlist' ? 'waitlist' : 'visit');
+      if (newType !== task.taskType) {
+        patch.taskType = newType;
+        effectiveTaskType = newType;
+        if (body.stage === undefined) patch.stage = newType === 'waitlist' ? 'waiting' : 'in_progress';
+        if (body.tags === undefined) patch.tags = [];
+      }
+    }
+
+    const isWaitlist = effectiveTaskType === 'waitlist';
     // С Фазы 22 'sale' по тегам и этапам ведёт себя как обычная задача (visit) —
     // своя ветка тегов осталась только у 'waitlist'.
     if (body.tags !== undefined) {
-      const allowedTags = isWaitlist ? WAITLIST_TAGS : (task.taskType === 'sale' ? SALE_TAGS : TASK_TAGS);
+      const allowedTags = isWaitlist ? WAITLIST_TAGS : (effectiveTaskType === 'sale' ? SALE_TAGS : (effectiveTaskType === 'agent' ? [] : TASK_TAGS));
       patch.tags = Array.isArray(body.tags) ? body.tags.filter((t) => allowedTags.includes(t)) : [];
     }
     if (body.stage !== undefined) {
@@ -1332,6 +1367,7 @@ function register(router) {
         description: t.description || '',
         dueDate: t.dueDate,
         visitTime: t.visitTime || '',
+        visitTimeTo: t.visitTimeTo || '',
         stage: t.stage,
         tags: t.tags || [],
         comment: t.comment || '',
@@ -1662,11 +1698,17 @@ function register(router) {
     let imported = 0, skippedDuplicate = 0;
     const unresolved = [];
     incoming.forEach((t) => {
-      const client = t.clientName ? clientsByName[norm(t.clientName)] : null;
-      if (!client) { unresolved.push({ reason: 'клиент не найден', clientName: t.clientName, title: t.title }); return; }
+      // П.6 бэклога (08.09.2026): задачи воронки "Задачи агенту" (taskType === 'agent')
+      // изначально без clientName (задача не привязана к клиенту) — старая проверка
+      // "клиент не найден" пометила бы их все как unresolved и молча выбросила при
+      // восстановлении из резервной выгрузки. Для этого типа клиент не ищем вовсе.
+      const isAgentTask = t.taskType === 'agent';
+      const client = !isAgentTask && t.clientName ? clientsByName[norm(t.clientName)] : null;
+      if (!isAgentTask && !client) { unresolved.push({ reason: 'клиент не найден', clientName: t.clientName, title: t.title }); return; }
       const assignee = t.agentName ? usersByName[norm(t.agentName)] : null;
-      const assigneeId = assignee ? assignee.id : client.ownerId;
-      const key = [norm(client.name), t.title, t.dueDate, t.createdAt].join('||');
+      if (isAgentTask && !assignee) { unresolved.push({ reason: 'агент не найден', clientName: t.clientName, title: t.title }); return; }
+      const assigneeId = assignee ? assignee.id : (client ? client.ownerId : null);
+      const key = [client ? norm(client.name) : `agent:${t.title}`, t.title, t.dueDate, t.createdAt].join('||');
       if (existingKeys.has(key)) { skippedDuplicate++; return; }
       const creator = t.createdByName ? usersByName[norm(t.createdByName)] : null;
       // Файл резервной выгрузки может быть сделан ДО обновления кода и содержать
@@ -1676,17 +1718,18 @@ function register(router) {
       // TASK_STAGES/WAITLIST_STAGES), т.к. миграция при старте сервера применяется
       // только к уже хранящимся записям, а не к тем, что приходят через импорт
       // уже после старта (см. normalizeLegacyTaskStage выше — Фаза 22, 08.09.2026).
-      const taskType = t.taskType === 'sale' ? 'sale' : (t.taskType === 'waitlist' ? 'waitlist' : 'visit');
+      const taskType = t.taskType === 'sale' ? 'sale' : (t.taskType === 'waitlist' ? 'waitlist' : (isAgentTask ? 'agent' : 'visit'));
       const legacyNorm = normalizeLegacyTaskStage({
         taskType, stage: t.stage || 'in_progress', tags: t.tags, report: t.report, explanation: t.explanation
       });
       db.insert('tasks', {
-        clientId: client.id,
+        clientId: client ? client.id : null,
         taskType,
         title: t.title || '',
         description: t.description || '',
         dueDate: t.dueDate,
         visitTime: t.visitTime || '',
+        visitTimeTo: t.visitTimeTo || '',
         stage: legacyNorm.stage,
         tags: legacyNorm.tags,
         comment: t.comment || '',
