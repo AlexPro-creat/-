@@ -81,20 +81,16 @@ function withFreshCurrentMonth(clients) {
       ...c,
       currentMonthRevenue: fresh ? (c.currentMonthRevenue || 0) : 0,
       currentMonthItems,
-      promotions: fresh ? (c.promotions || []) : [],
+      // Фаза 24 (09.09.2026): «Акции» по клиентам убраны по просьбе пользователя
+      // («убери акции по клиентам текущие показатели этого месяца») — фронтенду
+      // promotions больше не отдаём (пустой список всегда), независимо от
+      // свежести данных. Импорт (src/import.js) по-прежнему кладёт promotions на
+      // саму запись клиента в базе — это не трогали, просто API их не отдаёт.
+      promotions: [],
       regularAssortment: computeAtRisk(c.regularAssortment, currentMonthItems)
     };
   });
 }
-// Дата среза остатков склада (Фаза 6.1) — сам исходный файл выгрузки дату не
-// содержит. Раньше была захардкожена ('25.08.2026', задокументирована
-// пользователем при присылке файла) — с Фазы 19 хранится в settings базы и
-// обновляется автоматически датой сервера при каждой загрузке нового файла
-// остатков через панель «Команда» (см. POST /api/stock/import ниже).
-function getStockAsOf() {
-  return db.getSetting('stockAsOf', '25.08.2026');
-}
-
 // Этапы доски задач. "Новая задача" убрана — задача сразу создаётся в "В работе".
 // "Лист ожидания" и "Прогрев" больше не этапы доски, а теги задачи (см. TASK_TAGS) —
 // так их проще сочетать с обычным статусом выполнения.
@@ -572,8 +568,7 @@ function register(router) {
       serverDate: new Date().toISOString(),
       salesMonths: MONTH_ORDER,
       latestSalesMonth: MONTH_ORDER[MONTH_ORDER.length - 1],
-      currentMonthDataFresh: isCurrentMonthDataFresh(),
-      stockAsOf: getStockAsOf()
+      currentMonthDataFresh: isCurrentMonthDataFresh()
     });
   }));
 
@@ -1016,14 +1011,19 @@ function register(router) {
 
     // П.4 бэклога (08.09.2026): смена воронки (taskType) у уже созданной задачи —
     // раньше это можно было указать только при создании, если ошиблись при
-    // выборе воронки — приходилось удалять и создавать заново. Доступно только
-    // администратору/супервайзеру (структурная правка, меняющая доску/права).
+    // выборе воронки — приходилось удалять и создавать заново. С Фазы 24
+    // (09.09.2026, по прямой просьбе пользователя — «без запроса каждому
+    // агенту») доступно любому, у кого вообще есть право редактировать эту
+    // задачу (проверено выше, в начале хендлера: сам агент — только свою
+    // задачу, админ/супервайзер — любую) — раньше было доступно только
+    // администратору/супервайзеру, что на практике означало, что агент был
+    // вынужден просить их сменить воронку за себя.
     // Этап и теги, допустимые в старой воронке, могут быть недопустимы в новой
     // (у 'waitlist' свой набор этапов WAITLIST_STAGES и тегов WAITLIST_TAGS) —
     // если новые этап/теги не переданы этим же запросом явно, сбрасываем их на
     // дефолт новой воронки, а не оставляем потенциально невалидное значение.
     let effectiveTaskType = task.taskType;
-    if (isStaff(req.user) && body.taskType !== undefined) {
+    if (body.taskType !== undefined) {
       const newType = body.taskType === 'sale' ? 'sale' : (body.taskType === 'waitlist' ? 'waitlist' : 'visit');
       if (newType !== task.taskType) {
         patch.taskType = newType;
@@ -1603,71 +1603,14 @@ function register(router) {
     sendJson(res, 200, { parsedRows: debts.length, matchedClients: matched });
   }));
 
-  const STOCK_NAME_ALIASES = ['наименование товара', 'название товара', 'наименование', 'название', 'товар', 'номенклатура'];
-  const STOCK_QTY_ALIASES = ['остаток', 'количество', 'кол-во', 'кол'];
-  const STOCK_UNIT_ALIASES = ['ед.изм', 'ед. изм', 'единица измерения', 'единица', 'ед'];
-
-  router.post('/api/stock/import', requireAdmin(async (req, res) => {
-    let table;
-    try { table = await parseUploadedTable(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
-    const nameIdx = findColumn(table.header, STOCK_NAME_ALIASES);
-    const qtyIdx = findColumn(table.header, STOCK_QTY_ALIASES);
-    const unitIdx = findColumn(table.header, STOCK_UNIT_ALIASES);
-    if (nameIdx === -1 || qtyIdx === -1) {
-      return sendJson(res, 400, {
-        error: 'Не нашёл в заголовках колонки «наименование»/«остаток» — переименуйте заголовки в файле или пришлите его мне, поправлю сопоставление',
-        headerFound: table.header
-      });
-    }
-
-    const stockByName = {};
-    let parsedRows = 0;
-    table.dataRows.forEach((r) => {
-      const name = (r[nameIdx] || '').toString().trim();
-      if (!name) return;
-      const qty = parseFloat(String(r[qtyIdx] || '0').replace(',', '.')) || 0;
-      const unit = unitIdx !== -1 ? ((r[unitIdx] || '').toString().trim() || 'шт') : 'шт';
-      stockByName[norm(name)] = { name, unit, qty };
-      parsedRows++;
-    });
-    if (!parsedRows) return sendJson(res, 400, { error: 'Не нашёл ни одной строки с товаром' });
-
-    try {
-      fs.mkdirSync(IMPORT_DIR, { recursive: true });
-      fs.writeFileSync(path.join(IMPORT_DIR, 'stock.json'), JSON.stringify(stockByName, null, 2), 'utf8');
-    } catch (e) {
-      return sendJson(res, 500, { error: `Файл разобрал, но не смог сохранить на диск: ${e.message}` });
-    }
-
-    // Пересчитываем stockQty/stockUnit прямо на уже сохранённых позициях
-    // ассортимента у всех клиентов (без полного реимпорта — сам ассортимент
-    // не пересчитывается, только остаток на позициях, точно так же, как
-    // attachStock() делает при обычном runImport() в import.js).
-    function reattach(items) {
-      return (items || []).map((it) => {
-        const hit = stockByName[norm(it.product)];
-        return { ...it, stockQty: hit ? hit.qty : null, stockUnit: hit ? hit.unit : null };
-      });
-    }
-    db.beginBatch();
-    try {
-      db.all('clients').forEach((c) => {
-        const patch = {};
-        if (c.regularAssortment && c.regularAssortment.length) patch.regularAssortment = reattach(c.regularAssortment);
-        if (c.testAssortment && c.testAssortment.length) patch.testAssortment = reattach(c.testAssortment);
-        if (Object.keys(patch).length) db.update('clients', c.id, patch);
-      });
-    } finally {
-      db.endBatch();
-    }
-
-    const today = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const stockAsOf = `${pad(today.getDate())}.${pad(today.getMonth() + 1)}.${today.getFullYear()}`;
-    db.setSetting('stockAsOf', stockAsOf);
-
-    sendJson(res, 200, { parsedRows, stockAsOf });
-  }));
+  // Загрузка остатков склада через панель (POST /api/stock/import) убрана по
+  // просьбе пользователя (Фаза 24, 09.09.2026 — «убери остаток кол-во везде
+  // где он есть он больше не нужен»). data/import/stock.json (если был
+  // загружен раньше) на диске не трогали — просто больше ничем не читается;
+  // attachStock() в src/import.js по-прежнему подмешивает эти данные в
+  // stockQty/stockUnit при обычном импорте, но фронтенд их больше не
+  // показывает (см. stockBadgeHtml() в public/app.js). Если понадобится вернуть
+  // фичу — история реализации в claude/crm-mvp-status.md, Фаза 6.1/19.
 
   // Обратная загрузка ранее выгруженного файла (после пересборки/передеплоя) —
   // восстанавливает задачи, сопоставляя клиента и агента ПО ИМЕНИ (не по id, см.
@@ -1813,38 +1756,10 @@ function register(router) {
     });
   }));
 
-  // Отдельный отчёт "Акции" — что и кто из клиентов брал по текущим акциям
-  // склада/магазина (client.promotions, срез на дату последнего импорта), с
-  // разбивкой по агенту/клиенту — для супервайзера/администратора.
-  router.get('/api/reports/promotions', requireStaff(async (req, res) => {
-    const params = new URL(req.url, 'http://internal').searchParams;
-    const agentIdFilter = params.get('agentId');
-    const promoFilter = params.get('promo'); // правка 31.08.2026: фильтр по конкретной акции
-    const agentsById = {};
-    db.all('users').forEach((u) => { agentsById[u.id] = u; });
-    let clients = withFreshCurrentMonth(db.all('clients')).filter((c) => (c.promotions || []).length);
-    if (agentIdFilter) clients = clients.filter((c) => c.ownerId === Number(agentIdFilter));
-    const rows = [];
-    const promoSet = new Set();
-    clients.forEach((c) => {
-      (c.promotions || []).forEach((p) => {
-        promoSet.add(p.promo);
-        if (promoFilter && p.promo !== promoFilter) return;
-        const agent = agentsById[c.ownerId];
-        rows.push({
-          clientId: c.id, clientName: c.name,
-          agentId: c.ownerId, agentName: agent ? agent.name : '—',
-          promo: p.promo, qty: p.qty, sum: p.sum || 0
-        });
-      });
-    });
-    sendJson(res, 200, {
-      rows,
-      totalSum: rows.reduce((s, r) => s + (r.sum || 0), 0),
-      promos: Array.from(promoSet).sort(),
-      agents: db.all('users').filter((u) => u.role === 'agent').map((a) => ({ id: a.id, name: a.name }))
-    });
-  }));
+  // Отчёт "Акции" (GET /api/reports/promotions) убран по просьбе пользователя
+  // (Фаза 24, 09.09.2026) вместе со всей фичей акций по клиентам — см.
+  // withFreshCurrentMonth() выше (promotions теперь всегда []) и /api/stats
+  // ниже (карточки акций убраны из дашборда агента/команды).
 
   // ---- Дашборд ----
 
@@ -1970,23 +1885,8 @@ function register(router) {
         return !allTasks.some((t) => t.clientId === c.id && t.dueDate === dateForThisWeek);
       });
 
-      // Карточка "Акции" в дашборде супервайзера (п.3 правок 31.08.2026) — не было
-      // раньше, была только у агента. По всей команде + разбивка по агентам.
-      const clientsWithPromo = allClients.filter((c) => (c.promotions || []).length);
-      payload.promotionsSummary = {
-        clientsCount: clientsWithPromo.length,
-        itemsCount: clientsWithPromo.reduce((s, c) => s + (c.promotions || []).length, 0),
-        sumTotal: clientsWithPromo.reduce((s, c) => s + (c.promotions || []).reduce((s2, p) => s2 + (p.sum || 0), 0), 0),
-        byAgent: agents.map((agent) => {
-          const aClients = clientsWithPromo.filter((c) => c.ownerId === agent.id);
-          return {
-            agentId: agent.id, agentName: agent.name,
-            clientsCount: aClients.length,
-            itemsCount: aClients.reduce((s, c) => s + (c.promotions || []).length, 0),
-            sumTotal: aClients.reduce((s, c) => s + (c.promotions || []).reduce((s2, p) => s2 + (p.sum || 0), 0), 0)
-          };
-        })
-      };
+      // Карточка "Акции" в дашборде супервайзера убрана по просьбе пользователя
+      // (Фаза 24, 09.09.2026) вместе со всей фичей акций — см. withFreshCurrentMonth().
 
       // "Выполнение" в сомах + разбивка по брендам (п.10 правок 31.08.2026) — план
       // (salesPlan, поле клиента из Фазы 8) против факта этого месяца, по всей
@@ -2034,16 +1934,8 @@ function register(router) {
       const myTasksAll = db.all('tasks').filter((t) => t.assigneeId === req.user.id);
       const saleTasksToday = myTasksAll.filter((t) => t.taskType === 'sale' && t.dueDate === today);
 
-      // Карточка "Акции" на дашборде агента — сколько клиентов, сколько позиций
-      // и на какую сумму по акциям сейчас числится (срез на дату импорта).
-      // Добавлена 28.08.2026 без суммы (в старом promotions.json не было цены);
-      // 31.08.2026 пользователь прислал файлы с суммой по каждой акции за
-      // март-август — сумма теперь считается по-настоящему (см. build_promotions_by_month.py).
-      const clientsWithPromotions = clients.filter((c) => (c.promotions || []).length);
-      const promotionsItemsCount = clientsWithPromotions.reduce((s, c) => s + (c.promotions || []).length, 0);
-      const promotionsSumTotal = clientsWithPromotions.reduce(
-        (s, c) => s + (c.promotions || []).reduce((s2, p) => s2 + (p.sum || 0), 0), 0
-      );
+      // Карточка "Акции" на дашборде агента убрана по просьбе пользователя
+      // (Фаза 24, 09.09.2026) вместе со всей фичей акций — см. withFreshCurrentMonth().
 
       // Полная сумма продаж за все 7 месяцев (не только текущий) + разбивка по
       // клиентам — правка 31.08.2026 (п.9): "сумма из отчётов по реализации
@@ -2068,9 +1960,6 @@ function register(router) {
         clientsNotBoughtThisMonth,
         salesTotalAllMonths,
         salesByClientAllMonths,
-        promotionsClientsCount: clientsWithPromotions.length,
-        promotionsItemsCount,
-        promotionsSumTotal,
         topByBrand: {
           Kapous: topByBrand('Kapous', true),
           EPICA: topByBrand('EPICA', true),

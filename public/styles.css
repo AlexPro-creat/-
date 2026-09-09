@@ -292,7 +292,6 @@ th.sortable:hover { color: var(--text); }
 .badge-today { background: rgba(234, 179, 8, 0.2); color: #fbd88a; }
 .badge-pending { background: rgba(234, 179, 8, 0.2); color: #fbd88a; margin-left: 6px; }
 .badge-offroute { background: rgba(155, 107, 242, 0.2); color: #c7aefb; margin-left: 6px; }
-.badge-promo { background: rgba(216, 180, 106, 0.22); color: var(--gold); margin-left: 6px; }
 .badge-pay { background: rgba(155, 107, 242, 0.2); color: #c7aefb; }
 .badge-yes { background: rgba(74, 222, 128, 0.2); color: #86efac; }
 .badge-no { background: rgba(248, 113, 113, 0.2); color: #fca5a5; }
@@ -652,11 +651,6 @@ th.sortable:hover { color: var(--text); }
 #master-form { flex-direction: column; align-items: stretch; }
 #master-form input { margin-bottom: 6px; }
 .brand-badge { display: inline-block; font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: rgba(155, 107, 242, 0.18); color: #c7aefb; margin-left: 6px; }
-.stock-badge { display: inline-block; font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: rgba(74, 222, 128, 0.18); color: #86efac; margin-left: 6px; white-space: nowrap; }
-.stock-badge-empty { background: rgba(248, 113, 113, 0.18); color: #fca5a5; }
-.promo-row { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border); padding: 6px 0; font-size: 13px; }
-.promo-row:last-child { border-bottom: none; }
-.promo-row .promo-qty { color: var(--muted); white-space: nowrap; }
 
 .sku-badge { display: inline-block; font-size: 10.5px; color: var(--muted); font-family: monospace; }
 
