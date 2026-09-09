@@ -1051,7 +1051,7 @@ function renderClients(content) {
             <th>Тип точки</th>
             <th class="sortable" data-sort="route">Маршрут №${sortArrow('route')}</th>
             <th>План</th>
-            <th class="sortable" data-sort="sales">Продано (${escapeHtml(capitalize(latestSalesMonth()))})${sortArrow('sales')}</th>
+            <th class="sortable" data-sort="sales">Продано в этом месяце${sortArrow('sales')}</th>
             <th class="sortable" data-sort="debt">Долг${sortArrow('debt')}</th>
             <th class="sortable" data-sort="risk">Недопродано${sortArrow('risk')}</th>
           </tr></thead>
