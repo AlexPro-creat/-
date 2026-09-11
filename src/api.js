@@ -1444,12 +1444,22 @@ function register(router) {
   // id не совпадут со старыми; сопоставление строго в пределах агента — та же
   // логика, что и при обычном импорте клиентов в import.js, см. технические
   // заметки — иначе общие ярлыки вроде "Частное лицо" у разных агентов задвоятся).
-  // Обновляет ТОЛЬКО ручные поля (тот же набор, что выгружается в /api/clients/export)
-  // у уже существующих клиентов — новых клиентов эта загрузка не создаёт: если
-  // клиента с таким именем у этого агента нет (например, его больше нет в свежем
-  // импорте маршрутов), запись пропускается и попадает в unresolved, ничего не
-  // додумываем. Повторная загрузка того же файла безопасна — просто перезапишет
-  // те же поля теми же значениями, дублей не создаст.
+  // У уже существующих клиентов обновляет ТОЛЬКО ручные поля (тот же набор, что
+  // выгружается в /api/clients/export) — ассортимент/долг/продажи месяца не трогает,
+  // их пересчитает обычный импорт.
+  //
+  // Правка 11.09.2026 (Фаза 28, найдена и исправлена по прямому запросу
+  // пользователя — "клиенты, которых агенты завели сами, выпадают из общего
+  // списка при пересборке"): если клиента с таким именем у этого агента НЕТ —
+  // это, скорее всего, карточка, которую агент когда-то завёл сам через интерфейс
+  // (pendingApproval-поток) и которая НЕ входит в data/import/agents_clients.json,
+  // поэтому обычный импорт маршрутов её не пересоздаёт при пересборке с нуля.
+  // Раньше такая запись просто попадала в unresolved и терялась насовсем. Теперь
+  // вместо пропуска — создаём карточку заново с той же выгрузкой ручных полей
+  // (см. ниже). Единственный оставшийся источник unresolved — агент, которого нет
+  // в текущей базе вообще (переименован/удалён). Повторная загрузка того же файла
+  // по-прежнему безопасна — уже созданная карточка на второй раз просто обновится,
+  // дублей не будет.
   router.post('/api/clients/import', requireAdmin(async (req, res) => {
     let body;
     try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
@@ -1469,24 +1479,75 @@ function register(router) {
     ];
 
     let updated = 0;
+    let created = 0;
     const unresolved = [];
+    const now = new Date().toISOString();
     db.beginBatch();
     try {
       incoming.forEach((c) => {
         const agent = c.agentName ? usersByName[norm(c.agentName)] : null;
         if (!agent) { unresolved.push({ reason: 'агент не найден', agentName: c.agentName, clientName: c.name }); return; }
         const existing = clientsByKey[`${agent.id}||${norm(c.name)}`];
-        if (!existing) { unresolved.push({ reason: 'клиент не найден у этого агента', agentName: c.agentName, clientName: c.name }); return; }
         const patch = {};
         MANUAL_FIELDS.forEach((f) => { if (c[f] !== undefined) patch[f] = c[f]; });
-        db.update('clients', existing.id, patch);
-        updated++;
+        if (existing) {
+          db.update('clients', existing.id, patch);
+          updated++;
+        } else {
+          // Правка 11.09.2026 (Фаза 28): раньше клиент, не найденный у этого агента,
+          // просто пропускался в unresolved и терялся насовсем — именно так пропадали
+          // карточки, которые агент завёл сам через интерфейс (они не входят в
+          // data/import/agents_clients.json, поэтому обычный импорт маршрутов их не
+          // создаёт заново после пересборки с нуля). Теперь вместо пропуска — пересоздаём
+          // карточку с теми же ручными полями из выгрузки, как будто агент завёл её
+          // заново. pendingApproval: false — эта загрузка доступна только администратору
+          // (requireAdmin), восстановление уже одобренной ранее карточки не должно
+          // требовать повторного согласования супервайзером. Дефолты для остальных полей
+          // — те же, что при обычном создании клиента агентом (POST /api/clients).
+          const inserted = db.insert('clients', {
+            name: c.name,
+            ownerId: agent.id,
+            pointType: '',
+            address: '',
+            phone: '',
+            contactName: '',
+            visitDay: '',
+            contractStatus: 'неизвестно',
+            paymentMethod: '',
+            discountTerms: '',
+            salesPlan: 0,
+            notes: '',
+            isOffRoute: false,
+            pendingApproval: false,
+            regularAssortment: [],
+            testAssortment: [],
+            debtAmount: 0,
+            debtOverdue: false,
+            debtAsOf: null,
+            closed: false,
+            closureRequested: false,
+            closureRequestedBy: null,
+            contactNotes: [],
+            masters: [],
+            socialContact: '',
+            bestCallTime: '',
+            decisionMakerName: '',
+            specialRequests: '',
+            orderWindow: '',
+            routeNumber: null,
+            meetingRecords: [],
+            createdAt: now,
+            ...patch
+          });
+          clientsByKey[`${agent.id}||${norm(c.name)}`] = inserted;
+          created++;
+        }
       });
     } finally {
       db.endBatch();
     }
 
-    sendJson(res, 200, { updated, unresolvedCount: unresolved.length, unresolved });
+    sendJson(res, 200, { updated, created, unresolvedCount: unresolved.length, unresolved });
   }));
 
   // Загрузка долгов/остатков прямо через панель, без пересборки zip (Фаза 19,

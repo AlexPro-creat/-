@@ -1563,10 +1563,16 @@ function skuBadgeHtml(p) {
   return `<span class="sku-badge" title="Артикул">#${escapeHtml(p.sku)}</span> `;
 }
 
+// Правка 11.09.2026 (Фаза 27): позиция регулярного ассортимента, уже купленная
+// в текущем месяце (atRisk === false — см. computeAtRisk() в src/api.js),
+// помечается бейджем «оформлено» прямо в общем списке — чтобы не путать
+// с «⚠️ Недопродано» ниже, но и не терять из виду совсем. У тестового
+// ассортимента поля atRisk нет вовсе (undefined !== false) — там бейдж не
+// показывается, это не тот список, к которому применимо понятие «недопродано».
 function assortRow(p) {
   return `
     <div class="assort-row">
-      <span>${skuBadgeHtml(p)}${escapeHtml(p.product)} <span class="brand-badge">${escapeHtml(p.brand || 'Прочее')}</span> ${stockBadgeHtml(p)}</span>
+      <span>${skuBadgeHtml(p)}${escapeHtml(p.product)} <span class="brand-badge">${escapeHtml(p.brand || 'Прочее')}</span> ${stockBadgeHtml(p)}${p.atRisk === false ? ' <span class="badge badge-yes" title="Уже куплено в этом месяце">оформлено</span>' : ''}</span>
       <span class="freq">${p.monthsCount} из 6 посл. мес · ~${p.avgQty} шт/мес · посл.: ${p.lastMonth}</span>
     </div>
   `;
@@ -2307,25 +2313,24 @@ function openTaskModal(task, forceType, presetClientId) {
   if (isEdit && hasAssortment) wireAssortmentToggle(taskClient.id);
   if (isEdit) wireAttachments(task);
   if (isEdit) wireDateChangeSection(task);
-  if (!isEdit) wireTaskClientSearch(myClients, presetClientId);
+  if (!isEdit) wireTaskClientSearch(myClients);
 }
 
-// Поиск клиента в модалке создания задачи (в очереди с 02.09.2026, реализовано
-// в Фазе 18) — при сотнях клиентов у агента обычный <select> одним длинным
-// списком неудобен. Решение: текстовое поле над <select> живьём перестраивает
-// список опций по подстроке в названии клиента (без учёта регистра) — сам
-// <select> остаётся источником истины для отправки формы (clientId всегда
-// валиден), просто его опции сужаются на лету. Поле поиска есть только при
-// создании новой задачи — при редактировании клиент задачи заблокирован
-// (disabled select), искать нечего.
-function wireTaskClientSearch(myClients, presetClientId) {
-  const searchInput = document.getElementById('task-client-search');
-  const select = document.getElementById('task-client-select');
+// Поиск клиента над длинным <select> (в очереди с 02.09.2026, реализовано в
+// Фазе 18 для формы «Новая задача»; обобщено в Фазе 26, 11.09.2026, и
+// переиспользовано в форме «Встреча с клиентом» в Календаре — там до этого
+// был точно такой же длинный список без фильтра, без поиска). Текстовое поле
+// над <select> живьём перестраивает список опций по подстроке в названии
+// клиента (без учёта регистра) — сам <select> остаётся источником истины для
+// отправки формы (clientId всегда валиден), просто его опции сужаются на лету.
+function wireClientSearchSelect(searchInputId, selectId, clients) {
+  const searchInput = document.getElementById(searchInputId);
+  const select = document.getElementById(selectId);
   if (!searchInput || !select) return;
   searchInput.addEventListener('input', () => {
     const q = searchInput.value.trim().toLowerCase();
     const currentValue = select.value;
-    const filtered = q ? myClients.filter((c) => (c.name || '').toLowerCase().includes(q)) : myClients;
+    const filtered = q ? clients.filter((c) => (c.name || '').toLowerCase().includes(q)) : clients;
     select.innerHTML = filtered.map((c) => `<option value="${c.id}" ${String(c.id) === currentValue ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
     // Если текущий выбор отфильтрован — выбираем первый в списке (select
     // required не пропустит пустое значение при отправке формы).
@@ -2333,6 +2338,12 @@ function wireTaskClientSearch(myClients, presetClientId) {
       select.value = String(filtered[0].id);
     }
   });
+}
+
+// Поле поиска есть только при создании новой задачи — при редактировании
+// клиент задачи заблокирован (disabled select), искать нечего.
+function wireTaskClientSearch(myClients) {
+  wireClientSearchSelect('task-client-search', 'task-client-select', myClients);
 }
 
 // ---------- Заявка на перенос даты задачи ----------
@@ -2606,8 +2617,8 @@ function renderTeam(content) {
       <div class="toolbar">
         <h2 style="margin:0">Команда</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a class="btn-secondary" href="/api/clients/export" download style="text-decoration:none;display:inline-block" title="Ручные поля клиентов (адрес/телефон/контакт/маршрут/договор/заметки и т.п.) — чтобы перенести правки в новую базу при следующей пересборке">⬇ Выгрузить клиентов</a>
-          <button type="button" class="btn-secondary" id="client-import-btn" title="Обновить ручные поля уже существующих клиентов из ранее выгруженного файла — по имени и агенту, без дублей">⬆ Загрузить клиентов</button>
+          <a class="btn-secondary" href="/api/clients/export" download style="text-decoration:none;display:inline-block" title="Ручные поля клиентов (адрес/телефон/контакт/маршрут/договор/заметки и т.п.) — чтобы перенести правки в новую базу при следующей пересборке. Скачивайте перед КАЖДОЙ пересборкой архива — включая клиентов, которых агенты завели сами.">⬇ Выгрузить клиентов</a>
+          <button type="button" class="btn-secondary" id="client-import-btn" title="Обновить ручные поля существующих клиентов из ранее выгруженного файла (по имени и агенту) — а тех, кого не нашло (например, клиентов, заведённых агентом самостоятельно), создаёт заново">⬆ Загрузить клиентов</button>
           <input type="file" id="client-import-input" accept=".json" style="display:none">
           <button type="button" class="btn-secondary" id="debts-import-btn" title="Обновить задолженность по всем клиентам из файла .xlsx/.csv — без пересборки архива. Полностью заменяет прежний снимок долгов (клиент, которого нет в новом файле, — долг 0).">⬆ Загрузить долги</button>
           <input type="file" id="debts-import-input" accept=".xlsx,.csv" style="display:none">
@@ -2645,8 +2656,9 @@ function renderTeam(content) {
       try {
         const result = await api('POST', '/api/clients/import', { clients: parsed.clients || [] });
         let msg = `Обновлено клиентов: ${result.updated}.`;
+        if (result.created) msg += ` Создано заново (не найдены в текущей базе — например, заведённые агентом самостоятельно): ${result.created}.`;
         if (result.unresolvedCount) {
-          msg += `\nНе удалось сопоставить: ${result.unresolvedCount} (агент или клиент не найдены в текущей базе) — список в консоли браузера.`;
+          msg += `\nНе удалось сопоставить: ${result.unresolvedCount} (агент не найден в текущей базе — переименован/удалён) — список в консоли браузера.`;
           console.log('Не распознано при загрузке клиентов:', result.unresolved);
         }
         alert(msg);
@@ -2989,7 +3001,8 @@ function openSupervisorMeetingModal(dateKey) {
     <h2>Встреча с клиентом</h2>
     <form id="sup-meeting-form">
       <label>Клиент *</label>
-      <select name="clientId" required>
+      <input type="text" id="sup-meeting-client-search" placeholder="Поиск клиента по названию..." autocomplete="off" style="margin-bottom:6px">
+      <select name="clientId" id="sup-meeting-client-select" required>
         ${state.clients.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
       </select>
       <label>Дата *</label>
@@ -3011,6 +3024,7 @@ function openSupervisorMeetingModal(dateKey) {
     closeModal();
     render();
   });
+  wireClientSearchSelect('sup-meeting-client-search', 'sup-meeting-client-select', state.clients);
 }
 
 // ---------- "Мой день" — упрощённый вид для агента в дороге ----------
