@@ -24,10 +24,16 @@ const state = {
   // П.8 бэклога (08.09.2026): фильтр «есть заявка на перенос даты», общий для
   // всех трёх воронок задач (поле dateChangeRequest не завязано на taskType).
   onlyDateChangeRequest: false,
+  // Фаза 29 (14.09.2026): фильтр «Просроченные» на странице «Задачи» — по
+  // тому же принципу, что и onlyDateChangeRequest выше (общий для всех
+  // четырёх воронок задач, критерий — isTaskOverdue()).
+  onlyOverdue: false,
   // П.2 бэклога (08.09.2026): поиск клиента на странице «Задачи» — по образцу
   // поиска на странице «Клиенты» (filter-search).
   taskClientSearch: '',
-  calendar: { mode: 'month', date: new Date() },
+  // hiddenTypes (Фаза 31, 14.09.2026): набор taskType, скрытых фильтром по воронкам
+  // в Календаре — 'visit'|'sale'|'waitlist'|'agent'. Пусто по умолчанию — показаны все.
+  calendar: { mode: 'month', date: new Date(), hiddenTypes: new Set() },
   clientBulkMode: false,
   clientBulkSelected: new Set(),
   taskBulkMode: false,
@@ -47,21 +53,23 @@ const state = {
 const ACTIVE_STAGES = ['in_progress'];
 
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
-// Месяцы, за которые есть данные о продажах, и последний из них — приходят с
-// сервера через /api/me (state.salesMonths, заполняется в boot() из MONTH_ORDER,
-// src/import.js) — единственный источник правды, чтобы список месяцев не пришлось
-// синхронизировать руками в двух местах. ВАЖНО (01.09.2026): специально НЕ
-// вычисляется из текущей календарной даты (new Date()) — последний доступный
-// месяц выгрузки остаётся "август", даже когда реальный календарь уже в сентябре
-// и далее, пока пользователь не пришлёт новую выгрузку продаж. Все места на
-// дашборде, подписанные раньше как "(этот месяц)"/"текущий месяц" (карточки
-// "Продано", "Топ по брендам", "Выполнение плана"), теперь называют месяц явно
-// (через latestSalesMonth()), чтобы не создавать впечатление "живых" цифр за
-// месяц, который по факту ещё не выгружен.
-function latestSalesMonth() {
-  const months = state.salesMonths || [];
-  return months[months.length - 1] || '';
-}
+// Месяцы, за которые есть полная 6-месячная история ассортимента (regular/test
+// assortment), приходят с сервера через /api/me (state.salesMonths, заполняется
+// в boot() из MONTH_ORDER, src/import.js) — используются чипами-фильтрами по
+// месяцам («Продано всего», рейтинг клиентов, отчёт «Ассортимент по агентам»).
+// Правка 14.09.2026 (Фаза 32): раньше здесь же была функция latestSalesMonth(),
+// подписывавшая карточки «Топ-10 по брендам»/«Выручка»/«План»/«Факт» последним
+// месяцем ЭТОЙ 6-месячной истории (август) — но сами эти карточки считаются НЕ
+// из неё, а из currentMonthRevenue/currentMonthItems (см. topByBrand/salesPerformance
+// в src/api.js) — отдельного, уже живого источника (data/import/current_month_sales.json,
+// обновляется срезами в течение месяца, а не раз в 6 месяцев). Из-за этого карточки
+// с абсолютно актуальными (сентябрьскими) цифрами были подписаны «(Август)» — жалоба
+// пользователя: «продажи текущий месяц а не август как сейчас». Функция удалена,
+// эти 4 места теперь подписаны статично «текущий месяц» — см. renderTopBrandTable-
+// панель и renderPerf() ниже. Ограничение из старого комментария (не выводить месяц
+// из new Date(), чтобы не создавать впечатление «живых» цифр по НЕ обновлённым
+// данным) по-прежнему в силе — но относится только к 6-месячной истории ниже,
+// которая действительно обновляется редко и не совпадает с текущим календарём.
 
 // "Продажа" (taskType: 'sale') — до Фазы 22 была отдельной воронкой "звонок →
 // встреча → сделка/провал" со своими этапами. С Фазы 22 технически устроена так
@@ -75,6 +83,17 @@ const WAITLIST_ACTIVE_STAGES_CLIENT = ['waiting', 'invoiced'];
 function isTaskActiveClient(t) {
   if (t.taskType === 'waitlist') return WAITLIST_ACTIVE_STAGES_CLIENT.includes(t.stage);
   return ACTIVE_STAGES.includes(t.stage);
+}
+
+// Правка 14.09.2026 (Фаза 29): «просрочено» — тот же критерий, что уже
+// использовался поштучно на карточках четырёх досок (дата в прошлом + этап
+// ещё активный, т.е. isTaskActiveClient) и в счётчике «Просроченных задач»
+// на дашборде (см. case 'overdueTasksCount' в dashCardValue) — вынесено в
+// одну функцию, чтобы фильтр «Просроченные» на странице «Задачи» считал
+// ровно так же, а не по своей отдельной логике.
+function isTaskOverdue(t) {
+  const today = new Date().toISOString().slice(0, 10);
+  return !!(t.dueDate && t.dueDate < today && isTaskActiveClient(t));
 }
 
 // ---------- Утилита запросов к API ----------
@@ -520,7 +539,7 @@ async function renderDashboard(content) {
             ${stats.agentDashboard.salesByClientAllMonths.map((r) => `<div>${escapeHtml(r.clientName)} / ${fmtMoney(r.revenue)}</div>`).join('')}
           </div>
         </div>
-        <button type="button" class="assort-btn" id="top-brands-toggle">🏆 Топ-10 по брендам (${capitalize(latestSalesMonth())})</button>
+        <button type="button" class="assort-btn" id="top-brands-toggle">🏆 Топ-10 по брендам (текущий месяц)</button>
         <div class="assort-panel" id="top-brands-panel" style="display:none">
           ${renderTopBrandTable('Kapous', stats.agentDashboard.topByBrand.Kapous, true)}
           ${renderTopBrandTable('EPICA', stats.agentDashboard.topByBrand.EPICA, true)}
@@ -631,7 +650,7 @@ async function renderDashboard(content) {
         <div class="agent-metric-grid" id="perf-stat-cards"></div>
         <div class="table-wrap" style="margin-top:10px">
           <table>
-            <thead><tr><th>Бренд</th><th>Выручка (${capitalize(latestSalesMonth())})</th></tr></thead>
+            <thead><tr><th>Бренд</th><th>Выручка (текущий месяц)</th></tr></thead>
             <tbody id="perf-brand-tbody"></tbody>
           </table>
         </div>
@@ -766,8 +785,8 @@ async function renderDashboard(content) {
     const actualTotal = clientsF.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
     const pct = planTotal ? Math.round((actualTotal / planTotal) * 100) : null;
     document.getElementById('perf-stat-cards').innerHTML = `
-      <div class="stat-card"><div class="num">${fmtMoney(planTotal)}</div><div class="label">План (${capitalize(latestSalesMonth())})</div></div>
-      <div class="stat-card"><div class="num">${fmtMoney(actualTotal)}</div><div class="label">Факт (${capitalize(latestSalesMonth())})</div></div>
+      <div class="stat-card"><div class="num">${fmtMoney(planTotal)}</div><div class="label">План (текущий месяц)</div></div>
+      <div class="stat-card"><div class="num">${fmtMoney(actualTotal)}</div><div class="label">Факт (текущий месяц)</div></div>
       <div class="stat-card"><div class="num">${pct === null ? '—' : pct + '%'}</div><div class="label">Выполнение</div></div>
     `;
     const byBrandMap = {};
@@ -926,7 +945,12 @@ function filteredClients() {
     if (f.onlyDebt && !(c.debtAmount > 0)) return false;
     if (f.onlyShortfall && !riskCount(c)) return false;
     if (f.onlyDiscount && !(c.discountTerms || '').trim()) return false;
-    if (f.onlyPendingApproval && !c.pendingApproval) return false;
+    // Правка 14.09.2026 (Фаза 30): «На согласовании» должен ловить ВСЁ, что ждёт
+    // решения супервайзера/админа по клиенту — не только новую точку от агента
+    // (pendingApproval), но и запрос на закрытие точки (closureRequested). Раньше
+    // фильтр проверял только pendingApproval, и клиенты с запросом на закрытие
+    // (у которых в списке уже был свой бейдж «на закрытие») под фильтр не попадали.
+    if (f.onlyPendingApproval && !(c.pendingApproval || c.closureRequested)) return false;
     if (f.ownerId && c.ownerId !== Number(f.ownerId)) return false;
     if (f.search) {
       const q = f.search.trim().toLowerCase();
@@ -1024,7 +1048,7 @@ function renderClients(content) {
         <label class="filter-check"><input type="checkbox" id="filter-onlyDebt" ${f.onlyDebt ? 'checked' : ''}> Есть задолженность</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyShortfall" ${f.onlyShortfall ? 'checked' : ''}> Не добрал</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyDiscount" ${f.onlyDiscount ? 'checked' : ''}> Со скидкой/особыми условиями</label>
-        ${isStaff() ? `<label class="filter-check"><input type="checkbox" id="filter-onlyPendingApproval" ${f.onlyPendingApproval ? 'checked' : ''}> На согласовании</label>` : ''}
+        ${isStaff() ? `<label class="filter-check" title="Новые точки от агентов, ожидающие подтверждения, и точки с запросом на закрытие"><input type="checkbox" id="filter-onlyPendingApproval" ${f.onlyPendingApproval ? 'checked' : ''}> На согласовании</label>` : ''}
         ${isStaff() ? `<select id="filter-ownerId">
           <option value="">Агент: все</option>
           ${state.users.filter((u) => u.role === 'agent').map((u) => `<option value="${u.id}" ${String(f.ownerId) === String(u.id) ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
@@ -1786,6 +1810,7 @@ function stageLabel(key) {
 // Вынесено в отдельную функцию, чтобы не дублировать в трёх render*Kanban().
 function matchesTaskListFilters(t) {
   if (state.onlyDateChangeRequest && !t.dateChangeRequest) return false;
+  if (state.onlyOverdue && !isTaskOverdue(t)) return false;
   const q = (state.taskClientSearch || '').trim().toLowerCase();
   if (q) {
     const client = clientById(t.clientId);
@@ -1828,6 +1853,7 @@ function renderTasks(content) {
       </div>
       <div class="filter-bar">
         <input type="text" id="task-client-filter" placeholder="Поиск клиента по названию, телефону..." value="${escapeAttr(state.taskClientSearch || '')}" style="max-width:260px">
+        <label class="filter-check"><input type="checkbox" id="filter-onlyOverdue" ${state.onlyOverdue ? 'checked' : ''}> Просроченные</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyDateChangeRequest" ${state.onlyDateChangeRequest ? 'checked' : ''}> Есть заявка на перенос даты</label>
       </div>
       ${typeView === 'visit' ? `
@@ -1910,6 +1936,8 @@ function renderTasks(content) {
   });
   const dateChangeFilterCb = document.getElementById('filter-onlyDateChangeRequest');
   if (dateChangeFilterCb) dateChangeFilterCb.addEventListener('change', (e) => { state.onlyDateChangeRequest = e.target.checked; render(); });
+  const overdueFilterCb = document.getElementById('filter-onlyOverdue');
+  if (overdueFilterCb) overdueFilterCb.addEventListener('change', (e) => { state.onlyOverdue = e.target.checked; render(); });
   document.getElementById('task-type-visit-btn').addEventListener('click', () => { state.taskTypeView = 'visit'; render(); });
   document.getElementById('task-type-sale-btn').addEventListener('click', () => { state.taskTypeView = 'sale'; render(); });
   document.getElementById('task-type-waitlist-btn').addEventListener('click', () => { state.taskTypeView = 'waitlist'; render(); });
@@ -1981,7 +2009,7 @@ function renderTasks(content) {
     const colBody = col.querySelector('.col-body');
     inStage.forEach((t) => {
       const client = clientById(t.clientId);
-      const overdue = t.dueDate && t.dueDate < today && ACTIVE_STAGES.includes(t.stage);
+      const overdue = isTaskOverdue(t);
       const card = el(`
         <div class="deal-card" draggable="true" data-id="${t.id}">
           ${bulk ? `<input type="checkbox" class="bulk-check task-bulk-check" data-id="${t.id}" ${state.taskBulkSelected.has(t.id) ? 'checked' : ''} onclick="event.stopPropagation()">` : ''}
@@ -2038,7 +2066,7 @@ function renderSaleKanban() {
     const colBody = col.querySelector('.col-body');
     inStage.forEach((t) => {
       const client = clientById(t.clientId);
-      const overdue = t.dueDate && t.dueDate < today && ACTIVE_STAGES.includes(t.stage);
+      const overdue = isTaskOverdue(t);
       const card = el(`
         <div class="deal-card" draggable="true" data-id="${t.id}">
           <div class="deal-title">${escapeHtml(t.title)}</div>
@@ -2094,7 +2122,7 @@ function renderWaitlistKanban() {
     const colBody = col.querySelector('.col-body');
     inStage.forEach((t) => {
       const client = clientById(t.clientId);
-      const overdue = t.dueDate && t.dueDate < today && stage.key !== 'received';
+      const overdue = isTaskOverdue(t);
       const card = el(`
         <div class="deal-card" draggable="true" data-id="${t.id}">
           <div class="deal-title">${escapeHtml(t.title)}</div>
@@ -2141,7 +2169,7 @@ function renderAgentTasksKanban() {
     `);
     const colBody = col.querySelector('.col-body');
     inStage.forEach((t) => {
-      const overdue = t.dueDate && t.dueDate < today && ACTIVE_STAGES.includes(t.stage);
+      const overdue = isTaskOverdue(t);
       const card = el(`
         <div class="deal-card" draggable="true" data-id="${t.id}">
           <div class="deal-title">${escapeHtml(t.title)}</div>
@@ -2773,6 +2801,14 @@ function openUserModal() {
 
 const WEEKDAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const MONTH_LABELS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+// Фаза 31 (14.09.2026): те же 4 воронки задач, что на странице «Задачи» — подписи
+// намеренно совпадают дословно с кнопками-переключателями там (task-type-*-btn).
+const CALENDAR_TASK_TYPES = [
+  { key: 'visit', label: 'Визиты с супервайзером' },
+  { key: 'sale', label: 'Воронка продаж' },
+  { key: 'waitlist', label: 'Лист ожидания' },
+  { key: 'agent', label: 'Задачи агенту' }
+];
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 function toDateKey(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
@@ -2786,7 +2822,13 @@ function startOfWeek(d) {
 }
 function fmtDateShort(d) { return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}`; }
 function fmtDateLong(d) { return `${d.getDate()} ${(MONTH_LABELS[d.getMonth()] || '').toLowerCase()} ${d.getFullYear()}`; }
-function tasksOnDate(dateKey) { return state.tasks.filter((t) => t.dueDate === dateKey); }
+// Фаза 31 (14.09.2026): фильтр по воронкам в Календаре — задача скрыта, если её
+// taskType (по умолчанию 'visit', см. остальной код) в state.calendar.hiddenTypes.
+// Единая точка фильтрации — используется во всех представлениях (месяц/неделя/день)
+// и в «Печати маршрута», поэтому скрытые воронки не просачиваются никуда.
+function tasksOnDate(dateKey) {
+  return state.tasks.filter((t) => t.dueDate === dateKey && !state.calendar.hiddenTypes.has(t.taskType || 'visit'));
+}
 function supMeetingsOnDate(dateKey) { return (state.supervisorMeetings || []).filter((m) => m.date === dateKey); }
 
 function shiftCalendar(dir) {
@@ -2815,6 +2857,10 @@ function renderCalendar(content) {
           ${state.user.role === 'supervisor' ? '<button type="button" class="btn-primary" id="cal-add-sup-meeting">+ Встреча с клиентом</button>' : ''}
         </div>
       </div>
+      <div class="filter-bar">
+        ${CALENDAR_TASK_TYPES.map((t) => `<label class="filter-check"><input type="checkbox" class="cal-type-filter" data-type="${t.key}" ${cal.hiddenTypes.has(t.key) ? '' : 'checked'}> ${t.label}</label>`).join('')}
+        ${cal.hiddenTypes.size ? '<button type="button" class="link-btn" id="cal-type-filter-reset">Сбросить</button>' : ''}
+      </div>
       ${state.user.role !== 'supervisor' ? '<div class="sub muted" style="margin-bottom:6px">🟣 — в этот день у супервайзера запланирована встреча с клиентом (день занят).</div>' : ''}
       <div id="cal-title" class="cal-title"></div>
       <div id="cal-body"></div>
@@ -2826,6 +2872,19 @@ function renderCalendar(content) {
   if (printBtn) printBtn.addEventListener('click', () => { renderPrintRoute(); window.print(); });
   const addSupBtn = document.getElementById('cal-add-sup-meeting');
   if (addSupBtn) addSupBtn.addEventListener('click', () => openSupervisorMeetingModal(toDateKey(cal.date)));
+
+  // Фильтр по воронкам (Фаза 31, 14.09.2026) — снятая галочка прячет задачи этой
+  // воронки во всех представлениях календаря и в «Печати маршрута» (см. tasksOnDate()).
+  document.querySelectorAll('.cal-type-filter').forEach((cb) => {
+    cb.addEventListener('change', (e) => {
+      const type = e.target.getAttribute('data-type');
+      if (e.target.checked) cal.hiddenTypes.delete(type);
+      else cal.hiddenTypes.add(type);
+      render();
+    });
+  });
+  const calTypeResetBtn = document.getElementById('cal-type-filter-reset');
+  if (calTypeResetBtn) calTypeResetBtn.addEventListener('click', () => { cal.hiddenTypes.clear(); render(); });
 
   ['month', 'week', 'day'].forEach((m) => {
     const btn = document.getElementById(`cal-mode-${m}`);
