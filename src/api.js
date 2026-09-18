@@ -337,6 +337,56 @@ function migrateLegacyTaskStages() {
   }
 }
 
+// Одноразовая очистка дублей "Задач агенту" (taskType: 'agent'), созданных
+// багом в /api/tasks/import до его исправления 18.09.2026 (см. комментарий у
+// existingKeys там же) — при каждой повторной загрузке одного и того же
+// файла резервной выгрузки такая задача вставлялась заново вместо того,
+// чтобы распознаваться как уже существующая (дедупликация по имени клиента
+// не работает для задач без клиента). Жалоба пользователя «задачи по агенту
+// при загрузке исчезли комментарии» была вызвана именно этим — рядом с
+// задачей, где уже был написан комментарий, появлялась пустая задача-копия
+// с тем же названием/сроком/датой создания, и в списке было не разобрать,
+// какая из одинаковых на вид карточек — та самая. Группируем такие задачи по
+// (title, dueDate, createdAt) — для настоящих отдельных задач это сочетание
+// с точностью до миллисекунды createdAt практически не может совпасть
+// случайно. Из каждой группы оставляем запись с наименьшим id (создана
+// раньше остальных копий), при этом переносим на неё первое непустое
+// значение comment/report/description/tags, найденное СРЕДИ ВСЕХ копий
+// группы — так что если комментарий оказался записан не на "выигравшую"
+// копию, а на одну из удаляемых, он не потеряется. Остальные копии удаляются.
+function dedupeDuplicateAgentTasks() {
+  db.beginBatch();
+  try {
+    const agentTasks = db.all('tasks').filter((t) => t.taskType === 'agent');
+    const groups = {};
+    agentTasks.forEach((t) => {
+      const key = [t.title, t.dueDate, t.createdAt].join('||');
+      (groups[key] = groups[key] || []).push(t);
+    });
+    Object.values(groups).forEach((group) => {
+      if (group.length < 2) return;
+      group.sort((a, b) => a.id - b.id);
+      const keep = group[0];
+      const rest = group.slice(1);
+      const patch = {};
+      ['comment', 'report', 'description'].forEach((f) => {
+        if (!String(keep[f] || '').trim()) {
+          const withValue = rest.find((t) => String(t[f] || '').trim());
+          if (withValue) patch[f] = withValue[f];
+        }
+      });
+      if (!(keep.tags || []).length) {
+        const withTags = rest.find((t) => (t.tags || []).length);
+        if (withTags) patch.tags = withTags.tags;
+      }
+      if (Object.keys(patch).length) db.update('tasks', keep.id, patch);
+      rest.forEach((t) => db.remove('tasks', t.id));
+    });
+  } finally {
+    db.endBatch();
+  }
+}
+
 // Разрешение сотруднику-агенту редактировать адрес/телефон/контактное лицо у СВОИХ
 // клиентов (по умолчанию выключено — эти поля защищённые, см. CLIENT_ADMIN_ONLY_FIELDS).
 // Включается администратором индивидуально по сотруднику (раздел "Команда").
@@ -1720,10 +1770,28 @@ function register(router) {
     db.all('users').forEach((u) => { usersByName[norm(u.name)] = u; });
     const clientsById = {};
     db.all('clients').forEach((c) => { clientsById[c.id] = c; });
+    // Найдено 18.09.2026 (жалоба «задачи по агенту при загрузке исчезли
+    // комментарии» — проверка показала не потерю данных в самом импорте, а
+    // то, что «Задачи агенту» (taskType 'agent', clientId null) при КАЖДОЙ
+    // повторной загрузке одного и того же файла создавались заново вместо
+    // того, чтобы распознаваться как уже существующие — в файле пользователя
+    // нашлось 13 групп по 3 идентичные копии каждой такой задачи, тогда как
+    // среди задач с клиентом (визит/продажа/лист ожидания) дублей не было ни
+    // одного. Причина — этот ключ для уже существующих в базе задач, при
+    // clientId === null, строился на «голом» t.clientId (JS Array.join
+    // превращает null в '' при склейке через '||'), а ключ у ВХОДЯЩЕЙ задачи
+    // ниже — на строке `agent:${t.title}` (непустая) — ключи никогда не
+    // совпадали, `existingKeys.has(...)` всегда возвращал false для «Задач
+    // агенту», и дедупликация для них попросту не работала. Задача-дубликат
+    // из-за этого визуально выглядела как «та же самая задача, но без
+    // комментария», хотя технически комментарий оставался цел у оригинала —
+    // просто рядом появлялась пустая копия. Исправлено — тот же самый принцип
+    // построения ключа (по taskType === 'agent'), что и у входящей задачи ниже.
     const existingKeys = new Set(
       db.all('tasks').map((t) => {
         const c = clientsById[t.clientId];
-        return [c ? norm(c.name) : t.clientId, t.title, t.dueDate, t.createdAt].join('||');
+        const keyPrefix = t.taskType === 'agent' ? `agent:${t.title}` : (c ? norm(c.name) : t.clientId);
+        return [keyPrefix, t.title, t.dueDate, t.createdAt].join('||');
       })
     );
 
@@ -2068,4 +2136,4 @@ function register(router) {
   }));
 }
 
-module.exports = { register, migrateAgentRenames, migrateDocumentsStatus, migrateLegacyTaskStages, migrateClientDefaults, migrateUserDefaults, TASK_STAGES, TASK_TAGS, PAYMENT_METHODS, CONTRACT_STATUSES, sendJson, UPLOADS_DIR };
+module.exports = { register, migrateAgentRenames, migrateDocumentsStatus, migrateLegacyTaskStages, dedupeDuplicateAgentTasks, migrateClientDefaults, migrateUserDefaults, TASK_STAGES, TASK_TAGS, PAYMENT_METHODS, CONTRACT_STATUSES, sendJson, UPLOADS_DIR };

@@ -99,6 +99,7 @@ if (importResult.extraAgentsAdded) {
 // Миграция старых данных под новую схему (см. api.js) — безопасно запускать
 // при каждом старте, после первого раза она ничего не делает.
 api.migrateLegacyTaskStages();
+api.dedupeDuplicateAgentTasks();
 api.migrateClientDefaults();
 api.migrateUserDefaults();
 api.migrateDocumentsStatus();
