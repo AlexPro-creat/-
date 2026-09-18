@@ -31,6 +31,12 @@ const state = {
   // П.2 бэклога (08.09.2026): поиск клиента на странице «Задачи» — по образцу
   // поиска на странице «Клиенты» (filter-search).
   taskClientSearch: '',
+  // Бэклог, зафиксирован 17.09.2026, реализован 18.09.2026 (Фаза 33): фильтр
+  // по агентам на странице «Задачи» — по образцу filter-ownerId на «Клиентах»
+  // (видим только супервайзеру/админу). Фильтрует по assigneeId задачи — общий
+  // для всех четырёх воронок (визиты/продажи/лист ожидания/агенту), как и
+  // onlyOverdue/onlyDateChangeRequest выше.
+  taskFilterOwnerId: '',
   // hiddenTypes (Фаза 31, 14.09.2026): набор taskType, скрытых фильтром по воронкам
   // в Календаре — 'visit'|'sale'|'waitlist'|'agent'. Пусто по умолчанию — показаны все.
   calendar: { mode: 'month', date: new Date(), hiddenTypes: new Set() },
@@ -1811,6 +1817,7 @@ function stageLabel(key) {
 function matchesTaskListFilters(t) {
   if (state.onlyDateChangeRequest && !t.dateChangeRequest) return false;
   if (state.onlyOverdue && !isTaskOverdue(t)) return false;
+  if (state.taskFilterOwnerId && String(t.assigneeId) !== String(state.taskFilterOwnerId)) return false;
   const q = (state.taskClientSearch || '').trim().toLowerCase();
   if (q) {
     const client = clientById(t.clientId);
@@ -1853,6 +1860,10 @@ function renderTasks(content) {
       </div>
       <div class="filter-bar">
         <input type="text" id="task-client-filter" placeholder="Поиск клиента по названию, телефону..." value="${escapeAttr(state.taskClientSearch || '')}" style="max-width:260px">
+        ${isStaff() ? `<select id="task-filter-ownerId">
+          <option value="">Агент: все</option>
+          ${state.users.filter((u) => u.role === 'agent').map((u) => `<option value="${u.id}" ${String(state.taskFilterOwnerId) === String(u.id) ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
+        </select>` : ''}
         <label class="filter-check"><input type="checkbox" id="filter-onlyOverdue" ${state.onlyOverdue ? 'checked' : ''}> Просроченные</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyDateChangeRequest" ${state.onlyDateChangeRequest ? 'checked' : ''}> Есть заявка на перенос даты</label>
       </div>
@@ -1936,6 +1947,8 @@ function renderTasks(content) {
   });
   const dateChangeFilterCb = document.getElementById('filter-onlyDateChangeRequest');
   if (dateChangeFilterCb) dateChangeFilterCb.addEventListener('change', (e) => { state.onlyDateChangeRequest = e.target.checked; render(); });
+  const taskOwnerSel = document.getElementById('task-filter-ownerId');
+  if (taskOwnerSel) taskOwnerSel.addEventListener('change', (e) => { state.taskFilterOwnerId = e.target.value; render(); });
   const overdueFilterCb = document.getElementById('filter-onlyOverdue');
   if (overdueFilterCb) overdueFilterCb.addEventListener('change', (e) => { state.onlyOverdue = e.target.checked; render(); });
   document.getElementById('task-type-visit-btn').addEventListener('click', () => { state.taskTypeView = 'visit'; render(); });
