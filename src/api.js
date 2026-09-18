@@ -259,7 +259,22 @@ function migrateDocumentsStatus() {
 // нужно применить (report возвращается только если его стоит переписать).
 function normalizeLegacyTaskStage({ taskType, stage, tags, report, explanation }) {
   const result = { stage, tags: Array.isArray(tags) ? tags.slice() : [] };
-  if (stage === 'waiting' || stage === 'failed') {
+  // Найдено 18.09.2026 (жалоба «задачи лист ожидания не выгружаются» — по факту
+  // они выгружались корректно, но пропадали с самой доски «Лист ожидания» после
+  // каждого перезапуска сервера/передеплоя). 'waiting'/'failed' были этапами
+  // ТОЛЬКО на старой единой доске визитов (см. комментарий у TASK_STAGES выше) —
+  // но taskType 'waitlist' (Фаза 6, отдельная воронка) ЗАКОННО использует то же
+  // самое слово 'waiting' как свой ТЕКУЩИЙ, а не легаси, первый этап
+  // (WAITLIST_STAGES). Без проверки taskType ниже эта функция на каждом старте
+  // сервера (вызывается из migrateLegacyTaskStages()) ошибочно переводила ЛЮБУЮ
+  // задачу листа ожидания на этапе 'waiting' в 'in_progress' — этого этапа нет в
+  // WAITLIST_STAGES, поэтому renderWaitlistKanban() (фильтрует строго по
+  // WAITLIST_STAGES) переставал показывать такую задачу вообще ни в одной
+  // колонке — она оставалась в базе и корректно попадала в /api/tasks/export,
+  // просто была невидима на самой доске. Одноразовое исправление уже
+  // накопленных испорченных записей — см. отдельный проход в
+  // migrateLegacyTaskStages() ниже.
+  if (taskType !== 'waitlist' && (stage === 'waiting' || stage === 'failed')) {
     const tagToAdd = stage === 'waiting' ? 'Лист ожидания' : 'Прогрев';
     if (!result.tags.includes(tagToAdd)) result.tags.push(tagToAdd);
     result.stage = 'in_progress';
@@ -292,6 +307,19 @@ function migrateLegacyTaskStages() {
       const norm = normalizeLegacyTaskStage(t);
       const patch = {};
       if (norm.stage !== t.stage) patch.stage = norm.stage;
+      // Одноразовое исправление задач листа ожидания, уже испорченных багом
+      // выше (найдено 18.09.2026) на предыдущих перезапусках сервера — то есть
+      // taskType 'waitlist', у которых стадия по ошибке стала 'in_progress',
+      // хотя это не валидный этап WAITLIST_STAGES и через обычные действия в
+      // интерфейсе задача листа ожидания в него попасть не может (создание
+      // всегда ставит 'waiting', PUT /api/tasks/:id разрешает менять стадию
+      // waitlist-задачи только на ключ из WAITLIST_STAGES) — единственный
+      // источник такого состояния был именно этот баг. Возвращаем на 'waiting'
+      // (первый, самый безопасный этап) — 'invoiced'/'received' багом не
+      // затрагивались, чинить их не нужно. norm.stage не трогает это (сам баг
+      // уже исправлен выше проверкой taskType !== 'waitlist' в
+      // normalizeLegacyTaskStage), поэтому чиним отдельно, тем же проходом.
+      if (t.taskType === 'waitlist' && t.stage === 'in_progress') patch.stage = 'waiting';
       if (norm.report !== undefined) patch.report = norm.report;
       if ((t.tags || []).join('|') !== norm.tags.join('|')) patch.tags = norm.tags;
       if (t.report === undefined) patch.report = '';
