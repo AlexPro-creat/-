@@ -486,6 +486,11 @@ function paymentMethodFilterSelectHTML(cardKey) {
 }
 function wireCardAgentFilters(root) {
   function recompute(card) {
+    // Некоторые select с классом .card-agent-filter (например #perf-agent-filter
+    // в панели «Выполнение плана») находятся не внутри .stat-card, а у них своя
+    // отдельная логика/обработчик (см. renderPerf) — тут для них просто нечего
+    // пересчитывать, card будет null.
+    if (!card) return;
     const agentSel = card.querySelector('.card-agent-filter');
     const paySel = card.querySelector('.card-payment-filter');
     const numEl = card.querySelector('.num');
@@ -720,7 +725,7 @@ async function renderDashboard(content) {
         <div class="agent-metric-grid" id="perf-stat-cards"></div>
         <div class="table-wrap" style="margin-top:10px">
           <table>
-            <thead><tr><th>Бренд</th><th>Выручка (текущий месяц)</th></tr></thead>
+            <thead><tr><th>Бренд</th><th>План</th><th>Факт (текущий месяц)</th><th>%</th></tr></thead>
             <tbody id="perf-brand-tbody"></tbody>
           </table>
         </div>
@@ -864,17 +869,34 @@ async function renderDashboard(content) {
       <div class="stat-card"><div class="num">${fmtMoney(actualTotal)}</div><div class="label">Факт (текущий месяц)</div></div>
       <div class="stat-card"><div class="num">${pct === null ? '—' : pct + '%'}</div><div class="label">Выполнение</div></div>
     `;
-    const byBrandMap = {};
-    clientsF.forEach((c) => {
-      (c.currentMonthItems || []).forEach((it) => {
-        const b = it.brand || 'Прочее';
-        byBrandMap[b] = (byBrandMap[b] || 0) + (it.revenue || 0);
-      });
+    // Фаза 37 (21.09.2026): план по брендам — статичные значения из brandPlans
+    // на агенте (см. data/import/brand_plans.json / src/import.js), прописаны
+    // пользователем и не редактируются из интерфейса. Источник — stats.byAgent
+    // (посчитан на сервере в /api/stats), а не state.users: /api/users отдаёт
+    // полный набор полей только админу, а супервайзеру — только id/name/role,
+    // так что для брендов, как и для monthlyPlan/actualThisMonth выше, нужно
+    // брать именно stats.byAgent, иначе у супервайзера план по брендам будет
+    // всегда пустым.
+    const BRAND_BUCKETS = ['EPICA', 'Kapous', 'Остальное'];
+    const agentStats = aid
+      ? (stats.byAgent || []).filter((a) => a.agentId === aid)
+      : (stats.byAgent || []);
+    const actualByBucket = { EPICA: 0, Kapous: 0, 'Остальное': 0 };
+    const planByBucket = { EPICA: 0, Kapous: 0, 'Остальное': 0 };
+    let hasAnyPlan = false;
+    agentStats.forEach((a) => {
+      BRAND_BUCKETS.forEach((b) => { actualByBucket[b] += (a.actualByBrand && a.actualByBrand[b]) || 0; });
+      if (a.brandPlans) {
+        hasAnyPlan = true;
+        BRAND_BUCKETS.forEach((b) => { planByBucket[b] += a.brandPlans[b] || 0; });
+      }
     });
-    const rows = Object.entries(byBrandMap).map(([brand, revenue]) => ({ brand, revenue })).sort((a, b) => b.revenue - a.revenue);
-    document.getElementById('perf-brand-tbody').innerHTML = rows.length
-      ? rows.map((r) => `<tr><td>${escapeHtml(r.brand)}</td><td>${fmtMoney(r.revenue)}</td></tr>`).join('')
-      : '<tr><td colspan="2" class="muted">Нет продаж в этом месяце.</td></tr>';
+    document.getElementById('perf-brand-tbody').innerHTML = BRAND_BUCKETS.map((b) => {
+      const plan = planByBucket[b];
+      const actual = actualByBucket[b];
+      const pct = plan ? Math.round((actual / plan) * 100) : null;
+      return `<tr><td>${escapeHtml(b)}</td><td>${plan ? fmtMoney(plan) : '—'}</td><td>${fmtMoney(actual)}</td><td>${pct === null ? '—' : pct + '%'}</td></tr>`;
+    }).join('') + (!hasAnyPlan ? '<tr><td colspan="4" class="muted">План по брендам для выбранного агента не задан.</td></tr>' : '');
   }
   if (stats.salesPerformance) {
     renderPerf();

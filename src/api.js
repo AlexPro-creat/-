@@ -561,7 +561,7 @@ function readBody(req) {
 
 function publicUser(u) {
   if (!u) return null;
-  return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl || null, canEditClientContact: !!u.canEditClientContact, monthlyPlan: u.monthlyPlan || 0 };
+  return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl || null, canEditClientContact: !!u.canEditClientContact, monthlyPlan: u.monthlyPlan || 0, brandPlans: u.brandPlans || null };
 }
 
 function norm(s) {
@@ -2031,6 +2031,21 @@ function register(router) {
       const allTasks = db.all('tasks');
       const allClients = withFreshCurrentMonth(db.all('clients'));
 
+      // Бренд-корзины для плана/факта по брендам (Фаза 37) — те же 3 категории,
+      // что и в файле пользователя "Проекция продажи..." (EPICA / Kapous /
+      // Остальное — всё, что не EPICA и не Kapous, попадает в "Остальное").
+      const BRAND_BUCKETS = ['EPICA', 'Kapous', 'Остальное'];
+      function bucketOfBrand(brand) {
+        return (brand === 'EPICA' || brand === 'Kapous') ? brand : 'Остальное';
+      }
+      function actualByBrandBucket(clientsList) {
+        const map = { EPICA: 0, Kapous: 0, 'Остальное': 0 };
+        clientsList.forEach((c) => {
+          (c.currentMonthItems || []).forEach((it) => { map[bucketOfBrand(it.brand)] += (it.revenue || 0); });
+        });
+        return map;
+      }
+
       payload.byAgent = agents.map((agent) => {
         const aTasks = allTasks.filter((t) => t.assigneeId === agent.id);
         const done = aTasks.filter((t) => t.stage === 'done').length;
@@ -2057,7 +2072,13 @@ function register(router) {
           monthlyPlan,
           actualThisMonth,
           planPct: monthlyPlan ? Math.round((actualThisMonth / monthlyPlan) * 100) : null,
-          overdueCount
+          overdueCount,
+          // Планы по брендам (Фаза 37, 21.09.2026) — статичные значения из
+          // data/import/brand_plans.json (см. комментарий в src/import.js),
+          // прописаны пользователем и не редактируются из интерфейса, пока не
+          // будет новой задачи на изменение. null, если у агента плана нет.
+          brandPlans: agent.brandPlans || null,
+          actualByBrand: actualByBrandBucket(agentClients)
         };
       });
 

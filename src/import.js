@@ -209,6 +209,21 @@ function runImportBody() {
   const agentsByName = agentUserMap();
   const adminUser = db.all('users').find((u) => u.role === 'admin');
 
+  // Планы по брендам (Фаза 37, 21.09.2026) — по просьбе пользователя, прописаны
+  // статично из его файла "Проекция продажи сентябрь на 04.09 123.xlsx" (разбивка
+  // EPICA/Kapous/Остальное по каждому ТП). "Статично" значит: значения живут
+  // только в этом JSON-файле в репозитории (не в БД, не редактируются через
+  // интерфейс) — применяются к агентам заново при КАЖДОМ старте сервера, поэтому
+  // переживают сброс базы при передеплое (в отличие от user.monthlyPlan, который
+  // хранится в БД и стирается вместе с ней, пока не подключён постоянный диск).
+  // Меняются только когда пользователь явно попросит новую задачу на изменение —
+  // тогда правим data/import/brand_plans.json и пересобираем.
+  const brandPlansMap = loadJson('brand_plans.json') || {};
+  Object.keys(brandPlansMap).forEach((agentName) => {
+    const agent = agentsByName[norm(agentName)];
+    if (agent) db.update('users', agent.id, { brandPlans: brandPlansMap[agentName] });
+  });
+
   const contractors = loadJson('agents_clients.json') || [];
   const assortmentMap = loadJson('regular_assortment.json') || {};
   const testAssortmentMap = loadJson('test_assortment.json') || {};
