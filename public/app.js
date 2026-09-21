@@ -1075,14 +1075,14 @@ function renderClients(content) {
           <thead><tr>
             ${bulk ? '<th></th>' : ''}
             <th class="sticky-col">Название</th>
+            <th class="sortable" data-sort="sales">Продано в этом месяце${sortArrow('sales')}</th>
+            <th class="sortable" data-sort="debt">Долг${sortArrow('debt')}</th>
             <th>Номер телефона</th>
             <th>Адрес</th>
             <th>Контактное лицо</th>
             <th>Тип точки</th>
             <th class="sortable" data-sort="route">Маршрут №${sortArrow('route')}</th>
             <th>План</th>
-            <th class="sortable" data-sort="sales">Продано в этом месяце${sortArrow('sales')}</th>
-            <th class="sortable" data-sort="debt">Долг${sortArrow('debt')}</th>
             <th class="sortable" data-sort="risk">Недопродано${sortArrow('risk')}</th>
           </tr></thead>
           <tbody id="clients-tbody"></tbody>
@@ -1169,14 +1169,14 @@ function renderClients(content) {
           ${c.pendingApproval ? '<span class="badge badge-pending">на согласовании</span>' : ''}
           ${c.isOffRoute ? '<span class="badge badge-offroute">вне маршрута</span>' : ''}
         </td>
+        <td>${c.currentMonthRevenue ? fmtMoney(c.currentMonthRevenue) : '—'}</td>
+        <td>${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${escapeAttr([overdueDays, debtAsOfLabel(c) ? 'на ' + debtAsOfLabel(c) : ''].filter(Boolean).join(', '))}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
         <td>${telLink(c.phone)}</td>
         <td>${escapeHtml(c.address || '—')} ${mapsLink(c.address)}</td>
         <td>${escapeHtml(c.contactName || '—')}</td>
         <td>${escapeHtml(c.pointType || '—')}</td>
         <td>${c.routeNumber != null ? escapeHtml(String(c.routeNumber)) : '—'}</td>
         <td>${c.salesPlan ? fmtMoney(c.salesPlan) : '—'}</td>
-        <td>${c.currentMonthRevenue ? fmtMoney(c.currentMonthRevenue) : '—'}</td>
-        <td>${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${escapeAttr([overdueDays, debtAsOfLabel(c) ? 'на ' + debtAsOfLabel(c) : ''].filter(Boolean).join(', '))}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
         <td>${risk ? `<span class="badge badge-overdue">${risk} недопродано</span>` : '—'}</td>
       </tr>
     `);
