@@ -520,6 +520,40 @@ async function renderDashboard(content) {
         ${isStaff() && stats.newMastersCount ? `<div class="stat-card"><div class="num">${stats.newMastersCount}</div><div class="label">Новых мастеров (не просмотрено)</div></div>` : ''}
       </div>
 
+      ${stats.byAgent ? `
+      <div class="panel">
+        <h2>План vs факт по агентам <span class="muted" style="font-weight:400;font-size:12px">· текущий месяц</span></h2>
+        <div class="chart-desc">План — общая цифра на агента в месяц (задаётся на странице «Команда»). Факт — продано с начала месяца на сегодня.</div>
+        ${stats.byAgent.map((a, i) => `
+          <div class="bar-row">
+            <div class="bar-top"><span class="bar-name">${agentTag(a.agentId)}</span><span class="bar-pct">${a.monthlyPlan ? a.planPct + '% плана' : 'план не задан'}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${a.monthlyPlan ? Math.min(100, a.planPct) : 0}%;background:var(--c${(i % 6) + 1})"></div></div>
+            <div class="bar-foot"><span>факт ${fmtMoney(a.actualThisMonth)}</span><span>${a.monthlyPlan ? 'план ' + fmtMoney(a.monthlyPlan) : ''}</span></div>
+          </div>
+        `).join('')}
+        ${stats.byAgent.every((a) => !a.monthlyPlan) ? '<div class="muted" style="font-size:12px;margin-top:10px">План ни у одного агента ещё не задан — заполните на странице «Команда», тогда появится % выполнения.</div>' : ''}
+      </div>` : ''}
+
+      ${stats.criticalDebts && stats.criticalDebts.length ? `
+      <div class="panel">
+        <h2>Критичные долги <span class="muted" style="font-weight:400;font-size:12px">· &gt;50 000 сом и &gt;7 дней</span></h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Клиент</th><th>Ответственный</th><th>Долг</th><th>Дней</th></tr></thead>
+            <tbody>
+              ${stats.criticalDebts.map((d) => `
+                <tr>
+                  <td>${escapeHtml(d.clientName)}<br><span class="critical-pill">критично</span></td>
+                  <td>${agentTag(d.ownerId)}</td>
+                  <td>${fmtMoney(d.debtAmount)}</td>
+                  <td>${d.daysOverdue == null ? '—' : d.daysOverdue}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>` : ''}
+
       ${stats.agentDashboard ? `
       <div class="panel">
         <h2>Мои показатели</h2>
@@ -619,6 +653,36 @@ async function renderDashboard(content) {
       </div>
 
       ${stats.byAgent ? `
+      <div class="panel">
+        <h2>Долг по агентам</h2>
+        <div class="chart-desc">Сумма долга клиентов, закреплённых за агентом (ownerId в CRM).</div>
+        ${(() => {
+          const sorted = stats.byAgent.slice().sort((a, b) => b.totalDebt - a.totalDebt);
+          const max = Math.max(1, ...sorted.map((a) => a.totalDebt));
+          return sorted.map((a) => {
+            const i = stats.byAgent.indexOf(a);
+            return `
+            <div class="hbar-grid">
+              <div class="hbar-name">${escapeHtml(userName(a.agentId))}</div>
+              <div class="hbar-track"><div class="hbar-fill" style="width:${Math.round((a.totalDebt / max) * 100)}%;background:var(--c${(i % 6) + 1})"></div></div>
+              <div class="hbar-val">${fmtMoney(a.totalDebt)}</div>
+            </div>`;
+          }).join('');
+        })()}
+      </div>
+
+      <div class="panel">
+        <h2>Выполнение задач по агентам</h2>
+        <div class="chart-desc">Доля задач, закрытых как «выполнена», от закрытых задач (выполнена + не выполнена).</div>
+        ${stats.byAgent.map((a, i) => `
+          <div class="bar-row">
+            <div class="bar-top"><span class="bar-name">${escapeHtml(userName(a.agentId))}</span><span class="bar-pct">${a.completionRate === null ? '—' : a.done + ' из ' + (a.done + a.notDone)}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${a.completionRate || 0}%;background:${a.completionRate === null ? 'var(--muted)' : a.completionRate >= 70 ? 'var(--success)' : a.completionRate >= 40 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
+          </div>
+        `).join('')}
+        ${stats.byAgent.some((a) => a.overdueCount) ? `<div class="chart-desc" style="margin:12px 0 0">Просрочено сейчас: ${stats.byAgent.filter((a) => a.overdueCount).map((a) => `${escapeHtml(userName(a.agentId))} — ${a.overdueCount}`).join(', ')}</div>` : ''}
+      </div>
+
       <div class="panel">
         <h2>Выполнение по агентам</h2>
         <div class="table-wrap">
@@ -787,7 +851,12 @@ async function renderDashboard(content) {
     if (!sel) return;
     const aid = sel.value ? Number(sel.value) : null;
     const clientsF = aid ? state.clients.filter((c) => c.ownerId === aid) : state.clients;
-    const planTotal = clientsF.reduce((s, c) => s + (c.salesPlan || 0), 0);
+    // Фаза 36: план — сумма agent.monthlyPlan (см. stats.byAgent), а не старый
+    // per-client c.salesPlan (то поле так и не используется, всегда 0 — раньше
+    // тут поэтому всегда показывался план 0 сом, отсюда и была жалоба на дашборд).
+    const planTotal = aid
+      ? ((stats.byAgent || []).find((a) => a.agentId === aid) || {}).monthlyPlan || 0
+      : (stats.byAgent || []).reduce((s, a) => s + (a.monthlyPlan || 0), 0);
     const actualTotal = clientsF.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
     const pct = planTotal ? Math.round((actualTotal / planTotal) * 100) : null;
     document.getElementById('perf-stat-cards').innerHTML = `
@@ -2509,9 +2578,33 @@ function wireAttachDeletes(task) {
 
 async function renderReports(content) {
   if (!isStaff()) return;
+  const stats = await api('GET', '/api/stats');
   content.appendChild(el(`
     <div>
-      <h2 style="margin-top:0">Ассортимент по агентам</h2>
+      ${stats.periodComparison ? `
+      <div class="panel">
+        <h2>Продажи: сравнение периодов</h2>
+        <div class="chart-desc">Этот месяц (нарастающим итогом на сегодня) против ${escapeHtml(capitalize(stats.periodComparison.lastClosedMonth))}а — последнего полностью закрытого месяца. Не день-в-день (там весь месяц), но видно динамику.</div>
+        <div class="bar-row">
+          <div class="bar-top"><span class="bar-name">Команда</span><span class="bar-pct">${fmtMoney(stats.periodComparison.thisMonthSoFar)} vs ${fmtMoney(stats.periodComparison.lastMonthTotal)}</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${stats.periodComparison.lastMonthTotal ? Math.min(100, Math.round(stats.periodComparison.thisMonthSoFar / stats.periodComparison.lastMonthTotal * 100)) : 0}%;background:var(--c1)"></div></div>
+        </div>
+        ${stats.periodComparison.byAgent.map((a, i) => `
+          <div class="bar-row">
+            <div class="bar-top"><span class="bar-name">${escapeHtml(a.agentName)}</span><span class="bar-pct">${fmtMoney(a.thisMonthSoFar)} vs ${fmtMoney(a.lastMonthTotal)}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${a.lastMonthTotal ? Math.min(100, Math.round(a.thisMonthSoFar / a.lastMonthTotal * 100)) : 0}%;background:var(--c${(i % 6) + 1})"></div></div>
+          </div>
+        `).join('')}
+      </div>` : ''}
+
+      <div class="panel">
+        <h2>История по клиенту / агенту</h2>
+        <div class="chart-desc">Поиск клиента или агента — сводка по продажам в этом месяце, долгу и задачам.</div>
+        <input type="text" id="history-search" placeholder="Найти клиента или агента..." autocomplete="off" style="width:100%;max-width:420px;margin-bottom:10px">
+        <div id="history-results"></div>
+      </div>
+
+      <h2>Ассортимент по агентам</h2>
       <div class="sub muted" style="margin-bottom:10px">Товар / бренд / штук / выручка / число клиентов — фильтры по бренду, агенту и месяцу (по умолчанию — 7-месячная агрегация; при выборе конкретного месяца показаны данные только за него).</div>
       <div class="filter-bar" style="margin-bottom:10px">
         <select id="reports-agent-filter">
@@ -2647,6 +2740,47 @@ async function renderReports(content) {
   // Отчёт «Акции» убран по просьбе пользователя (Фаза 24, 09.09.2026) вместе
   // со всей фичей акций — см. withFreshCurrentMonth()/удалённый эндпоинт
   // /api/reports/promotions в src/api.js.
+
+  // «История по клиенту/агенту» (Фаза 36) — тот же паттерн поиска, что и везде
+  // в приложении (см. filteredClients()/matchesTaskListFilters() выше): запрос
+  // и «сенник» полей приводятся к нижнему регистру через .trim().toLowerCase(),
+  // совпадение — простой .includes(), без учёта ё/е и прочей нормализации —
+  // одинаково везде, чтобы поведение поиска не отличалось от вкладки к вкладке.
+  const historySearch = document.getElementById('history-search');
+  const historyResults = document.getElementById('history-results');
+  function renderHistoryResults() {
+    const q = (historySearch.value || '').trim().toLowerCase();
+    if (!q) { historyResults.innerHTML = ''; return; }
+    const agentMatches = stats.byAgent.filter((a) => a.agentName.toLowerCase().includes(q));
+    const clientMatches = state.clients.filter((c) => `${c.name} ${c.phone || ''} ${c.contactName || ''}`.toLowerCase().includes(q)).slice(0, 20);
+    if (!agentMatches.length && !clientMatches.length) {
+      historyResults.innerHTML = '<div class="empty-state">Ничего не нашлось.</div>';
+      return;
+    }
+    historyResults.innerHTML = `
+      ${agentMatches.map((a) => `
+        <div class="panel" style="margin-bottom:10px;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <strong>${escapeHtml(a.agentName)}</strong><span class="muted" style="font-size:12px">агент</span>
+          </div>
+          <div class="field"><span class="k">Продано в этом месяце</span><span class="v">${fmtMoney(a.actualThisMonth)}</span></div>
+          <div class="field"><span class="k">План на месяц</span><span class="v">${a.monthlyPlan ? fmtMoney(a.monthlyPlan) + ' (' + a.planPct + '%)' : '—'}</span></div>
+          <div class="field"><span class="k">Долг клиентов</span><span class="v">${fmtMoney(a.totalDebt)}</span></div>
+          <div class="field"><span class="k">Задач в работе / просрочено</span><span class="v">${a.open} / ${a.overdueCount}</span></div>
+        </div>
+      `).join('')}
+      ${clientMatches.map((c) => `
+        <div class="panel" style="margin-bottom:10px;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <strong>${escapeHtml(c.name)}</strong><span class="muted" style="font-size:12px">клиент · ${escapeHtml(userName(c.ownerId))}</span>
+          </div>
+          <div class="field"><span class="k">Продано в этом месяце</span><span class="v">${fmtMoney(c.currentMonthRevenue || 0)}</span></div>
+          <div class="field"><span class="k">Долг</span><span class="v">${c.debtAmount ? fmtMoney(c.debtAmount) + (c.debtOverdue ? ' (просрочка)' : '') : 'нет'}</span></div>
+        </div>
+      `).join('')}
+    `;
+  }
+  historySearch.addEventListener('input', renderHistoryResults);
 }
 
 // ---------- Команда (только админ) ----------
@@ -2669,7 +2803,7 @@ function renderTeam(content) {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Аватар</th><th>Имя</th><th>Email</th><th>Роль</th><th></th></tr></thead>
+          <thead><tr><th>Аватар</th><th>Имя</th><th>Email</th><th>Роль</th><th title="Общий план продаж на месяц — используется на дашборде («План vs факт по агентам»). Не по каждому клиенту, одна цифра на агента.">План (мес.)</th><th></th></tr></thead>
           <tbody id="users-tbody"></tbody>
         </table>
       </div>
@@ -2764,6 +2898,7 @@ function renderTeam(content) {
         <td>${escapeHtml(u.name)}</td>
         <td>${escapeHtml(u.email || '')}</td>
         <td>${roleLabel(u.role)}</td>
+        <td>${u.role === 'agent' ? `<input type="number" min="0" step="1000" class="plan-input" data-id="${u.id}" value="${u.monthlyPlan || ''}" placeholder="0" style="width:110px">` : '—'}</td>
         <td>${u.id !== state.user.id ? '<button class="link-btn delete-user">Удалить</button>' : ''}</td>
       </tr>
     `);
@@ -2785,6 +2920,22 @@ function renderTeam(content) {
         render();
       } catch (e) { alert(e.message); }
     });
+    // План на месяц (Фаза 36) — сохраняем по blur/Enter, без отдельной кнопки
+    // «Сохранить», как и остальные быстрые правки на этой странице.
+    const planInput = row.querySelector('.plan-input');
+    if (planInput) {
+      const savePlan = async () => {
+        const val = Math.max(0, Math.round(Number(planInput.value) || 0));
+        planInput.value = val || '';
+        try {
+          await api('PUT', `/api/users/${u.id}/plan`, { monthlyPlan: val });
+          const su = state.users.find((x) => x.id === u.id);
+          if (su) su.monthlyPlan = val;
+        } catch (e) { alert('Не удалось сохранить план: ' + e.message); }
+      };
+      planInput.addEventListener('blur', savePlan);
+      planInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') planInput.blur(); });
+    }
     tbody.appendChild(row);
   });
 }

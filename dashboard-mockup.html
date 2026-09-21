@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Макет — новый дашборд и отчёты</title>
+<style>
+:root {
+  --bg: #f9f9f7; --surface: #fcfcfb; --text: #0b0b0b; --text2: #52514e; --muted: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --primary: #4f46e5;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --c-tatiana: #2a78d6; --c-nagima: #eb6834; --c-albina: #1baf7a;
+  --c-bataeva: #eda100; --c-zhanara: #e87ba4; --c-begimay: #008300;
+}
+* { box-sizing: border-box; }
+body { margin:0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing:antialiased; }
+.note { background: #fff7e6; border-bottom: 1px solid #f4d38a; color: #7a5b12; padding: 12px 16px; font-size: 13px; line-height:1.5; }
+.wrap { max-width: 480px; margin: 0 auto; padding: 0 0 40px; }
+.appbar { position: sticky; top:0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; display:flex; align-items:center; justify-content:space-between; }
+.appbar h1 { font-size: 16px; margin:0; }
+.tabs { display:flex; gap:6px; }
+.tabs button { border:1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 6px 14px; font-size: 13px; cursor:pointer; color: var(--text2); }
+.tabs button.active { background: var(--primary); border-color: var(--primary); color:#fff; font-weight:600; }
+.period { padding: 10px 16px 0; font-size: 12.5px; color: var(--muted); display:flex; align-items:center; justify-content:space-between; }
+.period select { font-size:12.5px; border:1px solid var(--border); border-radius:6px; padding:4px 6px; background:var(--surface); color:var(--text); }
+section.page { padding: 12px 16px; display:none; }
+section.page.active { display:block; }
+.stat-row { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.stat-tile { background: var(--surface); border:1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.stat-tile .lbl { font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+.stat-tile .val { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-tile .sub { font-size: 11.5px; color: var(--text2); margin-top: 2px; }
+.stat-tile.crit .val { color: var(--critical); }
+.card { background: var(--surface); border:1px solid var(--border); border-radius: 14px; padding: 14px 14px 16px; margin-bottom: 14px; }
+.card h2 { font-size: 13.5px; margin: 0 0 2px; }
+.card .desc { font-size: 11.5px; color: var(--muted); margin-bottom: 12px; }
+.legend { display:flex; gap: 14px; flex-wrap:wrap; font-size: 11px; color: var(--text2); margin-bottom: 10px; }
+.legend .sw { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+
+/* --- grouped plan/fact bars --- */
+.bars { display:flex; flex-direction:column; gap: 12px; }
+.bar-row .top { display:flex; justify-content:space-between; font-size: 12.5px; margin-bottom: 4px; }
+.bar-row .top .name { font-weight:600; }
+.bar-row .top .pct { font-variant-numeric: tabular-nums; color: var(--text2); }
+.bar-track { position:relative; height: 14px; background: #f0efec; border-radius: 4px; overflow:hidden; }
+.bar-fill { position:absolute; top:0; left:0; height:100%; border-radius: 4px; }
+.bar-plan-mark { position:absolute; top:-3px; bottom:-3px; width:2px; background: var(--text); opacity:.55; }
+.bar-foot { display:flex; justify-content:space-between; font-size: 11px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+/* --- horizontal debt-by-agent bars --- */
+.hbar-row { display:grid; grid-template-columns: 78px 1fr 64px; align-items:center; gap:8px; margin-bottom:9px; font-size:12px; }
+.hbar-row .hname { color: var(--text2); }
+.hbar-track { height: 12px; background:#f0efec; border-radius:4px; overflow:hidden; }
+.hbar-fill { height:100%; border-radius:4px; }
+.hbar-val { text-align:right; font-variant-numeric: tabular-nums; color: var(--text2); }
+
+/* --- overdue debt table --- */
+.tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.tbl th { text-align:left; font-weight:600; color:var(--muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.02em; padding:0 6px 6px; border-bottom:1px solid var(--border); }
+.tbl td { padding:8px 6px; border-bottom:1px solid #f0f1f4; vertical-align:top; }
+.tbl td.num { text-align:right; font-variant-numeric: tabular-nums; white-space:nowrap; }
+.pill { display:inline-flex; align-items:center; gap:4px; padding: 2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+.pill.critical { background:#fbe3e2; color:#9c2b2b; }
+.pill.warning { background:#fef1d6; color:#8a5a06; }
+.pill::before { content:"●"; font-size:8px; }
+
+/* --- trend line (reports) --- */
+.trend-wrap { position:relative; }
+svg.trend { width:100%; height:150px; display:block; }
+.trend-tooltip { position:absolute; pointer-events:none; background: var(--text); color:#fff; font-size:11px; padding:4px 7px; border-radius:6px; transform:translate(-50%,-115%); white-space:nowrap; opacity:0; transition:opacity .1s; }
+
+/* --- overdue tasks --- */
+.mini-grid { display:grid; grid-template-columns: repeat(3,1fr); gap:8px; }
+.mini-tile { background:#f9f9f7; border:1px solid var(--border); border-radius:10px; padding:8px; text-align:center; }
+.mini-tile .n { font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; }
+.mini-tile .l { font-size:10px; color:var(--muted); margin-top:2px; }
+.mini-tile.crit { background:#fbe3e2; border-color:#f3c6c4; }
+.mini-tile.crit .n { color:var(--critical); }
+
+/* --- clients table reorder note --- */
+.excl-note { font-size:11px; color: var(--muted); border-top:1px dashed var(--border); padding-top:10px; margin-top:4px; }
+
+.period-toggle { display:flex; gap:6px; }
+.period-toggle button { border:1px solid var(--border); background:var(--surface); border-radius:8px; padding:5px 10px; font-size:11.5px; cursor:pointer; color:var(--text2); }
+.period-toggle button.active { background: var(--text); color:#fff; border-color:var(--text); }
+
+.drill { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f0f1f4; font-size:12.5px; cursor:pointer; }
+.drill:last-child{ border-bottom:none; }
+.drill .n { font-weight:600; }
+.drill .r { color: var(--muted); }
+.drill .chev { color: var(--muted); }
+.search { width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:8px; font-size:13px; margin-bottom:10px; background:var(--surface); color:var(--text); }
+</style>
+</head>
+<body>
+<div class="note">⚠️ Это макет для обсуждения — на согласование, как договорились. В приложении пока ничего не менял. Цифры по плану/факту — из вашего файла-проекции на 04.09 (реальные, просто не самые свежие); долги по конкретным клиентам — из вашей ведомости консигнации за 01–18.09 (тоже реальные). Долг «по агентам» и просроченные задачи — примерные, для показа вида графика: как только макет одобрите, всё заменю на текущие цифры из приложения. Оклад/бонус/ЗП агентов — нигде не показываю.</div>
+
+<div class="wrap">
+  <div class="appbar">
+    <h1 id="pageTitle">Дашборд</h1>
+    <div class="tabs">
+      <button class="active" id="tab-dash">Дашборд</button>
+      <button id="tab-reports">Отчёты</button>
+    </div>
+  </div>
+  <div class="period">
+    <span>Период: <strong>сентябрь 2026</strong> (текущий месяц)</span>
+  </div>
+
+  <!-- ===================== DASHBOARD ===================== -->
+  <section class="page active" id="page-dash">
+
+    <div class="stat-row">
+      <div class="stat-tile">
+        <div class="lbl">План команды (мес.)</div>
+        <div class="val">6 100 000 ⃀</div>
+      </div>
+      <div class="stat-tile">
+        <div class="lbl">Факт на сегодня</div>
+        <div class="val">714 088 ⃀</div>
+        <div class="sub">11.7% от плана</div>
+      </div>
+      <div class="stat-tile">
+        <div class="lbl">Общий долг клиентов</div>
+        <div class="val">1 681 171 ⃀</div>
+        <div class="sub">121 клиент с долгом</div>
+      </div>
+      <div class="stat-tile crit">
+        <div class="lbl">Критичный долг</div>
+        <div class="val">5 клиентов</div>
+        <div class="sub">&gt;50 000 ⃀ и &gt;7 дней</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>План vs факт по агентам</h2>
+      <div class="desc">Тёмная чёрточка — план на месяц. Цветной столбик — продано на сегодня.</div>
+      <div class="bars">
+
+        <div class="bar-row">
+          <div class="top"><span class="name">Татьяна</span><span class="pct">19.0% плана</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:19%;background:var(--c-tatiana)"></div></div>
+          <div class="bar-foot"><span>факт 237 796 ⃀</span><span>план 1 250 000 ⃀ · прогноз на конец мес. 104.6%</span></div>
+        </div>
+
+        <div class="bar-row">
+          <div class="top"><span class="name">Жанара</span><span class="pct">15.0% плана</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:15%;background:var(--c-zhanara)"></div></div>
+          <div class="bar-foot"><span>факт 224 861 ⃀</span><span>план 1 500 000 ⃀ · прогноз 82.5%</span></div>
+        </div>
+
+        <div class="bar-row">
+          <div class="top"><span class="name">Альбина</span><span class="pct">12.4% плана</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:12.4%;background:var(--c-albina)"></div></div>
+          <div class="bar-foot"><span>факт 86 485 ⃀</span><span>план 700 000 ⃀ · прогноз 68.0%</span></div>
+        </div>
+
+        <div class="bar-row">
+          <div class="top"><span class="name">Батаева</span><span class="pct">11.5% плана</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:11.5%;background:var(--c-bataeva)"></div></div>
+          <div class="bar-foot"><span>факт 85 939 ⃀</span><span>план 750 000 ⃀ · прогноз 63.0%</span></div>
+        </div>
+
+        <div class="bar-row">
+          <div class="top"><span class="name">Нагима</span><span class="pct">7.9% плана</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:7.9%;background:var(--c-nagima)"></div></div>
+          <div class="bar-foot"><span>факт 79 007 ⃀</span><span>план 1 000 000 ⃀ · прогноз 43.5%</span></div>
+        </div>
+
+        <div class="bar-row">
+          <div class="top"><span class="name">Бегимай</span><span class="pct">0% плана</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--c-begimay)"></div></div>
+          <div class="bar-foot"><span>факт 0 ⃀</span><span>план 900 000 ⃀</span></div>
+        </div>
+
+      </div>
+      <div class="desc" style="margin-top:10px;margin-bottom:0">«Прогноз» — оценка на конец месяца по текущему темпу продаж (за какое число дней сколько сделано).</div>
+    </div>
+
+    <div class="card">
+      <h2>Выполнение задач по агентам</h2>
+      <div class="desc">Доля задач, закрытых как «выполнена», от всех задач за месяц. Пример.</div>
+      <div class="bars">
+        <div class="bar-row"><div class="top"><span class="name">Татьяна</span><span class="pct">18 / 22</span></div><div class="bar-track"><div class="bar-fill" style="width:82%;background:var(--good)"></div></div></div>
+        <div class="bar-row"><div class="top"><span class="name">Альбина</span><span class="pct">14 / 19</span></div><div class="bar-track"><div class="bar-fill" style="width:74%;background:var(--good)"></div></div></div>
+        <div class="bar-row"><div class="top"><span class="name">Жанара</span><span class="pct">11 / 20</span></div><div class="bar-track"><div class="bar-fill" style="width:55%;background:var(--warning)"></div></div></div>
+        <div class="bar-row"><div class="top"><span class="name">Нагима</span><span class="pct">7 / 17</span></div><div class="bar-track"><div class="bar-fill" style="width:41%;background:var(--critical)"></div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Долг по агентам</h2>
+      <div class="desc">Сумма долга клиентов, закреплённых за агентом. Пример распределения — считаем по ответственному агенту клиента в CRM.</div>
+      <div class="hbar-row"><div class="hname">Жанара</div><div class="hbar-track"><div class="hbar-fill" style="width:100%;background:var(--c-zhanara)"></div></div><div class="hbar-val">420 000 ⃀</div></div>
+      <div class="hbar-row"><div class="hname">Татьяна</div><div class="hbar-track"><div class="hbar-fill" style="width:78%;background:var(--c-tatiana)"></div></div><div class="hbar-val">328 000 ⃀</div></div>
+      <div class="hbar-row"><div class="hname">Нагима</div><div class="hbar-track"><div class="hbar-fill" style="width:62%;background:var(--c-nagima)"></div></div><div class="hbar-val">261 000 ⃀</div></div>
+      <div class="hbar-row"><div class="hname">Альбина</div><div class="hbar-track"><div class="hbar-fill" style="width:44%;background:var(--c-albina)"></div></div><div class="hbar-val">185 000 ⃀</div></div>
+      <div class="hbar-row"><div class="hname">Батаева</div><div class="hbar-track"><div class="hbar-fill" style="width:38%;background:var(--c-bataeva)"></div></div><div class="hbar-val">160 000 ⃀</div></div>
+      <div class="hbar-row"><div class="hname">Бегимай</div><div class="hbar-track"><div class="hbar-fill" style="width:31%;background:var(--c-begimay)"></div></div><div class="hbar-val">130 000 ⃀</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Критичные долги</h2>
+      <div class="desc">Сумма &gt; 50 000 ⃀ и висит больше 7 дней — реальные клиенты из вашего файла от 18.09.</div>
+      <table class="tbl">
+        <thead><tr><th>Клиент</th><th class="num">Сумма</th><th class="num">Дней</th></tr></thead>
+        <tbody>
+          <tr><td>Магазин Фен г.Ош<br><span class="pill critical">критично</span></td><td class="num">126 463 ⃀</td><td class="num">20</td></tr>
+          <tr><td>Магазин Оптовые Цены Киевская<br><span class="pill critical">критично</span></td><td class="num">100 005 ⃀</td><td class="num">10</td></tr>
+          <tr><td>ОсОО Гемотест КГ<br><span class="pill critical">критично</span></td><td class="num">85 400 ⃀</td><td class="num">14</td></tr>
+          <tr><td>ИП Мырзабекова Мадина<br><span class="pill critical">критично</span></td><td class="num">56 705 ⃀</td><td class="num">20</td></tr>
+          <tr><td>Ортосай Салима<br><span class="pill warning">на грани</span></td><td class="num">50 871 ⃀</td><td class="num">17</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Просроченные задачи</h2>
+      <div class="desc">Пример — сколько задач просрочено и насколько давно, по всей команде.</div>
+      <div class="mini-grid">
+        <div class="mini-tile crit"><div class="n">9</div><div class="l">просрочено</div></div>
+        <div class="mini-tile"><div class="n">3</div><div class="l">&gt;3 дней</div></div>
+        <div class="mini-tile"><div class="n">2</div><div class="l">&gt;7 дней</div></div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ===================== REPORTS ===================== -->
+  <section class="page" id="page-reports">
+
+    <div class="card">
+      <h2>Продажи: сравнение периодов</h2>
+      <div class="desc">Этот месяц (на сегодня) против аналогичного дня прошлого месяца.</div>
+      <div class="period-toggle" style="margin-bottom:12px">
+        <button class="active">По команде</button>
+        <button>По агенту</button>
+      </div>
+      <div class="trend-wrap">
+        <svg class="trend" viewBox="0 0 320 150" preserveAspectRatio="none" id="trendSvg">
+          <line x1="0" y1="112" x2="320" y2="112" stroke="#e1e0d9" stroke-width="1"/>
+          <line x1="0" y1="75" x2="320" y2="75" stroke="#e1e0d9" stroke-width="1"/>
+          <line x1="0" y1="38" x2="320" y2="38" stroke="#e1e0d9" stroke-width="1"/>
+          <polyline points="0,120 40,110 80,104 120,95 160,80 200,68 240,55 280,40 320,28" fill="none" stroke="#898781" stroke-width="2" stroke-dasharray="4 3" stroke-linecap="round"/>
+          <polyline points="0,124 40,118 80,108 120,100 160,90 200,72 240,58 280,44 320,30" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:#2a78d6"></span>сентябрь (текущий)</span>
+        <span><span class="sw" style="background:#898781"></span>август (тот же период)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>История по клиенту / агенту</h2>
+      <div class="desc">Поиск клиента или агента — открывается динамика продаж, долга и задач.</div>
+      <input class="search" placeholder="🔍 Найти клиента или агента…" disabled>
+      <div class="drill"><span class="n">Lisa hair</span><span class="r">Веселовский Ф. <span class="chev">›</span></span></div>
+      <div class="drill"><span class="n">Almo beauty lab Томми Молл</span><span class="r">Адамалиева О. <span class="chev">›</span></span></div>
+      <div class="drill"><span class="n">Татьяна (агент)</span><span class="r">6 клиентов с долгом <span class="chev">›</span></span></div>
+    </div>
+
+    <div class="card">
+      <h2>Долги: динамика по месяцу</h2>
+      <div class="desc">Как менялась общая сумма долга клиентов за последние недели. Пример.</div>
+      <svg class="trend" viewBox="0 0 320 150" preserveAspectRatio="none">
+        <line x1="0" y1="112" x2="320" y2="112" stroke="#e1e0d9" stroke-width="1"/>
+        <line x1="0" y1="75" x2="320" y2="75" stroke="#e1e0d9" stroke-width="1"/>
+        <polyline points="0,90 53,95 107,82 160,70 213,75 267,58 320,45" fill="none" stroke="#d03b3b" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div class="legend"><span><span class="sw" style="background:#d03b3b"></span>общий долг, ⃀</span></div>
+    </div>
+
+  </section>
+
+  <div class="excl-note" style="margin:0 16px">Не показываем здесь и нигде в отчётах: оклад, бонус, ЗП агентов — только продажи, план, долги и задачи.</div>
+</div>
+
+<script>
+const tabDash = document.getElementById('tab-dash');
+const tabReports = document.getElementById('tab-reports');
+const pageDash = document.getElementById('page-dash');
+const pageReports = document.getElementById('page-reports');
+const title = document.getElementById('pageTitle');
+tabDash.addEventListener('click', () => {
+  tabDash.classList.add('active'); tabReports.classList.remove('active');
+  pageDash.classList.add('active'); pageReports.classList.remove('active');
+  title.textContent = 'Дашборд';
+});
+tabReports.addEventListener('click', () => {
+  tabReports.classList.add('active'); tabDash.classList.remove('active');
+  pageReports.classList.add('active'); pageDash.classList.remove('active');
+  title.textContent = 'Отчёты';
+});
+</script>
+</body>
+</html>

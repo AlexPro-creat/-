@@ -561,7 +561,7 @@ function readBody(req) {
 
 function publicUser(u) {
   if (!u) return null;
-  return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl || null, canEditClientContact: !!u.canEditClientContact };
+  return { id: u.id, name: u.name, email: u.email, role: u.role, avatarUrl: u.avatarUrl || null, canEditClientContact: !!u.canEditClientContact, monthlyPlan: u.monthlyPlan || 0 };
 }
 
 function norm(s) {
@@ -693,6 +693,21 @@ function register(router) {
     let body;
     try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
     const updated = db.update('users', params.id, { canEditClientContact: !!body.canEditClientContact });
+    sendJson(res, 200, { user: publicUser(updated) });
+  }));
+
+  // Общий план продаж агента на месяц (Фаза 36, 21.09.2026) — по решению
+  // пользователя, план ведём НЕ по каждому клиенту (поле salesPlan у клиента
+  // так и осталось незаполненным ни у одного из 720 клиентов), а одной цифрой
+  // на агента в месяц — её же показываем на дашборде («План vs факт по
+  // агентам»). Редактируется только админом на странице «Команда».
+  router.put('/api/users/:id/plan', requireAdmin(async (req, res, params) => {
+    const user = db.find('users', params.id);
+    if (!user) return sendJson(res, 404, { error: 'Не найдено' });
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const plan = Math.max(0, Math.round(Number(body.monthlyPlan)) || 0);
+    const updated = db.update('users', params.id, { monthlyPlan: plan });
     sendJson(res, 200, { user: publicUser(updated) });
   }));
 
@@ -2021,7 +2036,15 @@ function register(router) {
         const done = aTasks.filter((t) => t.stage === 'done').length;
         const notDone = aTasks.filter((t) => t.stage === 'not_done').length;
         const closed = done + notDone;
-        const agentDebt = allClients.filter((c) => c.ownerId === agent.id).reduce((s, c) => s + (c.debtAmount || 0), 0);
+        const agentClients = allClients.filter((c) => c.ownerId === agent.id);
+        const agentDebt = agentClients.reduce((s, c) => s + (c.debtAmount || 0), 0);
+        // План vs факт по агенту (Фаза 36) — план теперь одна цифра на агента
+        // в месяц (см. /api/users/:id/plan выше), факт — сумма currentMonthRevenue
+        // клиентов агента (то же самое поле, что и раньше в per-client расчёте
+        // «Выполнение плана», просто сгруппировано по агенту, а не по всей команде).
+        const monthlyPlan = agent.monthlyPlan || 0;
+        const actualThisMonth = agentClients.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
+        const overdueCount = aTasks.filter((t) => isActiveStage(t) && t.dueDate && t.dueDate < today).length;
         return {
           agentId: agent.id,
           agentName: agent.name,
@@ -2030,9 +2053,32 @@ function register(router) {
           notDone,
           open: aTasks.filter(isActiveStage).length,
           completionRate: closed ? Math.round((done / closed) * 100) : null,
-          totalDebt: agentDebt
+          totalDebt: agentDebt,
+          monthlyPlan,
+          actualThisMonth,
+          planPct: monthlyPlan ? Math.round((actualThisMonth / monthlyPlan) * 100) : null,
+          overdueCount
         };
       });
+
+      // Критичные долги (Фаза 36) — тот же порог, что и при загрузке долгов
+      // (src/debtLedger.js / /api/debts/import): сумма > 50 000 сом и висит
+      // больше 7 дней (client.debtOverdue уже посчитан на загрузке). Отдельный
+      // список для дашборда — самые крупные/старые долги сверху, без похода
+      // клиента по всей таблице «Клиенты» с фильтром.
+      payload.criticalDebts = allClients
+        .filter((c) => c.debtOverdue && c.debtAmount > 0)
+        .map((c) => {
+          let daysOverdue = null;
+          const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec((c.debtAsOf || '').trim());
+          if (m) {
+            const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+            if (!isNaN(d.getTime())) daysOverdue = Math.floor((Date.now() - d.getTime()) / 86400000);
+          }
+          return { clientId: c.id, clientName: c.name, ownerId: c.ownerId, debtAmount: c.debtAmount, debtAsOf: c.debtAsOf, daysOverdue };
+        })
+        .sort((a, b) => b.debtAmount - a.debtAmount)
+        .slice(0, 30);
 
       // Явный общий итог по всей команде — чтобы у супервайзера точно было видно
       // суммарное количество задач по сотрудникам, а не только разбивку по одному.
@@ -2101,10 +2147,14 @@ function register(router) {
       // (Фаза 24, 09.09.2026) вместе со всей фичей акций — см. withFreshCurrentMonth().
 
       // "Выполнение" в сомах + разбивка по брендам (п.10 правок 31.08.2026) — план
-      // (salesPlan, поле клиента из Фазы 8) против факта этого месяца, по всей
-      // команде; пересчёт при смене фильтра по агенту делается на клиенте (app.js),
-      // т.к. state.clients у супервайзера и так содержит все нужные поля.
-      const planTotal = allClients.reduce((s, c) => s + (c.salesPlan || 0), 0);
+      // против факта этого месяца, по всей команде; пересчёт при смене фильтра по
+      // агенту делается на клиенте (app.js), т.к. state.clients у супервайзера и
+      // так содержит все нужные поля.
+      // Фаза 36 (21.09.2026): план — сумма agent.monthlyPlan (новое поле на агенте,
+      // см. /api/users/:id/plan), а не старый per-client salesPlan (он так и не
+      // используется — 0 из 720 клиентов). Пока ни один агент план не проставил —
+      // planTotal будет 0, это ожидаемо, а не баг.
+      const planTotal = agents.reduce((s, a) => s + (a.monthlyPlan || 0), 0);
       const actualTotal = allClients.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
       const byBrandMap = {};
       allClients.forEach((c) => {
@@ -2117,6 +2167,30 @@ function register(router) {
         planTotal,
         actualTotal,
         byBrand: Object.entries(byBrandMap).map(([brand, revenue]) => ({ brand, revenue })).sort((a, b) => b.revenue - a.revenue)
+      };
+
+      // Сравнение периодов для «Отчётов» (Фаза 36) — этот месяц (нарастающим
+      // итогом на сегодня, current_month_sales.json) против последнего ПОЛНОСТЬЮ
+      // закрытого месяца из 7-месячного окна (monthlyAssortment). Не идеально
+      // сравнимо день-в-день (там весь месяц, здесь — срез на сегодня), но лучше,
+      // чем ничего, и подписано явно на фронте, чтобы не вводить в заблуждение.
+      const lastClosedMonth = MONTH_ORDER[MONTH_ORDER.length - 1];
+      function lastMonthRevenue(list) {
+        return list.reduce((s, c) => s + ((c.monthlyAssortment && c.monthlyAssortment[lastClosedMonth]) || []).reduce((s2, it) => s2 + (it.revenue || 0), 0), 0);
+      }
+      payload.periodComparison = {
+        lastClosedMonth,
+        thisMonthSoFar: actualTotal,
+        lastMonthTotal: lastMonthRevenue(allClients),
+        byAgent: agents.map((agent) => {
+          const agentClients = allClients.filter((c) => c.ownerId === agent.id);
+          return {
+            agentId: agent.id,
+            agentName: agent.name,
+            thisMonthSoFar: agentClients.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0),
+            lastMonthTotal: lastMonthRevenue(agentClients)
+          };
+        })
       };
     }
 

@@ -197,6 +197,37 @@ main#content { padding: 20px; max-width: 1200px; margin: 0 auto; }
 
 .panel h2 { margin-top: 0; font-size: 16px; color: var(--text); }
 
+/* ---- Графики дашборда (Фаза 36) — план/факт по агентам, долг по агентам,
+   критичные долги. Свои CSS-переменные под 6 агентов — цвета подобраны
+   отдельно от --danger/--success/--warning (у тех уже есть значение
+   "просрочено"/"хорошо"/"внимание", их нельзя занимать под серии). */
+:root {
+  --c1: #9b6bf2; /* фиолетовый (primary) */
+  --c2: #d8b46a; /* золотой (gold) */
+  --c3: #5ec8e0; /* голубой */
+  --c4: #f28fb0; /* розовый */
+  --c5: #3fbfa0; /* бирюзовый */
+  --c6: #f2a154; /* оранжевый */
+}
+.chart-desc { color: var(--muted); font-size: 12.5px; margin: -6px 0 14px; }
+.bar-row { margin-bottom: 12px; }
+.bar-row:last-child { margin-bottom: 0; }
+.bar-row .bar-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; margin-bottom: 4px; gap: 8px; }
+.bar-row .bar-top .bar-name { font-weight: 600; }
+.bar-row .bar-top .bar-pct { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bar-track { position: relative; height: 12px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.bar-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px; min-width: 3px; }
+.bar-row .bar-foot { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.hbar-grid { display: grid; grid-template-columns: 90px 1fr 90px; align-items: center; gap: 10px; margin-bottom: 9px; font-size: 12.5px; }
+.hbar-grid:last-child { margin-bottom: 0; }
+.hbar-grid .hbar-name { color: var(--text); }
+.hbar-grid .hbar-track { height: 12px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.hbar-grid .hbar-fill { height: 100%; border-radius: 999px; min-width: 3px; }
+.hbar-grid .hbar-val { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.critical-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; background: rgba(248, 113, 113, 0.16); color: #f87171; }
+.critical-pill::before { content: "●"; font-size: 8px; }
+.critical-pill.warn { background: rgba(234, 179, 8, 0.16); color: #eab308; }
+
 /* ---- Панель инструментов над списками ---- */
 
 .toolbar {
