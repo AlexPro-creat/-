@@ -2661,8 +2661,8 @@ function renderTeam(content) {
           <a class="btn-secondary" href="/api/clients/export" download style="text-decoration:none;display:inline-block" title="Ручные поля клиентов (адрес/телефон/контакт/маршрут/договор/заметки и т.п.) — чтобы перенести правки в новую базу при следующей пересборке. Скачивайте перед КАЖДОЙ пересборкой архива — включая клиентов, которых агенты завели сами.">⬇ Выгрузить клиентов</a>
           <button type="button" class="btn-secondary" id="client-import-btn" title="Обновить ручные поля существующих клиентов из ранее выгруженного файла (по имени и агенту) — а тех, кого не нашло (например, клиентов, заведённых агентом самостоятельно), создаёт заново">⬆ Загрузить клиентов</button>
           <input type="file" id="client-import-input" accept=".json" style="display:none">
-          <button type="button" class="btn-secondary" id="debts-import-btn" title="Обновить задолженность по всем клиентам из файла .xlsx/.csv — без пересборки архива. Полностью заменяет прежний снимок долгов (клиент, которого нет в новом файле, — долг 0).">⬆ Загрузить долги</button>
-          <input type="file" id="debts-import-input" accept=".xlsx,.csv" style="display:none">
+          <button type="button" class="btn-secondary" id="debts-import-btn" title="Обновить задолженность по всем клиентам — без пересборки архива. Понимает и простую таблицу клиент/сумма/дата, и «Ведомость консигнации» (.xlsx) прямо из бухгалтерской программы — дата и просрочка (>50 000 сом и >7 дней) считаются сами. Формат .xlsb не читаем — пересохраните как .xlsx. Полностью заменяет прежний снимок долгов (клиент, которого нет в новом файле, — долг 0).">⬆ Загрузить долги</button>
+          <input type="file" id="debts-import-input" accept=".xlsx,.xls,.xlsb,.csv" style="display:none">
           <a class="btn-secondary" href="/api/backup" style="text-decoration:none;display:inline-block" title="Полный архив: клиенты, задачи, сотрудники, вложения">Скачать резервную копию (всё)</a>
           <button class="btn-primary" id="add-user-btn">+ Сотрудник</button>
         </div>
@@ -2742,7 +2742,14 @@ function renderTeam(content) {
   wireTableUploadButton(
     'debts-import-btn', 'debts-import-input', '/api/debts/import',
     'Это полностью заменит текущие данные о долгах у всех клиентов (клиент, которого нет в новом файле, останется с долгом 0). Продолжить?',
-    (r) => `Готово. Строк в файле: ${r.parsedRows}, сопоставлено с клиентами: ${r.matchedClients}.`
+    (r) => {
+      let msg = `Готово. Строк в файле: ${r.parsedRows}, сопоставлено с клиентами: ${r.matchedClients}.`;
+      if (r.unmatchedCount) {
+        msg += `\nНе удалось сопоставить: ${r.unmatchedCount} (нет такого клиента в CRM — переименован, разовая продажа или ещё не заведён) — список в консоли браузера.`;
+        console.log('Не распознано при загрузке долгов:', r.unmatched);
+      }
+      return msg;
+    }
   );
   const tbody = document.getElementById('users-tbody');
   state.users.forEach((u) => {

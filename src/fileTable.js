@@ -13,14 +13,42 @@
 
 const zlib = require('zlib');
 
+// Сообщение для .xlsb (Excel Binary Workbook) и старого бинарного .xls —
+// добавлено в Фазе 36 (21.09.2026) после того, как пользователь прислал файл
+// долгов именно в .xlsb: формат хоть и упакован как ZIP (как .xlsx), но листы
+// внутри — двоичный BIFF12, а не XML, наш ридер их прочитать не может. Вместо
+// невнятной ошибки "не найден лист" — понятная инструкция, что делать.
+const XLSB_ERROR = 'Файл в формате .xlsb (Excel — двоичная книга). Такой формат не читаем напрямую. ' +
+  'В программе, где вы формируете этот отчёт, при сохранении/экспорте выберите ' +
+  'формат «Excel 2007-365 (*.xlsx)» вместо «Excel (двоичная книга) (*.xlsb)» — и загрузите получившийся .xlsx-файл.';
+const XLS_ERROR = 'Файл в старом формате .xls (двоичная книга Excel 97-2003). Такой формат не читаем напрямую. ' +
+  'Откройте файл и сохраните его как .xlsx (Excel 2007-365) или .csv, затем загрузите заново.';
+
 function parseTableFile(filename, buffer) {
   const lower = (filename || '').toLowerCase();
   if (lower.endsWith('.csv')) return parseCsv(buffer);
+  if (lower.endsWith('.xlsb')) throw new Error(XLSB_ERROR);
+  if (lower.endsWith('.xls')) throw new Error(XLS_ERROR);
   if (lower.endsWith('.xlsx')) return parseXlsx(buffer);
   // Определяем по содержимому, если расширение не помогло/отсутствует:
-  // .xlsx — это ZIP-архив, начинается с сигнатуры "PK".
-  if (buffer.length >= 2 && buffer[0] === 0x50 && buffer[1] === 0x4b) return parseXlsx(buffer);
+  // .xlsx и .xlsb — оба ZIP-архивы, начинаются с сигнатуры "PK", различаем по
+  // тому, есть ли внутри XML-лист (.xlsx) или только двоичный sheetN.bin (.xlsb).
+  if (buffer.length >= 2 && buffer[0] === 0x50 && buffer[1] === 0x4b) {
+    if (looksLikeXlsbContent(buffer)) throw new Error(XLSB_ERROR);
+    return parseXlsx(buffer);
+  }
   return parseCsv(buffer);
+}
+
+function looksLikeXlsbContent(buffer) {
+  try {
+    const entries = readZipCentralDirectory(buffer);
+    const hasXmlSheet = entries.some((e) => /^xl\/worksheets\/sheet\d+\.xml$/i.test(e.name));
+    const hasBinSheet = entries.some((e) => /^xl\/worksheets\/sheet\d+\.bin$/i.test(e.name));
+    return !hasXmlSheet && hasBinSheet;
+  } catch (e) {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------- CSV ----

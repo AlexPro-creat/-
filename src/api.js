@@ -5,6 +5,7 @@ const auth = require('./auth');
 const { parseMultipart } = require('./multipart');
 const { buildZip } = require('./miniZip');
 const { parseTableFile } = require('./fileTable');
+const { looksLikeConsignmentLedger, parseConsignmentLedger } = require('./debtLedger');
 const googleSheets = require('./googleSheets');
 const { normalizePhone, MONTH_ORDER } = require('./import');
 const IMPORT_DIR = path.join(__dirname, '..', 'data', 'import');
@@ -1669,12 +1670,100 @@ function register(router) {
 
   const DEBT_NAME_ALIASES = ['контрагент', 'клиент', 'название клиента', 'наименование клиента', 'название', 'наименование', 'точка'];
   const DEBT_AMOUNT_ALIASES = ['сумма долга', 'задолженность', 'долг', 'сумма'];
-  const DEBT_DATE_ALIASES = ['дата поставки', 'дата накладной', 'дата платежа', 'дата оплаты', 'дата'];
+  const DEBT_DATE_ALIASES = ['дата когда оставили', 'дата оставления', 'дата долга', 'дата поставки', 'дата накладной', 'дата платежа', 'дата оплаты', 'дата'];
   const DEBT_OVERDUE_ALIASES = ['просрочено', 'просрочка', 'overdue'];
+
+  // Порог "критичной" просрочки — по решению пользователя (Фаза 35, вопросы
+  // по дашборду): сумма > 50 000 сом И висит больше 7 дней с даты, когда товар
+  // оставили в долг. Раньше (до Фазы 36) просрочка считалась иначе — по тому,
+  // прошла ли "дата платежа" — теперь везде единое правило.
+  const OVERDUE_MIN_AMOUNT = 50000;
+  const OVERDUE_MIN_DAYS = 7;
+  function daysSinceDate(dateStr) {
+    const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec((dateStr || '').toString().trim());
+    if (!m) return null;
+    const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+    if (isNaN(d.getTime())) return null;
+    return Math.floor((Date.now() - d.getTime()) / 86400000);
+  }
+  function computeOverdue(amount, dateStr) {
+    const days = daysSinceDate(dateStr);
+    return amount > OVERDUE_MIN_AMOUNT && days !== null && days > OVERDUE_MIN_DAYS;
+  }
+
+  // Общая часть для обоих форматов файла (плоская таблица и "Ведомость
+  // консигнации", см. src/debtLedger.js) — сохраняет снимок на диск (чтобы
+  // при следующем деплое/рестарте runImport() тоже его подхватил, как и
+  // раньше) и применяет его к клиентам по имени.
+  function applyDebtsSnapshot(res, debts) {
+    if (!debts.length) return sendJson(res, 400, { error: 'Не нашёл ни одной строки с именем клиента и долгом' });
+    try {
+      fs.mkdirSync(IMPORT_DIR, { recursive: true });
+      fs.writeFileSync(path.join(IMPORT_DIR, 'debts.json'), JSON.stringify(debts, null, 2), 'utf8');
+    } catch (e) {
+      return sendJson(res, 500, { error: `Файл разобрал, но не смог сохранить на диск: ${e.message}` });
+    }
+
+    // Долг — снимок на дату (как и при обычном runImport()): полностью
+    // заменяем цифры у ВСЕХ клиентов, а не только у совпавших — клиент, для
+    // которого в новом файле долга нет, считается погашенным (0), см.
+    // комментарий выше. Сопоставление — по имени (по решению пользователя, то
+    // же ограничение, что было раньше — без учёта агента).
+    const debtByName = {};
+    debts.forEach((d) => { debtByName[norm(d.client_name)] = d; });
+    const matchedKeys = new Set();
+    db.beginBatch();
+    try {
+      db.all('clients').forEach((c) => {
+        const key = norm(c.name);
+        const d = debtByName[key];
+        if (d) matchedKeys.add(key);
+        db.update('clients', c.id, {
+          debtAmount: d ? d.debt_amount : 0,
+          debtOverdue: d ? !!d.is_overdue : false,
+          debtAsOf: d ? d.payment_date : null
+        });
+      });
+    } finally {
+      db.endBatch();
+    }
+
+    // Клиенты из файла, которых не нашли в базе (переименован/это разовая
+    // "Частное лицо"/ещё не заведён в CRM) — не додумываем и не создаём,
+    // просто показываем список, как и при загрузке клиентов/задач.
+    const unmatched = debts.filter((d) => !matchedKeys.has(norm(d.client_name))).map((d) => d.client_name);
+    sendJson(res, 200, { parsedRows: debts.length, matchedClients: matchedKeys.size, unmatchedCount: unmatched.length, unmatched });
+  }
 
   router.post('/api/debts/import', requireAdmin(async (req, res) => {
     let table;
     try { table = await parseUploadedTable(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const allRows = [table.header, ...table.dataRows];
+
+    // "Ведомость консигнации" — выгрузка прямо из бухгалтерской программы
+    // (Фаза 36, 21.09.2026): много блоков, один на клиента, с историей
+    // движений, а не плоская таблица. Определяем по характерному началу файла
+    // и, если это она — разбираем отдельным парсером (там же считается дата
+    // "с какой долг висит" методом FIFO по движениям внутри блока).
+    if (looksLikeConsignmentLedger(allRows)) {
+      let parsed;
+      try {
+        parsed = parseConsignmentLedger(allRows);
+      } catch (e) {
+        return sendJson(res, 400, { error: `Не удалось разобрать ведомость консигнации: ${e.message}` });
+      }
+      if (!parsed.length) {
+        return sendJson(res, 400, { error: 'Файл похож на «Ведомость консигнации», но не нашёл в нём ни одного клиента с долгом — проверьте файл' });
+      }
+      const debts = parsed.map((d) => ({
+        client_name: d.name,
+        debt_amount: d.debtAmount,
+        payment_date: d.debtSince,
+        is_overdue: computeOverdue(d.debtAmount, d.debtSince)
+      }));
+      return applyDebtsSnapshot(res, debts);
+    }
+
     const nameIdx = findColumn(table.header, DEBT_NAME_ALIASES);
     const amountIdx = findColumn(table.header, DEBT_AMOUNT_ALIASES);
     const dateIdx = findColumn(table.header, DEBT_DATE_ALIASES);
@@ -1694,52 +1783,18 @@ function register(router) {
       const paymentDate = dateIdx !== -1 ? (r[dateIdx] || '').toString().trim() || null : null;
       let isOverdue;
       if (overdueIdx !== -1) {
+        // Явная колонка "просрочено" в файле — доверяем ей как есть (то, что
+        // сама бухгалтерская/учётная система уже посчитала).
         const raw = normHeaderCell(r[overdueIdx]);
         isOverdue = raw === 'да' || raw === 'true' || raw === '1' || raw === 'yes';
       } else {
-        // Явной колонки "просрочено" нет — считаем просроченным, если дата
-        // платежа/поставки уже в прошлом (по формату ДД.ММ.ГГГГ). Осознанное
-        // предположение, не 100%-но точное — если в реальном файле есть
-        // отдельный признак просрочки под другим названием, лучше пришлите
-        // файл, доработаю сопоставление.
-        const m = paymentDate ? /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(paymentDate) : null;
-        isOverdue = m ? (new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime() < Date.now()) : false;
+        // Явной колонки нет — считаем сами по единому правилу (сумма > 50 000
+        // сом И больше 7 дней с даты, когда товар оставили в долг).
+        isOverdue = computeOverdue(amount, paymentDate);
       }
       debts.push({ client_name: name, debt_amount: amount, is_overdue: isOverdue, payment_date: paymentDate });
     });
-    if (!debts.length) return sendJson(res, 400, { error: 'Не нашёл ни одной строки с именем клиента' });
-
-    try {
-      fs.mkdirSync(IMPORT_DIR, { recursive: true });
-      fs.writeFileSync(path.join(IMPORT_DIR, 'debts.json'), JSON.stringify(debts, null, 2), 'utf8');
-    } catch (e) {
-      return sendJson(res, 500, { error: `Файл разобрал, но не смог сохранить на диск: ${e.message}` });
-    }
-
-    // Долг — снимок на дату (как и при обычном runImport()): полностью
-    // заменяем цифры у ВСЕХ клиентов, а не только у совпавших — клиент, для
-    // которого в новом файле долга нет, считается погашенным (0), см.
-    // комментарий выше. Сопоставление — по имени (по решению пользователя, то
-    // же ограничение, что было раньше — без учёта агента).
-    const debtByName = {};
-    debts.forEach((d) => { debtByName[norm(d.client_name)] = d; });
-    let matched = 0;
-    db.beginBatch();
-    try {
-      db.all('clients').forEach((c) => {
-        const d = debtByName[norm(c.name)];
-        if (d) matched++;
-        db.update('clients', c.id, {
-          debtAmount: d ? d.debt_amount : 0,
-          debtOverdue: d ? !!d.is_overdue : false,
-          debtAsOf: d ? d.payment_date : null
-        });
-      });
-    } finally {
-      db.endBatch();
-    }
-
-    sendJson(res, 200, { parsedRows: debts.length, matchedClients: matched });
+    applyDebtsSnapshot(res, debts);
   }));
 
   // Загрузка остатков склада через панель (POST /api/stock/import) убрана по
