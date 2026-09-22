@@ -218,10 +218,22 @@ function runImportBody() {
   // хранится в БД и стирается вместе с ней, пока не подключён постоянный диск).
   // Меняются только когда пользователь явно попросит новую задачу на изменение —
   // тогда правим data/import/brand_plans.json и пересобираем.
+  // Общий "План (мес.)" (Фаза 37.1, 21.09.2026) — пользователь увидел на дашборде
+  // "план не задан" у всех агентов, т.к. это отдельное поле (user.monthlyPlan,
+  // задаётся вручную на странице «Команда» через /api/users/:id/plan) — оно НЕ
+  // связано с планами по брендам выше и никогда не заполнялось. Чтобы не заставлять
+  // вручную дублировать те же цифры, общий план на агента теперь = сумма его же
+  // EPICA+Kapous+Остальное из того же файла — считается из brandPlansMap ниже и
+  // применяется так же статично (каждый старт сервера), как и planPlans по брендам.
+  // Если понадобится завести план, отличающийся от простой суммы по брендам —
+  // это отдельная задача (например, флаг "не перезаписывать вручную заданное").
   const brandPlansMap = loadJson('brand_plans.json') || {};
   Object.keys(brandPlansMap).forEach((agentName) => {
     const agent = agentsByName[norm(agentName)];
-    if (agent) db.update('users', agent.id, { brandPlans: brandPlansMap[agentName] });
+    if (!agent) return;
+    const buckets = brandPlansMap[agentName];
+    const totalPlan = Object.values(buckets).reduce((s, v) => s + (Number(v) || 0), 0);
+    db.update('users', agent.id, { brandPlans: buckets, monthlyPlan: totalPlan });
   });
 
   const contractors = loadJson('agents_clients.json') || [];
