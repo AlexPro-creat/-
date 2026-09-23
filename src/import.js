@@ -297,6 +297,19 @@ function runImportBody() {
   // либо созданы заново) — используется дальше для очистки "осиротевших" карточек.
   const touchedClientIds = new Set();
 
+  // Постоянные переназначения карточек между агентами (Фаза 39,
+  // data/import/client_reassignments.json) — до сопоставления ниже, чтобы на
+  // живой базе карточка сменила агента, а не задвоилась.
+  const reassign = (loadJson('client_reassignments.json') || {}).moves || [];
+  reassign.forEach((m) => {
+    const from = agentsByName[norm(m.from)];
+    const to = agentsByName[norm(m.to)];
+    if (!from || !to) return;
+    const card = db.all('clients').find((cl) => norm(cl.name) === norm(m.name) && cl.ownerId === from.id);
+    const already = db.all('clients').find((cl) => norm(cl.name) === norm(m.name) && cl.ownerId === to.id);
+    if (card && !already) db.update('clients', card.id, { ownerId: to.id });
+  });
+
   contractors.forEach((c) => {
     const key = norm(c.name);
     const assortmentRaw = assortmentByName[key];
