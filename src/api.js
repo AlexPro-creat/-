@@ -44,6 +44,20 @@ const CURRENT_MONTH_DATA_STALE_FROM = new Date('2026-10-01T00:00:00');
 function isCurrentMonthDataFresh() {
   return new Date() < CURRENT_MONTH_DATA_STALE_FROM;
 }
+// Факт продаж текущего месяца ПО АГЕНТУ (Фаза 39) — «Итого» из последнего
+// среза агента (data/import/agent_sales.json → настройка agentSales, её пишет
+// runImport()). Не сумма по карточкам! См. src/agentSales.js.
+function agentSalesFact(agentName) {
+  const all = db.getSetting('agentSales', {}) || {};
+  const a = all[agentName];
+  if (!a || !isCurrentMonthDataFresh()) return { total: 0, items: [], period: a ? a.period : '', asOf: a ? a.asOf : null };
+  return a;
+}
+function agentSalesChecks() {
+  if (!isCurrentMonthDataFresh()) return [];
+  const check = db.getSetting('agentSalesCheck', {}) || {};
+  return Object.entries(check).map(([agentName, ch]) => ({ agentName, ...ch }));
+}
 // Возвращает список клиентов с обнулёнными currentMonthRevenue/currentMonthItems/
 // promotions, если данные "текущего месяца" устарели (см. выше) — иначе список
 // без изменений. Применять на КАЖДОМ месте, где список клиентов идёт на
@@ -2038,11 +2052,11 @@ function register(router) {
       function bucketOfBrand(brand) {
         return (brand === 'EPICA' || brand === 'Kapous') ? brand : 'Остальное';
       }
-      function actualByBrandBucket(clientsList) {
+      // Фаза 39: по бренд-корзинам считаем из ТОВАРНЫХ СТРОК СРЕЗА агента
+      // (а не из карточек его клиентов) — см. agentSalesFact().
+      function actualByBrandBucket(items) {
         const map = { EPICA: 0, Kapous: 0, 'Остальное': 0 };
-        clientsList.forEach((c) => {
-          (c.currentMonthItems || []).forEach((it) => { map[bucketOfBrand(it.brand)] += (it.revenue || 0); });
-        });
+        (items || []).forEach((it) => { map[bucketOfBrand(it.brand)] += (it.revenue || 0); });
         return map;
       }
 
@@ -2058,7 +2072,8 @@ function register(router) {
         // клиентов агента (то же самое поле, что и раньше в per-client расчёте
         // «Выполнение плана», просто сгруппировано по агенту, а не по всей команде).
         const monthlyPlan = agent.monthlyPlan || 0;
-        const actualThisMonth = agentClients.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
+        const fact = agentSalesFact(agent.name);
+        const actualThisMonth = fact.total || 0;
         const overdueCount = aTasks.filter((t) => isActiveStage(t) && t.dueDate && t.dueDate < today).length;
         return {
           agentId: agent.id,
@@ -2078,7 +2093,8 @@ function register(router) {
           // прописаны пользователем и не редактируются из интерфейса, пока не
           // будет новой задачи на изменение. null, если у агента плана нет.
           brandPlans: agent.brandPlans || null,
-          actualByBrand: actualByBrandBucket(agentClients)
+          actualByBrand: actualByBrandBucket(fact.items),
+          salesPeriod: fact.period || ''
         };
       });
 
@@ -2176,14 +2192,19 @@ function register(router) {
       // используется — 0 из 720 клиентов). Пока ни один агент план не проставил —
       // planTotal будет 0, это ожидаемо, а не баг.
       const planTotal = agents.reduce((s, a) => s + (a.monthlyPlan || 0), 0);
-      const actualTotal = allClients.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
+      // Фаза 39: факт команды = сумма «Итого» срезов всех агентов.
+      const agentFacts = agents.map((a) => agentSalesFact(a.name));
+      const actualTotal = agentFacts.reduce((s, f) => s + (f.total || 0), 0);
       const byBrandMap = {};
-      allClients.forEach((c) => {
-        (c.currentMonthItems || []).forEach((it) => {
+      agentFacts.forEach((f) => {
+        (f.items || []).forEach((it) => {
           const b = it.brand || 'Прочее';
           byBrandMap[b] = (byBrandMap[b] || 0) + (it.revenue || 0);
         });
       });
+      // Короткая сверка «сумма продаж / сумма по клиентам» — показывается на
+      // дашборде, только если не сходится (правило пользователя, Фаза 39).
+      payload.salesChecks = agentSalesChecks().filter((ch) => ch.diff !== 0 || (ch.unmatched || []).length);
       payload.salesPerformance = {
         planTotal,
         actualTotal,
@@ -2208,7 +2229,7 @@ function register(router) {
           return {
             agentId: agent.id,
             agentName: agent.name,
-            thisMonthSoFar: agentClients.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0),
+            thisMonthSoFar: agentSalesFact(agent.name).total || 0,
             lastMonthTotal: lastMonthRevenue(agentClients)
           };
         })
@@ -2220,8 +2241,11 @@ function register(router) {
     // ТЕКУЩИЙ месяц (не за 7 мес.), топ-товаров — топ-10 отдельно по трём брендам за
     // текущий месяц (Kapous/EPICA без красителей и оксидов), а не общий топ-5 за 7 мес.
     if (req.user.role === 'agent') {
-      const monthItems = clients.flatMap((c) => (c.currentMonthItems || []));
-      const salesTotalThisMonth = clients.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
+      // Фаза 39: «Продано в этом месяце» и топы агента — из его среза («Итого»
+      // последнего файла и его товарные строки), а не из карточек клиентов.
+      const myFact = agentSalesFact(req.user.name);
+      const monthItems = myFact.items || [];
+      const salesTotalThisMonth = myFact.total || 0;
       const clientsBoughtThisMonth = clients.filter((c) => (c.currentMonthRevenue || 0) > 0).length;
       const clientsNotBoughtThisMonth = clients.length - clientsBoughtThisMonth;
 
@@ -2263,6 +2287,7 @@ function register(router) {
 
       payload.agentDashboard = {
         salesTotalThisMonth,
+        salesPeriod: myFact.period || '',
         clientsBoughtThisMonth,
         clientsNotBoughtThisMonth,
         salesTotalAllMonths,

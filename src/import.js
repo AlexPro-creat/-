@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 const auth = require('./auth');
+const agentSales = require('./agentSales');
 
 const IMPORT_DIR = path.join(__dirname, '..', 'data', 'import');
 const MONTH_ORDER = ['февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август'];
@@ -255,7 +256,9 @@ function runImportBody() {
   const activeMonthsMap = loadJson('active_months.json') || {};
   // Сумма продаж и товарные строки ТОЛЬКО за текущий месяц (август) — для
   // дашборда агента (сумма за месяц вместо суммы за 7 мес., топ по брендам).
-  const currentMonthMap = loadJson('current_month_sales.json') || {};
+  // С Фазы 39 (23.09.2026) продажи текущего месяца живут в agent_sales.json
+  // (срезы ПО АГЕНТАМ) и раскладываются по карточкам ПОСЛЕ цикла ниже — см.
+  // src/agentSales.js и блок «Раскладка срезов» в конце runImportBody().
   // По каждому клиенту и каждому месяцу — построчный ассортимент (см. build_assortment_by_month.py
   // в gdrive-data). Нужно для фильтра "по месяцам" в вкладке "Отчёты" (у супервайзера/админа) —
   // 7-месячная агрегация (regular/testAssortment) не хранит разбивку по отдельным месяцам.
@@ -276,8 +279,6 @@ function runImportBody() {
   const activeMonthsByName = {};
   Object.keys(activeMonthsMap).forEach((k) => { activeMonthsByName[norm(k)] = activeMonthsMap[k]; });
 
-  const currentMonthByName = {};
-  Object.keys(currentMonthMap).forEach((k) => { currentMonthByName[norm(k)] = currentMonthMap[k]; });
 
   const monthlyAssortmentByName = {};
   Object.keys(monthlyAssortmentMap).forEach((k) => { monthlyAssortmentByName[norm(k)] = monthlyAssortmentMap[k]; });
@@ -304,7 +305,6 @@ function runImportBody() {
     const promotions = promotionsByName[key] || [];
     const owner = agentsByName[norm(c.agent)] || adminUser;
     const activeMonths = activeMonthsByName[key] || [];
-    const currentMonth = currentMonthByName[key] || null;
     // Артикул (Фаза 20) подмешиваем и сюда — тот же lookup, что и в
     // regular/testAssortment, чтобы раздел "Последние продажи" тоже его показывал.
     const monthlyAssortmentRaw = monthlyAssortmentByName[key] || {};
@@ -335,8 +335,6 @@ function runImportBody() {
       // пригодится, если пользователь попросит другой порог месяцев позже.
       activeMonths,
       isRegularClient: isRegularByLast3Months(activeMonths),
-      currentMonthRevenue: currentMonth ? currentMonth.revenue : 0,
-      currentMonthItems: currentMonth ? currentMonth.items : [],
       // Ассортимент по месяцам { 'февраль': [...], ... } — только для отчёта "по месяцам".
       monthlyAssortment
     };
@@ -369,29 +367,40 @@ function runImportBody() {
     }
   });
 
-  // Обнуляем currentMonthRevenue/currentMonthItems у карточек, которых цикл выше НЕ
-  // затронул ("осиротевшие" клиенты — не входят в agents_clients.json вообще: созданы
-  // вручную через UI либо остались от ручных сверок прошлых фаз, например Фазы 10/11).
-  // Важно: сверяем по touchedClientIds (реально обновлённые записи), а НЕ по имени —
-  // currentMonthByName матчит только по имени без учёта владельца, поэтому у карточки
-  // с тем же именем, что и у чужого контрагента (например общее "Частное лицо" у
-  // нескольких агентов), currentMonthByName[key] был бы непустым, хотя ЭТУ конкретную
-  // карточку (другой ownerId) цикл выше не трогал — обнуление по имени такую карточку
-  // бы пропустило. Раньше баг был незаметен, потому что withFreshCurrentMonth() обнулял
-  // currentMonth* у ВСЕХ клиентов в ответах API, пока CURRENT_MONTH_DATA_STALE_FROM не
-  // наступил; как только флаг "протухания" снимается, такие карточки показывают чужие
-  // устаревшие суммы как текущие. Найдено и исправлено при загрузке среза за
-  // 01.09-07.09.26 (Фаза 22).
+  // ---- Раскладка срезов продаж по агентам (Фаза 39, 23.09.2026) ----
+  // Факт агента = «Итого» его последнего файла; строки по клиентам ложатся на
+  // карточки по имени (свой агент → другие агенты), см. src/agentSales.js.
+  // Карточки, которым ничего не досталось, обнуляются — это заменило прежнюю
+  // «очистку осиротевших карточек» (Фаза 22) и current_month_sales.json.
+  // Технические карточки-«корректировки» (Фазы 25/38) больше не нужны —
+  // удаляем их, если к ним не привязано ни одной задачи.
   db.beginBatch();
+  let salesResult;
   try {
+    const tasks = db.all('tasks');
+    db.all('clients')
+      .filter((c) => /^Корректировка отгрузки /.test(c.name || '') && !tasks.some((t) => t.clientId === c.id))
+      .forEach((c) => db.remove('clients', c.id));
+
+    salesResult = agentSales.distribute(agentSales.loadSlices(), db.all('clients'), db.all('users'));
     db.all('clients').forEach((c) => {
-      if (!touchedClientIds.has(c.id) && ((c.currentMonthRevenue || 0) !== 0 || (c.currentMonthItems || []).length)) {
-        db.update('clients', c.id, { currentMonthRevenue: 0, currentMonthItems: [] });
+      const got = salesResult.byClientId[c.id];
+      const revenue = got ? got.revenue : 0;
+      const items = got ? got.items : [];
+      if ((c.currentMonthRevenue || 0) !== revenue || JSON.stringify(c.currentMonthItems || []) !== JSON.stringify(items)) {
+        db.update('clients', c.id, { currentMonthRevenue: revenue, currentMonthItems: items });
       }
     });
+    db.setSetting('agentSales', salesResult.agents);
+    db.setSetting('agentSalesCheck', salesResult.check);
   } finally {
     db.endBatch();
   }
+  Object.entries(salesResult.check).forEach(([agent, ch]) => {
+    if (ch.diff !== 0 || ch.unmatched.length) {
+      console.log(`Срез ${agent}: сумма продаж ${ch.total}, по клиентам ${ch.distributed}` + (ch.unmatched.length ? `, не найдены карточки: ${ch.unmatched.map((u) => u.name).join('; ')}` : ''));
+    }
+  });
 
   return { usersCreated, extraAgentsAdded, clientsCreated, clientsUpdated };
 }

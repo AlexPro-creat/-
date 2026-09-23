@@ -39,7 +39,7 @@ const state = {
   taskFilterOwnerId: '',
   // hiddenTypes (Фаза 31, 14.09.2026): набор taskType, скрытых фильтром по воронкам
   // в Календаре — 'visit'|'sale'|'waitlist'|'agent'. Пусто по умолчанию — показаны все.
-  calendar: { mode: 'month', date: new Date(), hiddenTypes: new Set() },
+  calendar: { mode: 'month', date: new Date(), hiddenTypes: new Set(), agentId: '' },
   clientBulkMode: false,
   clientBulkSelected: new Set(),
   taskBulkMode: false,
@@ -373,6 +373,7 @@ function render() {
   if (state.view === 'dashboard') return renderDashboard(content);
   if (state.view === 'clients') return renderClients(content);
   if (state.view === 'tasks') return renderTasks(content);
+  if (state.view === 'brands') return renderBrands(content);
   if (state.view === 'calendar') return renderCalendar(content);
   if (state.view === 'myday') return renderMyDay(content);
   if (state.view === 'reports') return renderReports(content);
@@ -719,6 +720,13 @@ async function renderDashboard(content) {
         </div>
       </div>` : ''}
 
+      ${(stats.salesChecks || []).length ? `
+      <div class="panel sales-check-panel">
+        <h2>Сверка срезов продаж</h2>
+        ${stats.salesChecks.map((ch) => `<div class="sales-check-row"><strong>${escapeHtml(ch.agentName)}</strong> (${escapeHtml(ch.period || '')}): сумма продаж ${fmtMoney(ch.total)}, по клиентам ${fmtMoney(ch.distributed)}${ch.unmatched && ch.unmatched.length ? ` · нет карточки: ${ch.unmatched.map((u) => escapeHtml(u.name)).join(', ')}` : ''}</div>`).join('')}
+        <div class="muted" style="font-size:12px;margin-top:4px">Факт агента = «Итого» его последнего файла. Разница — суммы среза, которых нет на карточках клиентов (нет карточки или строки не сохранились) — уйдёт со следующим файлом агента.</div>
+      </div>` : ''}
+
       ${stats.salesPerformance ? `
       <div class="panel">
         <h2>Выполнение плана (сом) <select class="card-agent-filter" id="perf-agent-filter"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select></h2>
@@ -855,14 +863,16 @@ async function renderDashboard(content) {
     const sel = document.getElementById('perf-agent-filter');
     if (!sel) return;
     const aid = sel.value ? Number(sel.value) : null;
-    const clientsF = aid ? state.clients.filter((c) => c.ownerId === aid) : state.clients;
     // Фаза 36: план — сумма agent.monthlyPlan (см. stats.byAgent), а не старый
     // per-client c.salesPlan (то поле так и не используется, всегда 0 — раньше
     // тут поэтому всегда показывался план 0 сом, отсюда и была жалоба на дашборд).
     const planTotal = aid
       ? ((stats.byAgent || []).find((a) => a.agentId === aid) || {}).monthlyPlan || 0
       : (stats.byAgent || []).reduce((s, a) => s + (a.monthlyPlan || 0), 0);
-    const actualTotal = clientsF.reduce((s, c) => s + (c.currentMonthRevenue || 0), 0);
+    // Фаза 39: факт = «Итого» последних срезов агентов (stats.byAgent[].actualThisMonth),
+    // а не сумма по карточкам клиентов — см. src/agentSales.js.
+    const actualTotal = (aid ? (stats.byAgent || []).filter((a) => a.agentId === aid) : (stats.byAgent || []))
+      .reduce((s, a) => s + (a.actualThisMonth || 0), 0);
     const pct = planTotal ? Math.round((actualTotal / planTotal) * 100) : null;
     document.getElementById('perf-stat-cards').innerHTML = `
       <div class="stat-card"><div class="num">${fmtMoney(planTotal)}</div><div class="label">План (текущий месяц)</div></div>
@@ -2596,6 +2606,243 @@ function wireAttachDeletes(task) {
   });
 }
 
+// ---------- По брендам: клиент × бренд (Фаза 39, 23.09.2026) ----------
+// Просьба пользователя: «не видно какие клиенты купили по брендам Kapous/EPICA/
+// Чистовье — нужна отдельная вкладка для недопроданных по брендам, чтобы было
+// видно сразу клиента и ассортимент». Выбран вид «таблица клиент × бренд».
+// В ячейке: сумма покупок бренда в текущем месяце (c.currentMonthItems) и число
+// позиций регулярного ассортимента этого бренда, ещё не купленных в этом месяце
+// (atRisk — та же логика «Недопродано», что везде, computeAtRisk() на сервере).
+// Клик по ячейке раскрывает под строкой ассортимент: что куплено / что недопродано.
+const BRAND_MATRIX_BRANDS = ['Kapous', 'EPICA', 'Чистовье', 'Studio', 'AV/ES/PRO/MS'];
+
+function brandCell(c, brand) {
+  const bought = (c.currentMonthItems || []).filter((it) => (it.brand || 'Прочее') === brand);
+  const sum = bought.reduce((s, it) => s + (it.revenue || 0), 0);
+  const risk = (c.regularAssortment || []).filter((p) => p.brand === brand && p.atRisk);
+  const regular = (c.regularAssortment || []).filter((p) => p.brand === brand);
+  return { bought, sum, risk, regular };
+}
+
+function renderBrands(content) {
+  const f = state.brandMatrix || (state.brandMatrix = { agentId: '', q: '', show: 'active', sortBrand: '', open: null });
+  content.appendChild(el(`
+    <div>
+      <div class="toolbar"><h2 style="margin:0">По брендам — купили / недопродано</h2></div>
+      <div class="sub muted" style="margin-bottom:8px">В ячейке: сумма покупок бренда в текущем месяце и ⚠ число позиций регулярного ассортимента бренда, которые клиент ещё не купил. Нажмите на ячейку — откроется ассортимент.</div>
+      <div class="filter-bar">
+        <input type="text" id="bm-q" placeholder="Поиск клиента..." value="${escapeHtml(f.q)}" autocomplete="off">
+        ${isStaff() ? `<select id="bm-agent"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((a) => `<option value="${a.id}" ${String(f.agentId) === String(a.id) ? 'selected' : ''}>${escapeHtml(a.name)}</option>`).join('')}</select>` : ''}
+        <select id="bm-show">
+          <option value="active" ${f.show === 'active' ? 'selected' : ''}>Есть покупки или недопродано</option>
+          <option value="risk" ${f.show === 'risk' ? 'selected' : ''}>Только с недопроданным</option>
+          <option value="bought" ${f.show === 'bought' ? 'selected' : ''}>Только купившие</option>
+          <option value="all" ${f.show === 'all' ? 'selected' : ''}>Все клиенты</option>
+        </select>
+      </div>
+      <div id="bm-totals" class="agent-metric-grid" style="margin:10px 0"></div>
+      <div class="table-wrap brand-matrix-wrap"><table class="brand-matrix"><thead><tr>
+        <th class="sticky-col">Клиент</th>${isStaff() ? '<th>Агент</th>' : ''}
+        ${BRAND_MATRIX_BRANDS.map((b) => `<th class="sortable bm-sort" data-brand="${escapeHtml(b)}" title="Сортировать: больше недопроданного — выше">${escapeHtml(b)}${f.sortBrand === b ? ' ↓' : ''}</th>`).join('')}
+      </tr></thead><tbody id="bm-tbody"></tbody></table></div>
+      <div id="bm-more" class="muted" style="font-size:12px;margin-top:6px"></div>
+    </div>
+  `));
+
+  function draw() {
+    const aid = f.agentId ? Number(f.agentId) : null;
+    const q = f.q.trim().toLowerCase();
+    let rows = state.clients
+      .filter((c) => !c.closed)
+      .filter((c) => !aid || c.ownerId === aid)
+      .filter((c) => !q || (c.name || '').toLowerCase().includes(q))
+      .map((c) => ({ c, cells: Object.fromEntries(BRAND_MATRIX_BRANDS.map((b) => [b, brandCell(c, b)])) }));
+    const hasRisk = (r) => BRAND_MATRIX_BRANDS.some((b) => r.cells[b].risk.length);
+    const hasBought = (r) => BRAND_MATRIX_BRANDS.some((b) => r.cells[b].sum > 0);
+    if (f.show === 'risk') rows = rows.filter(hasRisk);
+    else if (f.show === 'bought') rows = rows.filter(hasBought);
+    else if (f.show === 'active') rows = rows.filter((r) => hasRisk(r) || hasBought(r));
+    if (f.sortBrand) rows.sort((a, b) => (b.cells[f.sortBrand].risk.length - a.cells[f.sortBrand].risk.length) || (b.cells[f.sortBrand].sum - a.cells[f.sortBrand].sum));
+    else rows.sort((a, b) => BRAND_MATRIX_BRANDS.reduce((s, br) => s + b.cells[br].risk.length, 0) - BRAND_MATRIX_BRANDS.reduce((s, br) => s + a.cells[br].risk.length, 0));
+
+    document.getElementById('bm-totals').innerHTML = BRAND_MATRIX_BRANDS.map((b) => {
+      const sum = rows.reduce((s, r) => s + r.cells[b].sum, 0);
+      const boughtN = rows.filter((r) => r.cells[b].sum > 0).length;
+      const riskN = rows.filter((r) => r.cells[b].risk.length).length;
+      return `<div class="stat-card"><div class="num" style="font-size:18px">${fmtMoney(sum)}</div><div class="label">${escapeHtml(b)} · купили ${boughtN} · недопродано у ${riskN}</div></div>`;
+    }).join('');
+
+    const LIMIT = 300;
+    const cols = BRAND_MATRIX_BRANDS.length + (isStaff() ? 2 : 1);
+    const tbody = document.getElementById('bm-tbody');
+    tbody.innerHTML = rows.slice(0, LIMIT).map((r) => {
+      const c = r.c;
+      const main = `<tr>
+        <td class="sticky-col open-client" data-id="${c.id}" title="Двойной клик — карточка клиента">${escapeHtml(c.name)}</td>
+        ${isStaff() ? `<td>${escapeHtml(calAgentShort(c.ownerId))}</td>` : ''}
+        ${BRAND_MATRIX_BRANDS.map((b) => {
+          const cell = r.cells[b];
+          if (!cell.sum && !cell.risk.length && !cell.regular.length) return '<td class="bm-cell bm-empty">—</td>';
+          const cls = cell.risk.length ? (cell.sum ? 'bm-partial' : 'bm-risk') : (cell.sum ? 'bm-ok' : '');
+          const isOpen = f.open && f.open.id === c.id && f.open.brand === b;
+          return `<td class="bm-cell ${cls} ${isOpen ? 'bm-open' : ''}" data-id="${c.id}" data-brand="${escapeHtml(b)}">
+            <div>${cell.sum ? fmtMoney(cell.sum) : '<span class="muted">не брал</span>'}</div>
+            ${cell.risk.length ? `<div class="bm-risk-n">⚠ ${cell.risk.length} недопр.</div>` : ''}
+          </td>`;
+        }).join('')}
+      </tr>`;
+      if (!(f.open && f.open.id === c.id)) return main;
+      const cell = r.cells[f.open.brand];
+      const boughtByProduct = {};
+      cell.bought.forEach((it) => {
+        const k = it.product;
+        boughtByProduct[k] = boughtByProduct[k] || { ...it, qty: 0, revenue: 0 };
+        boughtByProduct[k].qty += it.qty || 0; boughtByProduct[k].revenue += it.revenue || 0;
+      });
+      const bought = Object.values(boughtByProduct).sort((a, b) => b.revenue - a.revenue);
+      return main + `<tr class="bm-detail"><td colspan="${cols}">
+        <div class="bm-detail-grid">
+          <div><div class="bm-detail-h">⚠ Недопродано — ${escapeHtml(f.open.brand)} (${cell.risk.length})</div>
+            ${cell.risk.length ? cell.risk.map((p) => `<div class="assort-row"><span>${skuBadgeHtml(p)}${escapeHtml(p.product)}</span><span class="freq">~${p.avgQty} шт/мес · посл.: ${escapeHtml(p.lastMonth || '')}</span></div>`).join('') : '<div class="muted">Весь регулярный ассортимент бренда уже куплен.</div>'}
+          </div>
+          <div><div class="bm-detail-h">✓ Куплено в этом месяце — ${escapeHtml(f.open.brand)} (${fmtMoney(cell.sum)})</div>
+            ${bought.length ? bought.map((it) => `<div class="assort-row"><span>${skuBadgeHtml(it)}${escapeHtml(it.product)}</span><span class="freq">${it.qty} шт · ${fmtMoney(it.revenue)}${it.soldBy ? ` · продал(а) ${escapeHtml(it.soldBy)}` : ''}</span></div>`).join('') : '<div class="muted">В этом месяце не покупал.</div>'}
+          </div>
+        </div>
+      </td></tr>`;
+    }).join('') || `<tr><td colspan="${cols}" class="muted">Нет клиентов по выбранным фильтрам.</td></tr>`;
+    document.getElementById('bm-more').textContent = rows.length > LIMIT ? `Показаны первые ${LIMIT} из ${rows.length} — уточните фильтр или поиск.` : `Клиентов: ${rows.length}`;
+
+    tbody.querySelectorAll('.bm-cell[data-brand]').forEach((td) => {
+      td.addEventListener('click', () => {
+        const id = Number(td.dataset.id); const brand = td.dataset.brand;
+        f.open = (f.open && f.open.id === id && f.open.brand === brand) ? null : { id, brand };
+        draw();
+      });
+    });
+    tbody.querySelectorAll('.open-client').forEach((td) => {
+      td.addEventListener('dblclick', () => { const c = clientById(Number(td.dataset.id)); if (c) openClientModal(c); });
+    });
+  }
+
+  const qInput = document.getElementById('bm-q');
+  qInput.addEventListener('input', (e) => { f.q = e.target.value; draw(); });
+  const agSel = document.getElementById('bm-agent');
+  if (agSel) agSel.addEventListener('change', (e) => { f.agentId = e.target.value; f.open = null; draw(); });
+  document.getElementById('bm-show').addEventListener('change', (e) => { f.show = e.target.value; draw(); });
+  document.querySelectorAll('.bm-sort').forEach((th) => {
+    th.addEventListener('click', () => { f.sortBrand = f.sortBrand === th.dataset.brand ? '' : th.dataset.brand; render(); });
+  });
+  draw();
+}
+
+// ---------- Отчёт «Продажи по брендам и клиентам» (Фаза 39, 23.09.2026) ----------
+// Просьба: «в отчётах не видно, сколько продано по каждому бренду и по клиентам».
+// Период — текущий месяц (срезы агентов, c.currentMonthItems) и/или любые из
+// закрытых месяцев (c.monthlyAssortment). Считается в браузере из state.clients.
+// Агент строки текущего месяца — кто продал (soldBy, если клиент чужой), иначе
+// владелец карточки. Факт агента по срезу («Итого») может быть больше суммы по
+// клиентам — если в срезе есть строки без карточки (см. «Сверка срезов» на дашборде).
+function wireSalesBrandReport(stats) {
+  const box = document.getElementById('sr-box');
+  if (!box) return;
+  const st = { months: new Set(['current']), agentId: '', brand: '', open: null, q: '' };
+  const agents = state.users.filter((u) => u.role === 'agent');
+  const nameToId = {}; agents.forEach((a) => { nameToId[a.name] = a.id; });
+  box.innerHTML = `
+    <div class="filter-bar" id="sr-months">
+      <button type="button" class="brand-chip active" data-month="current">Текущий месяц</button>
+      ${(state.salesMonths || []).slice().reverse().map((m) => `<button type="button" class="brand-chip" data-month="${escapeAttr(m)}">${escapeHtml(capitalize(m))}</button>`).join('')}
+    </div>
+    <div class="filter-bar">
+      <select id="sr-agent"><option value="">Все агенты</option>${agents.map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select>
+      <input type="text" id="sr-q" placeholder="Поиск клиента..." autocomplete="off">
+    </div>
+    <div id="sr-fact" class="muted" style="font-size:12px;margin:6px 0"></div>
+    <div class="table-wrap"><table><thead><tr><th>Бренд</th><th>Сумма</th><th>Шт</th><th>Клиентов</th><th>Доля</th></tr></thead><tbody id="sr-brands"></tbody></table></div>
+    <h3 id="sr-clients-h" style="margin:14px 0 6px"></h3>
+    <div class="table-wrap"><table><thead><tr><th>Клиент</th><th>Агент</th><th>Сумма</th><th>Шт</th><th>Позиций</th></tr></thead><tbody id="sr-clients"></tbody></table></div>
+    <div id="sr-more" class="muted" style="font-size:12px;margin-top:6px"></div>
+  `;
+
+  function lines() {
+    const out = [];
+    state.clients.forEach((c) => {
+      st.months.forEach((m) => {
+        const items = m === 'current' ? (c.currentMonthItems || []) : ((c.monthlyAssortment && c.monthlyAssortment[m]) || []);
+        items.forEach((it) => {
+          const agentId = it.soldBy && nameToId[it.soldBy] ? nameToId[it.soldBy] : c.ownerId;
+          out.push({ c, agentId, brand: it.brand || 'Прочее', product: it.product, sku: it.sku, qty: it.qty || 0, revenue: it.revenue || 0 });
+        });
+      });
+    });
+    const aid = st.agentId ? Number(st.agentId) : null;
+    return aid ? out.filter((l) => l.agentId === aid) : out;
+  }
+
+  function draw() {
+    const all = lines();
+    const total = all.reduce((s, l) => s + l.revenue, 0);
+    const byBrand = {};
+    all.forEach((l) => {
+      const b = byBrand[l.brand] || (byBrand[l.brand] = { brand: l.brand, revenue: 0, qty: 0, clients: new Set() });
+      b.revenue += l.revenue; b.qty += l.qty; b.clients.add(l.c.id);
+    });
+    const brands = Object.values(byBrand).sort((a, b) => b.revenue - a.revenue);
+    document.getElementById('sr-brands').innerHTML = brands.map((b) => `
+      <tr class="sr-brand-row ${st.brand === b.brand ? 'bm-open' : ''}" data-brand="${escapeAttr(b.brand)}" style="cursor:pointer">
+        <td><span class="brand-badge">${escapeHtml(b.brand)}</span></td><td>${fmtMoney(b.revenue)}</td><td>${b.qty}</td><td>${b.clients.size}</td><td>${total ? Math.round(b.revenue / total * 100) : 0}%</td>
+      </tr>`).join('') + `<tr><td><strong>Итого</strong></td><td><strong>${fmtMoney(total)}</strong></td><td><strong>${all.reduce((s, l) => s + l.qty, 0)}</strong></td><td><strong>${new Set(all.map((l) => l.c.id)).size}</strong></td><td></td></tr>`;
+
+    // Подсказка про факт по срезам — только когда выбран текущий месяц.
+    const factBox = document.getElementById('sr-fact');
+    if (st.months.has('current') && stats && stats.byAgent) {
+      const list = st.agentId ? stats.byAgent.filter((a) => String(a.agentId) === String(st.agentId)) : stats.byAgent;
+      const fact = list.reduce((s, a) => s + (a.actualThisMonth || 0), 0);
+      factBox.textContent = `Текущий месяц: факт по срезам агентов (Итого файлов) — ${fmtMoney(fact)}.` + (st.months.size === 1 && fact !== total ? ` По клиентам — ${fmtMoney(total)} (разница — см. «Сверка срезов продаж» на дашборде).` : '');
+    } else factBox.textContent = '';
+
+    const q = st.q.trim().toLowerCase();
+    const scoped = all.filter((l) => (!st.brand || l.brand === st.brand) && (!q || (l.c.name || '').toLowerCase().includes(q)));
+    const byClient = {};
+    scoped.forEach((l) => {
+      const r = byClient[l.c.id] || (byClient[l.c.id] = { c: l.c, agentIds: new Set(), revenue: 0, qty: 0, products: {} });
+      r.agentIds.add(l.agentId); r.revenue += l.revenue; r.qty += l.qty;
+      const p = r.products[l.product] || (r.products[l.product] = { product: l.product, sku: l.sku, brand: l.brand, qty: 0, revenue: 0 });
+      p.qty += l.qty; p.revenue += l.revenue;
+    });
+    const clients = Object.values(byClient).sort((a, b) => b.revenue - a.revenue);
+    document.getElementById('sr-clients-h').textContent = `Клиенты${st.brand ? ` — ${st.brand}` : ' — все бренды'} (${clients.length})`;
+    const LIMIT = 200;
+    document.getElementById('sr-clients').innerHTML = clients.slice(0, LIMIT).map((r) => {
+      const main = `<tr class="sr-client-row" data-id="${r.c.id}" style="cursor:pointer">
+        <td>${escapeHtml(r.c.name)}</td><td>${[...r.agentIds].map((id) => escapeHtml(calAgentShort(id))).join(', ')}</td>
+        <td>${fmtMoney(r.revenue)}</td><td>${r.qty}</td><td>${Object.keys(r.products).length}</td></tr>`;
+      if (st.open !== r.c.id) return main;
+      const prods = Object.values(r.products).sort((a, b) => b.revenue - a.revenue);
+      return main + `<tr class="bm-detail"><td colspan="5">${prods.map((p) => `<div class="assort-row"><span>${skuBadgeHtml(p)}${escapeHtml(p.product)} <span class="brand-badge">${escapeHtml(p.brand)}</span></span><span class="freq">${p.qty} шт · ${fmtMoney(p.revenue)}</span></div>`).join('')}</td></tr>`;
+    }).join('') || '<tr><td colspan="5" class="muted">Нет продаж по выбранным фильтрам.</td></tr>';
+    document.getElementById('sr-more').textContent = clients.length > LIMIT ? `Показаны первые ${LIMIT} из ${clients.length}.` : '';
+
+    box.querySelectorAll('.sr-brand-row').forEach((tr) => tr.addEventListener('click', () => {
+      st.brand = st.brand === tr.dataset.brand ? '' : tr.dataset.brand; st.open = null; draw();
+    }));
+    box.querySelectorAll('.sr-client-row').forEach((tr) => tr.addEventListener('click', () => {
+      const id = Number(tr.dataset.id); st.open = st.open === id ? null : id; draw();
+    }));
+  }
+
+  box.querySelectorAll('#sr-months .brand-chip').forEach((chip) => chip.addEventListener('click', () => {
+    const m = chip.dataset.month;
+    if (st.months.has(m)) { if (st.months.size > 1) st.months.delete(m); } else st.months.add(m);
+    box.querySelectorAll('#sr-months .brand-chip').forEach((c) => c.classList.toggle('active', st.months.has(c.dataset.month)));
+    draw();
+  }));
+  document.getElementById('sr-agent').addEventListener('change', (e) => { st.agentId = e.target.value; st.open = null; draw(); });
+  document.getElementById('sr-q').addEventListener('input', (e) => { st.q = e.target.value; draw(); });
+  draw();
+}
+
 // ---------- Отчёты (админ/супервайзер) ----------
 
 async function renderReports(content) {
@@ -2620,6 +2867,12 @@ async function renderReports(content) {
       </div>` : ''}
 
       <div class="panel">
+        <h2>Продажи по брендам и клиентам</h2>
+        <div class="chart-desc">Сколько продано по каждому бренду и каким клиентам. Период — текущий месяц и/или закрытые месяцы (можно несколько). Нажмите на бренд — список клиентов по нему; на клиента — его товары.</div>
+        <div id="sr-box"></div>
+      </div>
+
+      <div class="panel">
         <h2>История по клиенту / агенту</h2>
         <div class="chart-desc">Поиск клиента или агента — сводка по продажам в этом месяце, долгу и задачам.</div>
         <input type="text" id="history-search" placeholder="Найти клиента или агента..." autocomplete="off" style="width:100%;max-width:420px;margin-bottom:10px">
@@ -2639,6 +2892,7 @@ async function renderReports(content) {
       <div id="reports-table" class="report-table-wrap"><div class="muted">Загрузка…</div></div>
     </div>
   `));
+  wireSalesBrandReport(stats);
 
   // Правка 02.09.2026: фильтр по бренду стал мультивыбором (можно отметить сразу
   // Kapous+EPICA+Studio и т.п.), а "Красители/оксиды" вынесен в отдельный
@@ -3019,8 +3273,23 @@ function fmtDateLong(d) { return `${d.getDate()} ${(MONTH_LABELS[d.getMonth()] |
 // taskType (по умолчанию 'visit', см. остальной код) в state.calendar.hiddenTypes.
 // Единая точка фильтрации — используется во всех представлениях (месяц/неделя/день)
 // и в «Печати маршрута», поэтому скрытые воронки не просачиваются никуда.
+// Фаза 39 (23.09.2026): плюс фильтр по агенту (state.calendar.agentId, только у
+// администратора/супервайзера) — через ту же единую точку.
 function tasksOnDate(dateKey) {
-  return state.tasks.filter((t) => t.dueDate === dateKey && !state.calendar.hiddenTypes.has(t.taskType || 'visit'));
+  const aid = state.calendar.agentId ? Number(state.calendar.agentId) : null;
+  return state.tasks.filter((t) => t.dueDate === dateKey
+    && !state.calendar.hiddenTypes.has(t.taskType || 'visit')
+    && (!aid || t.assigneeId === aid));
+}
+// Короткое имя агента для чипа календаря (Фаза 39): первое слово имени.
+function calAgentShort(userId) {
+  const n = userName(userId);
+  return n && n !== '—' ? n.split(/\s+/)[0] : '';
+}
+function calChipLabel(t) {
+  const c = clientById(t.clientId);
+  const who = isStaff() ? calAgentShort(t.assigneeId) : '';
+  return `${who ? `<span class="cal-chip-agent">${escapeHtml(who)}</span> ` : ''}${escapeHtml(c ? c.name : t.title)}`;
 }
 function supMeetingsOnDate(dateKey) { return (state.supervisorMeetings || []).filter((m) => m.date === dateKey); }
 
@@ -3052,7 +3321,8 @@ function renderCalendar(content) {
       </div>
       <div class="filter-bar">
         ${CALENDAR_TASK_TYPES.map((t) => `<label class="filter-check"><input type="checkbox" class="cal-type-filter" data-type="${t.key}" ${cal.hiddenTypes.has(t.key) ? '' : 'checked'}> ${t.label}</label>`).join('')}
-        ${cal.hiddenTypes.size ? '<button type="button" class="link-btn" id="cal-type-filter-reset">Сбросить</button>' : ''}
+        ${isStaff() ? `<select id="cal-agent-filter" class="card-agent-filter"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((a) => `<option value="${a.id}" ${String(cal.agentId) === String(a.id) ? 'selected' : ''}>${escapeHtml(a.name)}</option>`).join('')}</select>` : ''}
+        ${cal.hiddenTypes.size || cal.agentId ? '<button type="button" class="link-btn" id="cal-type-filter-reset">Сбросить</button>' : ''}
       </div>
       ${state.user.role !== 'supervisor' ? '<div class="sub muted" style="margin-bottom:6px">🟣 — в этот день у супервайзера запланирована встреча с клиентом (день занят).</div>' : ''}
       <div id="cal-title" class="cal-title"></div>
@@ -3077,7 +3347,9 @@ function renderCalendar(content) {
     });
   });
   const calTypeResetBtn = document.getElementById('cal-type-filter-reset');
-  if (calTypeResetBtn) calTypeResetBtn.addEventListener('click', () => { cal.hiddenTypes.clear(); render(); });
+  if (calTypeResetBtn) calTypeResetBtn.addEventListener('click', () => { cal.hiddenTypes.clear(); cal.agentId = ''; render(); });
+  const calAgentSel = document.getElementById('cal-agent-filter');
+  if (calAgentSel) calAgentSel.addEventListener('change', (e) => { cal.agentId = e.target.value; render(); });
 
   ['month', 'week', 'day'].forEach((m) => {
     const btn = document.getElementById(`cal-mode-${m}`);
@@ -3118,7 +3390,7 @@ function renderCalMonth() {
       <div class="cal-day-cell ${inMonth ? '' : 'cal-day-outside'} ${key === todayKey ? 'cal-day-today' : ''}">
         <div class="cal-day-num">${d.getDate()} ${supMeetings.length ? '<span class="cal-dot cal-dot-sup" title="Встреча супервайзера в этот день">●</span>' : ''}</div>
         <div class="cal-day-tasks">
-          ${dayTasks.slice(0, 3).map((t) => { const c = clientById(t.clientId); return `<div class="cal-chip">${escapeHtml(c ? c.name : t.title)}</div>`; }).join('')}
+          ${dayTasks.slice(0, 3).map((t) => `<div class="cal-chip">${calChipLabel(t)}</div>`).join('')}
           ${dayTasks.length > 3 ? `<div class="cal-more">+${dayTasks.length - 3}</div>` : ''}
         </div>
         ${incomplete.length ? `<div class="cal-day-dot-wrap"><span class="cal-dot ${dotClass}"></span><span class="cal-dot-count">${incomplete.length}</span></div>` : ''}
@@ -3153,7 +3425,7 @@ function renderCalWeek() {
     if (!dayTasks.length) colBody.appendChild(el('<div class="muted" style="font-size:12px;padding:4px">—</div>'));
     dayTasks.forEach((t) => {
       const c = clientById(t.clientId);
-      const card = el(`<div class="cal-chip cal-chip-block">${escapeHtml(c ? c.name : t.title)}<div class="muted" style="font-size:11px">${escapeHtml(stageLabel(t.stage))}</div></div>`);
+      const card = el(`<div class="cal-chip cal-chip-block">${calChipLabel(t)}<div class="muted" style="font-size:11px">${escapeHtml(stageLabel(t.stage))}</div></div>`);
       card.addEventListener('click', () => openTaskModal(t));
       colBody.appendChild(card);
     });

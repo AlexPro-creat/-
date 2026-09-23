@@ -1,5 +1,5 @@
 // Слияние файла "Анализ <Агент>.xls" (выгрузка продаж за текущий месяц по одному
-// агенту, накопительным итогом с начала месяца) в data/import/current_month_sales.json.
+// агенту, накопительным итогом с начала месяца) в data/import/agent_sales.json (срез агента целиком).
 //
 // Это НЕ часть работающего сервера — ручной инструмент обслуживания, запускается
 // самим Клодом при получении нового файла от пользователя (нет UI для загрузки
@@ -23,41 +23,19 @@
 // сохраняет, поэтому тип строки определяется по соседям: если СЛЕДУЮЩАЯ строка
 // начинается с "Реализация" — эта строка товарная, иначе — клиент.
 //
-// ВАЖНЫЕ ПРАВИЛА (все — по прямым решениям пользователя в этом проекте, см.
-// README.md/context-brief.md "Фаза 25/31/38" за подробностями и прецедентами):
+// ПРАВИЛО (Фаза 39, 23.09.2026, прямое указание пользователя): «сумма
+// выполнения берётся по срезу, а уже по клиентам раскидывается как надо».
+//   - Файл агента ЦЕЛИКОМ заменяет его срез в data/import/agent_sales.json
+//     (total = «Итого» файла — это и есть факт агента на дашборде).
+//   - Раскладка строк по карточкам клиентов делается при старте сервера
+//     (src/agentSales.js): свой агент → другие агенты. Технические карточки-
+//     «корректировки» (Фазы 25/38) больше не нужны.
+//   - Скрипт печатает короткую сверку «сумма продаж N, по клиентам M» и список
+//     клиентов без карточки — если есть расхождение, коротко сообщить
+//     пользователю, он уточнит (новых клиентов заводим только по его ответу).
 //
-// 1. "Последний файл побеждает" — итог агента должен показывать РОВНО то, что в
-//    его последнем файле, а не накопление поверх более старых частичных
-//    импортов. Поэтому мы не просто накладываем новые записи поверх старых, а
-//    ещё и ОЧИЩАЕМ (удаляем ключ из current_month_sales.json) те клиенты этого
-//    агента, которых В НОВОМ ФАЙЛЕ нет — НО ТОЛЬКО если это имя уникально для
-//    агента (никакой другой агент в agents_clients.json не делит это же имя).
-//    Общие имена (см. п.2) трогать нельзя — их очистка задела бы чужого агента.
-//
-// 2. current_month_sales.json матчится по имени клиента БЕЗ учёта агента
-//    (см. src/import.js: currentMonthByName). Поэтому у клиентов с именем,
-//    которое встречается у НЕСКОЛЬКИХ агентов (например задвоенные "Студия
-//    Vivienne Lashes" у Альбины/Бегимай, или до Фазы 31 — общее "Частное
-//    лицо"), нельзя просто писать под исходным именем: одно число уйдёт сразу
-//    всем однофамильцам. Такие случаи решаются через ALIASES ниже — сначала
-//    переименованием карточки нужного агента на уникальное имя (Фаза 31, УЖЕ
-//    сделано для "Частное лицо" у всех 6 агентов), затем прописыванием алиаса
-//    "как называется в файле агента" -> "под каким ключом писать".
-//
-// 3. Если клиент из файла реально принадлежит (в agents_clients.json) ДРУГОМУ
-//    агенту, и пользователь подтвердил не переназначать карточку — сумму всё
-//    равно нужно засчитать этому агенту в общий итог. Решение (Фаза 25) —
-//    техническая карточка-корректировка "Корректировка отгрузки <Агент>
-//    (клиент закреплён за <Другой>)", заведённая в agents_clients.json за
-//    ЭТИМ агентом; алиас в ALIASES ниже перенаправляет сумму именно туда,
-//    а не в карточку реального владельца (которую руками не трогаем — так
-//    сохраняется её собственный итог нетронутым, ценой сознательного
-//    задвоения суммы в общекомандном итоге супервайзера, что пользователем
-//    уже принято как компромисс в Фазе 25).
-//
-// Персональные алиасы по каждому агенту живут в
-// data/import/client_name_aliases.json — правь их там, не здесь, когда
-// появится новый похожий случай; сам скрипт остаётся общим.
+// Алиасы имён (как клиент назван в файле агента → имя карточки) — в
+// data/import/client_name_aliases.json.
 
 const fs = require('fs');
 const path = require('path');
@@ -120,7 +98,7 @@ function parseAgentFile(filePath) {
   return { clients, clientOrder, itogoQty, itogoSum, totalQty, totalSum, unexplained };
 }
 
-function buildProductLookup(currentMonth) {
+function buildProductLookup(slices) {
   const regular = loadJson('regular_assortment.json');
   const test = loadJson('test_assortment.json');
   const lookup = {};
@@ -133,14 +111,30 @@ function buildProductLookup(currentMonth) {
   }
   Object.values(regular).forEach(feed);
   Object.values(test).forEach(feed);
-  Object.values(currentMonth).forEach((c) => feed(c.items || []));
+  Object.keys(slices).forEach((k) => {
+    if (slices[k] && Array.isArray(slices[k].clients)) slices[k].clients.forEach((c) => feed(c.items));
+  });
   return lookup;
 }
 
+// Бренд по префиксу — то же правило, что во всём проекте (Фаза 14), для товаров,
+// которых ещё нет в справочниках.
+function brandByPrefix(product) {
+  const p = norm(product);
+  if (p.startsWith('e ')) return 'EPICA';
+  if (p.startsWith('hy ')) return 'Kapous';
+  if (p.startsWith('s ')) return 'Studio';
+  if (/^(av|es|pro|ms) /.test(p)) return 'AV/ES/PRO/MS';
+  if (p.includes('epica')) return 'EPICA';
+  if (p.includes('kapous')) return 'Kapous';
+  if (!/^[a-z]/.test(p)) return 'Чистовье';
+  return 'Прочее';
+}
+
 function main() {
-  const [, , agentName, filePath] = process.argv;
+  const [, , agentName, filePath, period, asOf] = process.argv;
   if (!agentName || !filePath) {
-    console.error('Использование: node scripts/merge_agent_sales.js "<Агент>" <путь-к-xlsx>');
+    console.error('Использование: node scripts/merge_agent_sales.js "<Агент>" <путь-к-xlsx> ["01.09–25.09.26"] [2026-09-25]');
     process.exit(1);
   }
 
@@ -148,98 +142,61 @@ function main() {
   console.log(`Клиентов в файле: ${parsed.clientOrder.length}`);
   console.log(`Итого (из файла): qty=${parsed.itogoQty} sum=${parsed.itogoSum}`);
   const sumOk = parsed.totalQty === parsed.itogoQty && parsed.totalSum === parsed.itogoSum;
-  console.log(`Сумма по товарным строкам: qty=${parsed.totalQty} sum=${parsed.totalSum} ${sumOk ? 'OK' : 'MISMATCH!'}`);
-  if (!sumOk) {
-    console.error('Сумма не сошлась с "Итого" файла — остановлено, проверь файл вручную.');
-    process.exit(1);
-  }
-  if (parsed.unexplained.length) {
-    console.log('Товарные строки без клиента (пропущены):', JSON.stringify(parsed.unexplained));
-  }
+  console.log(`Сумма по товарным строкам: qty=${parsed.totalQty} sum=${parsed.totalSum} ${sumOk ? 'OK' : 'РАСХОЖДЕНИЕ'}`);
+  if (parsed.unexplained.length) console.log('Товарные строки без клиента:', JSON.stringify(parsed.unexplained));
 
-  const contractors = loadJson('agents_clients.json');
-  const aliasesAll = (() => {
-    try { return loadJson('client_name_aliases.json'); } catch (e) { return {}; }
-  })();
-  const aliases = aliasesAll[agentName] || {};
+  const slicesPath = path.join(IMPORT_DIR, 'agent_sales.json');
+  const slices = loadJson('agent_sales.json');
+  const lookup = buildProductLookup(slices);
+  let byPrefix = 0;
 
-  // Имена, которые встречаются больше чем у одного агента в agents_clients.json —
-  // их нельзя молча "очищать при отсутствии в новом файле" (задело бы другого
-  // агента). Список считаем по ВСЕЙ базе, не только по этому агенту.
-  const nameOwners = {};
-  contractors.forEach((c) => {
-    const k = norm(c.name);
-    if (!nameOwners[k]) nameOwners[k] = new Set();
-    nameOwners[k].add(c.agent);
-  });
-  function isSharedName(name) {
-    const owners = nameOwners[norm(name)];
-    return owners && owners.size > 1;
-  }
-
-  const currentPath = path.join(IMPORT_DIR, 'current_month_sales.json');
-  const currentMonth = loadJson('current_month_sales.json');
-  const existingByNorm = {};
-  Object.keys(currentMonth).forEach((k) => { existingByNorm[norm(k)] = k; });
-
-  const productLookup = buildProductLookup(currentMonth);
-  let matchedProducts = 0;
-  const unmatchedProducts = [];
-
-  // ---- Шаг 1: "последний файл побеждает" — чистим ключи, которые принадлежат
-  // ТОЛЬКО этому агенту (уникальное имя) и не встречаются в новом файле. ----
-  const fileNamesNorm = new Set(parsed.clientOrder.map((n) => norm(aliases[n] ? aliases[n].target : n)));
-  const agentOwnClients = contractors.filter((c) => c.agent === agentName);
-  let cleared = 0;
-  agentOwnClients.forEach((c) => {
-    if (isSharedName(c.name)) return; // общее имя с другим агентом — не трогаем
-    const nk = norm(c.name);
-    if (fileNamesNorm.has(nk)) return; // есть в новом файле — будет перезаписано ниже
-    if (existingByNorm[nk] !== undefined) {
-      delete currentMonth[existingByNorm[nk]];
-      delete existingByNorm[nk];
-      cleared++;
-    }
-  });
-  console.log(`Очищено (было в базе за ${agentName}, нет в новом файле, имя уникально): ${cleared}`);
-
-  // ---- Шаг 2: применяем данные файла (с учётом алиасов) ----
-  let overwritten = 0, added = 0;
-  parsed.clientOrder.forEach((rawName) => {
-    const alias = aliases[rawName];
-    const targetName = alias ? alias.target : rawName;
+  const clients = parsed.clientOrder.map((rawName) => {
     const items = parsed.clients[rawName].items.map((it) => {
-      const key = norm(it.product);
-      const found = productLookup[key];
-      if (found) matchedProducts++; else unmatchedProducts.push(it.product);
+      const found = lookup[norm(it.product)];
+      if (!found) byPrefix++;
       return {
         product: it.product,
-        brand: found ? found.brand : null,
+        brand: found && found.brand ? found.brand : brandByPrefix(it.product),
         category: found ? found.category : null,
         qty: it.qty,
         revenue: it.revenue
       };
     });
-    const revenue = items.reduce((s, it) => s + it.revenue, 0);
-    const nk = norm(targetName);
-    const existingKey = existingByNorm[nk];
-    if (existingKey) {
-      currentMonth[existingKey] = { revenue, items };
-      overwritten++;
-    } else {
-      currentMonth[targetName] = { revenue, items };
-      existingByNorm[nk] = targetName;
-      added++;
-    }
+    return { name: rawName, revenue: items.reduce((s, it) => s + it.revenue, 0), items };
   });
 
-  console.log(`Товарных строк: ${matchedProducts + unmatchedProducts.length} matched: ${matchedProducts} unmatched: ${unmatchedProducts.length}`);
-  if (unmatchedProducts.length) console.log('Unmatched products:', JSON.stringify(unmatchedProducts, null, 2));
-  console.log(`Перезаписано ключей: ${overwritten}, добавлено новых: ${added}`);
-  console.log('Итого ключей в current_month_sales.json:', Object.keys(currentMonth).length);
+  const prev = slices[agentName] || {};
+  slices[agentName] = {
+    period: period || prev.period || '',
+    asOf: asOf || new Date().toISOString().slice(0, 10),
+    // Факт агента = «Итого» файла (правило пользователя).
+    total: parsed.itogoSum,
+    qty: parsed.itogoQty,
+    clients
+  };
+  fs.writeFileSync(slicesPath, JSON.stringify(slices, null, 1) + '\n');
+  console.log(`Срез ${agentName} записан: total=${parsed.itogoSum}, клиентов=${clients.length}, бренд по префиксу у ${byPrefix} строк`);
 
-  fs.writeFileSync(currentPath, JSON.stringify(currentMonth, null, 2) + '\n');
-  console.log('Записано в', currentPath);
+  // Предварительная сверка раскладки по карточкам из agents_clients.json
+  // (на сервере раскладка идёт по всем карточкам базы, включая заведённые
+  // агентами вручную — там может найтись больше).
+  const contractors = loadJson('agents_clients.json');
+  const aliases = (() => { try { return loadJson('client_name_aliases.json')[agentName] || {}; } catch (e) { return {}; } })();
+  const own = new Set(contractors.filter((c) => c.agent === agentName).map((c) => norm(c.name)));
+  const other = {};
+  contractors.forEach((c) => { if (c.agent !== agentName) (other[norm(c.name)] = other[norm(c.name)] || []).push(c.agent); });
+  let distributed = 0;
+  const toOthers = [];
+  const missing = [];
+  clients.forEach((c) => {
+    const t = norm(aliases[c.name] ? aliases[c.name].target : c.name);
+    if (own.has(t)) distributed += c.revenue;
+    else if (other[t]) { distributed += c.revenue; toOthers.push(`${c.name} → ${other[t].join('/')} (${c.revenue})`); }
+    else missing.push(`${c.name} (${c.revenue})`);
+  });
+  console.log(`Сверка: сумма продаж ${parsed.itogoSum}, по клиентам ${distributed}`);
+  if (toOthers.length) console.log('На карточки других агентов:\n  ' + toOthers.join('\n  '));
+  if (missing.length) console.log('Нет карточки:\n  ' + missing.join('\n  '));
 }
 
 main();

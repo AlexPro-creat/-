@@ -746,3 +746,25 @@ th.sortable:hover { color: var(--text); }
   white-space: nowrap;
 }
 .colorant-exclude-toggle input { cursor: pointer; }
+
+/* Фаза 39 (23.09.2026): агент на чипе задачи в календаре + сверка срезов продаж */
+.cal-chip-agent { color: var(--gold); font-weight: 600; }
+.sales-check-panel { border-color: var(--warning); }
+.sales-check-row { font-size: 13px; padding: 3px 0; }
+
+/* Фаза 39: вкладка «По брендам» (клиент × бренд) */
+.brand-matrix td, .brand-matrix th { white-space: nowrap; }
+.brand-matrix .sticky-col { position: sticky; left: 0; background: var(--surface); z-index: 1; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.bm-cell { cursor: pointer; font-size: 13px; min-width: 110px; }
+.bm-cell:hover { outline: 1px solid var(--primary); }
+.bm-empty { color: var(--muted); cursor: default; }
+.bm-empty:hover { outline: none; }
+.bm-ok { background: rgba(34, 197, 94, 0.12); }
+.bm-partial { background: rgba(234, 179, 8, 0.12); }
+.bm-risk { background: rgba(239, 68, 68, 0.12); }
+.bm-open { outline: 2px solid var(--gold); }
+.bm-risk-n { font-size: 11px; color: var(--warning); }
+.bm-detail td { background: var(--surface-2); white-space: normal; }
+.bm-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.bm-detail-h { font-weight: 600; margin-bottom: 6px; }
+@media (max-width: 720px) { .bm-detail-grid { grid-template-columns: 1fr; } }
