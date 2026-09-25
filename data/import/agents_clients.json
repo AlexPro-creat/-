@@ -7563,5 +7563,16 @@
     "contact_name": null,
     "contract_status": "неизвестно",
     "note_from_import": "Добавлен 23.09.2026 из среза продаж Нагимы 01–23.09.26"
+  },
+  {
+    "agent": "Татьяна",
+    "name": "Салон Kera Style",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "ул.Салиева,149",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 25.09.2026 из среза продаж Татьяны 01–25.09.26"
   }
 ]
