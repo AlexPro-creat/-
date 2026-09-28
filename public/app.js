@@ -16,7 +16,7 @@ const state = {
   supervisorMeetings: [],
   view: 'dashboard',
   stats: null,
-  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyDiscount: false, onlyPendingApproval: false, showClosed: false, search: '' },
+  clientFilters: { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyDiscount: false, onlyPendingApproval: false, showClosed: false, geo: '', search: '' },
   clientSort: { key: null, dir: -1 },
   taskTagFilter: new Set(),
   saleTagFilter: new Set(),
@@ -412,9 +412,15 @@ function telLink(phone, label) {
   return `<a class="tel-link" href="tel:${digits}" onclick="event.stopPropagation()">${escapeHtml(label !== undefined ? label : phone)}</a> ${waLink(phone)}`;
 }
 
-function mapsLink(address) {
+// 28.09.2026: если у клиента уже есть координаты точки (первая отметка
+// посещения, client.geo) — ссылка «Карта» ведёт по координатам, а не по
+// поиску адреса в 2ГИС (адрес часто неточный).
+function mapsLink(address, geo) {
+  if (geo && geo.lat != null && geo.lng != null) {
+    return `<a class="maps-link" target="_blank" rel="noopener" href="https://2gis.kg/geo/${geo.lng},${geo.lat}" onclick="event.stopPropagation()" title="По сохранённым координатам точки">📍 Карта ✓</a>`;
+  }
   if (!address) return '';
-  return `<a class="maps-link" target="_blank" rel="noopener" href="https://2gis.kg/bishkek/search/${encodeURIComponent(address)}" onclick="event.stopPropagation()">📍 Карта</a>`;
+  return `<a class="maps-link" target="_blank" rel="noopener" href="https://2gis.kg/bishkek/search/${encodeURIComponent(address)}" onclick="event.stopPropagation()" title="Поиск по адресу — координат точки ещё нет">📍 Карта</a>`;
 }
 
 // Фаза 15, п.12: поле "Соцсети/WhatsApp" переименовано в "Instagram" (WhatsApp
@@ -1072,6 +1078,8 @@ function filteredClients() {
     // фильтр проверял только pendingApproval, и клиенты с запросом на закрытие
     // (у которых в списке уже был свой бейдж «на закрытие») под фильтр не попадали.
     if (f.onlyPendingApproval && !(c.pendingApproval || c.closureRequested)) return false;
+    if (f.geo === 'yes' && !c.geo) return false;
+    if (f.geo === 'no' && c.geo) return false;
     if (f.ownerId && c.ownerId !== Number(f.ownerId)) return false;
     if (f.search) {
       const q = f.search.trim().toLowerCase();
@@ -1086,6 +1094,7 @@ function filteredClients() {
       if (key === 'debt') return c.debtAmount || 0;
       if (key === 'route') return c.routeNumber == null ? Infinity : c.routeNumber;
       if (key === 'sales') return c.currentMonthRevenue || 0;
+      if (key === 'geo') return c.geo ? 1 : 0;
       return riskCount(c);
     };
     list = list.slice().sort((a, b) => (sortVal(a) - sortVal(b)) * dir);
@@ -1139,7 +1148,7 @@ function renderClients(content) {
   // но теперь после миграции значения и так только из этого набора.
   const pointTypes = state.pointTypes;
   const f = state.clientFilters;
-  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.ownerId || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.onlyDiscount || f.onlyPendingApproval || f.showClosed || f.search;
+  const filtersActive = f.visitDay || f.pointType || f.paymentMethod || f.ownerId || f.onlyRegular || f.onlyDebt || f.onlyShortfall || f.onlyDiscount || f.onlyPendingApproval || f.showClosed || f.geo || f.search;
   const bulk = state.clientBulkMode;
   content.appendChild(el(`
     <div>
@@ -1169,6 +1178,11 @@ function renderClients(content) {
         <label class="filter-check"><input type="checkbox" id="filter-onlyDebt" ${f.onlyDebt ? 'checked' : ''}> Есть задолженность</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyShortfall" ${f.onlyShortfall ? 'checked' : ''}> Не добрал</label>
         <label class="filter-check"><input type="checkbox" id="filter-onlyDiscount" ${f.onlyDiscount ? 'checked' : ''}> Со скидкой/особыми условиями</label>
+        <select id="filter-geo" title="Сохранены ли координаты точки (первая отметка посещения)">
+          <option value="">Координаты: все</option>
+          <option value="yes" ${f.geo === 'yes' ? 'selected' : ''}>✓ Координаты есть</option>
+          <option value="no" ${f.geo === 'no' ? 'selected' : ''}>Координат нет</option>
+        </select>
         ${isStaff() ? `<label class="filter-check" title="Новые точки от агентов, ожидающие подтверждения, и точки с запросом на закрытие"><input type="checkbox" id="filter-onlyPendingApproval" ${f.onlyPendingApproval ? 'checked' : ''}> На согласовании</label>` : ''}
         ${isStaff() ? `<select id="filter-ownerId">
           <option value="">Агент: все</option>
@@ -1190,10 +1204,11 @@ function renderClients(content) {
           <thead><tr>
             ${bulk ? '<th></th>' : ''}
             <th class="sticky-col">Название</th>
-            <th class="sortable" data-sort="sales">Продано в этом месяце${sortArrow('sales')}</th>
-            <th class="sortable" data-sort="debt">Долг${sortArrow('debt')}</th>
+            <th class="sortable col-narrow" data-sort="sales">Продано<br>в этом месяце${sortArrow('sales')}</th>
+            <th class="sortable col-narrow" data-sort="debt">Долг${sortArrow('debt')}</th>
             <th>Номер телефона</th>
             <th>Адрес</th>
+            <th class="col-narrow sortable" data-sort="geo" title="Координаты точки сохранены (первая отметка посещения)">Коорд.${sortArrow('geo')}</th>
             <th>Контактное лицо</th>
             <th>Тип точки</th>
             <th class="sortable" data-sort="route">Маршрут №${sortArrow('route')}</th>
@@ -1234,6 +1249,8 @@ function renderClients(content) {
   document.getElementById('filter-onlyDebt').addEventListener('change', (e) => { state.clientFilters.onlyDebt = e.target.checked; render(); });
   document.getElementById('filter-onlyShortfall').addEventListener('change', (e) => { state.clientFilters.onlyShortfall = e.target.checked; render(); });
   document.getElementById('filter-onlyDiscount').addEventListener('change', (e) => { state.clientFilters.onlyDiscount = e.target.checked; render(); });
+  const geoFilterSel = document.getElementById('filter-geo');
+  if (geoFilterSel) geoFilterSel.addEventListener('change', (e) => { state.clientFilters.geo = e.target.value; render(); });
   const onlyPendingApprovalCb = document.getElementById('filter-onlyPendingApproval');
   if (onlyPendingApprovalCb) onlyPendingApprovalCb.addEventListener('change', (e) => { state.clientFilters.onlyPendingApproval = e.target.checked; render(); });
   const ownerSel = document.getElementById('filter-ownerId');
@@ -1242,7 +1259,7 @@ function renderClients(content) {
   if (showClosedCb) showClosedCb.addEventListener('change', (e) => { state.clientFilters.showClosed = e.target.checked; render(); });
   const resetBtn = document.getElementById('filter-reset');
   if (resetBtn) resetBtn.addEventListener('click', () => {
-    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyDiscount: false, onlyPendingApproval: false, showClosed: false, search: '' };
+    state.clientFilters = { visitDay: '', pointType: '', paymentMethod: '', ownerId: '', onlyRegular: false, onlyDebt: false, onlyShortfall: false, onlyDiscount: false, onlyPendingApproval: false, showClosed: false, geo: '', search: '' };
     render();
   });
   content.querySelectorAll('th.sortable').forEach((th) => {
@@ -1268,7 +1285,7 @@ function renderClients(content) {
   const tbody = document.getElementById('clients-tbody');
   const list = filteredClients();
   if (!list.length) {
-    tbody.appendChild(el(`<tr><td colspan="${bulk ? 11 : 10}"><div class="empty-state">${state.clients.length ? 'Ничего не найдено по выбранным фильтрам.' : 'Пока нет клиентов. Добавьте первого.'}</div></td></tr>`));
+    tbody.appendChild(el(`<tr><td colspan="${bulk ? 12 : 11}"><div class="empty-state">${state.clients.length ? 'Ничего не найдено по выбранным фильтрам.' : 'Пока нет клиентов. Добавьте первого.'}</div></td></tr>`));
     return;
   }
   list.forEach((c) => {
@@ -1284,10 +1301,11 @@ function renderClients(content) {
           ${c.pendingApproval ? '<span class="badge badge-pending">на согласовании</span>' : ''}
           ${c.isOffRoute ? '<span class="badge badge-offroute">вне маршрута</span>' : ''}
         </td>
-        <td>${c.currentMonthRevenue ? fmtMoney(c.currentMonthRevenue) : '—'}</td>
-        <td>${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${escapeAttr([overdueDays, debtAsOfLabel(c) ? 'на ' + debtAsOfLabel(c) : ''].filter(Boolean).join(', '))}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
+        <td class="col-narrow">${c.currentMonthRevenue ? fmtMoney(c.currentMonthRevenue) : '—'}</td>
+        <td class="col-narrow">${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${escapeAttr([overdueDays, debtAsOfLabel(c) ? 'на ' + debtAsOfLabel(c) : ''].filter(Boolean).join(', '))}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
         <td>${telLink(c.phone)}</td>
-        <td>${escapeHtml(c.address || '—')} ${mapsLink(c.address)}</td>
+        <td>${escapeHtml(c.address || '—')} ${mapsLink(c.address, c.geo)}</td>
+        <td class="col-narrow">${c.geo ? `<span class="geo-yes" title="Координаты сохранены ${escapeAttr(fmtVisitTime(c.geo.setAt))}${c.geo.setBy ? ' (' + escapeAttr(c.geo.setBy) + ')' : ''}">✓</span>` : '<span class="muted">—</span>'}</td>
         <td>${escapeHtml(c.contactName || '—')}</td>
         <td>${escapeHtml(c.pointType || '—')}</td>
         <td>${c.routeNumber != null ? escapeHtml(String(c.routeNumber)) : '—'}</td>
@@ -1504,7 +1522,7 @@ async function openClientModal(client) {
       ${renderClosureBlock(client)}
       <div class="panel-inline">
         ${fieldRow('Тип точки', escapeHtml(client.pointType || '—'), true)}
-        ${canEditContact ? '' : fieldRow('Адрес', `${escapeHtml(client.address || '—')} ${mapsLink(client.address)}`, true)}
+        ${canEditContact ? '' : fieldRow('Адрес', `${escapeHtml(client.address || '—')} ${mapsLink(client.address, client.geo)}`, true)}
         ${canEditContact ? '' : fieldRow('Телефон', telLink(client.phone), true)}
         ${canEditContact ? '' : fieldRow('Контактное лицо', escapeHtml(client.contactName || '—'), true)}
         ${fieldRow('День визита', escapeHtml(client.visitDay || '—'), true)}
@@ -1524,7 +1542,7 @@ async function openClientModal(client) {
       </div>
       <form id="client-form">
         ${canEditContact ? `
-        <label>Адрес ${client.address ? mapsLink(client.address) : ''}</label>
+        <label>Адрес ${client.address || client.geo ? mapsLink(client.address, client.geo) : ''}</label>
         <input name="address" value="${escapeAttr(client.address)}">
         <div class="field-row">
           <div><label>Телефон ${client.phone ? telLink(client.phone) : ''}</label><input name="phone" value="${escapeAttr(client.phone)}"></div>
@@ -1565,7 +1583,7 @@ async function openClientModal(client) {
             </select>
           </div>
         </div>
-        <label>Адрес ${client && client.address ? mapsLink(client.address) : ''}</label>
+        <label>Адрес ${client && (client.address || client.geo) ? mapsLink(client.address, client.geo) : ''}</label>
         <input name="address" value="${client ? escapeAttr(client.address) : ''}">
         <div class="field-row">
           <div><label>Телефон ${client && client.phone ? telLink(client.phone, '📞') : ''}</label><input name="phone" value="${client ? escapeAttr(client.phone) : ''}"></div>
@@ -2004,8 +2022,12 @@ function renderTasks(content) {
         ${state.waitlistTagFilter.size ? '<button type="button" class="link-btn" id="waitlist-tag-filter-reset">Сбросить</button>' : ''}
       </div>
       ` : typeView === 'checkin' ? `
-      <div class="sub muted" style="margin-bottom:6px">Создаются автоматически каждый день в 00:01 на всех клиентов, у кого день визита — этот день недели. Закрываются кнопкой «📍 Отметить посещение». Срок — до 20:00.</div>
-      <div class="filter-bar"><label class="muted" style="margin:0">Дата: <input type="date" id="checkin-date" value="${escapeAttr(state.checkinDate || new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10))}"></label></div>
+      <div class="sub muted" style="margin-bottom:6px">Кнопка «Создать задачи» ставит «Посещение» на выбранную дату всем клиентам агента, у кого день визита — день недели этой даты (повторно не дублирует). Закрываются кнопкой «📍 Отметить посещение». Срок — до 20:00.</div>
+      <div class="filter-bar">
+        <label class="muted" style="margin:0">Дата: <input type="date" id="checkin-date" value="${escapeAttr(state.checkinDate || new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10))}"></label>
+        ${isStaff() ? `<select id="checkin-gen-agent"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((u) => `<option value="${u.id}" ${String(state.checkinGenAgent || '') === String(u.id) ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}</select>` : ''}
+        <button type="button" class="btn-primary" id="checkin-generate-btn">+ Создать задачи на посещения</button>
+      </div>
       ` : `
       <div class="sub muted" style="margin-bottom:6px">Задачи, не привязанные к клиенту — напоминания и поручения агенту напрямую (например, сдать отчёт, забрать образцы и т.п.).</div>
       `}
@@ -2079,6 +2101,24 @@ function renderTasks(content) {
   document.getElementById('task-type-checkin-btn').addEventListener('click', () => { state.taskTypeView = 'checkin'; render(); });
   const checkinDateInput = document.getElementById('checkin-date');
   if (checkinDateInput) checkinDateInput.addEventListener('change', (e) => { state.checkinDate = e.target.value; render(); });
+  const checkinGenAgent = document.getElementById('checkin-gen-agent');
+  if (checkinGenAgent) checkinGenAgent.addEventListener('change', (e) => { state.checkinGenAgent = e.target.value; });
+  const checkinGenBtn = document.getElementById('checkin-generate-btn');
+  if (checkinGenBtn) checkinGenBtn.addEventListener('click', async () => {
+    const date = document.getElementById('checkin-date').value;
+    const agentSel = document.getElementById('checkin-gen-agent');
+    const agentId = agentSel ? agentSel.value : '';
+    const who = agentSel ? (agentId ? agentSel.options[agentSel.selectedIndex].text : 'всех агентов') : 'себя';
+    if (!confirm(`Создать задачи «Посещение» на ${date.split('-').reverse().join('.')} для: ${who}?`)) return;
+    checkinGenBtn.disabled = true;
+    try {
+      const r = await api('POST', '/api/tasks/checkin-generate', { date, agentId: agentId || null });
+      state.checkinDate = date;
+      showToast(`${r.weekday}: создано задач — ${r.created}${r.skipped ? `, уже были — ${r.skipped}` : ''}`, r.created ? 'ok' : 'warn');
+      await loadAll();
+      render();
+    } catch (e) { showToast(e.message, 'warn'); checkinGenBtn.disabled = false; }
+  });
   const taskBulkModeBtn = document.getElementById('task-bulk-mode-btn');
   if (taskBulkModeBtn) taskBulkModeBtn.addEventListener('click', () => { state.taskBulkMode = !state.taskBulkMode; state.taskBulkSelected = new Set(); render(); });
   const taskBulkDeleteBtn = document.getElementById('task-bulk-delete-btn');
@@ -3811,7 +3851,7 @@ function renderMyDay(content) {
     const card = el(`
       <div class="myday-card">
         <div class="myday-name">${escapeHtml(client ? client.name : t.title)}</div>
-        ${client ? `<div class="myday-row">${escapeHtml(client.address || 'адрес не указан')} ${mapsLink(client.address)}</div>` : ''}
+        ${client ? `<div class="myday-row">${escapeHtml(client.address || 'адрес не указан')} ${mapsLink(client.address, client.geo)}</div>` : ''}
         ${client && client.phone ? `<div class="myday-row">${telLink(client.phone, '📞 ' + client.phone)}</div>` : ''}
         <div class="myday-row muted">${escapeHtml(stageLabel(t.stage))}${t.report ? ' · ✓ отчёт' : ''}</div>
         <div class="filter-bar" style="margin-top:6px">

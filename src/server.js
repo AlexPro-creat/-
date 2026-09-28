@@ -104,10 +104,10 @@ api.migrateClientDefaults();
 api.migrateUserDefaults();
 api.migrateDocumentsStatus();
 
-// Воронка «Посещения» (Фаза 40): задачи на сегодня по дню визита клиентов —
-// при старте и затем раз в минуту (идемпотентно; новый день подхватывается в 00:01).
-api.ensureDailyCheckinTasks();
-setInterval(() => { try { api.ensureDailyCheckinTasks(); } catch (e) { console.error(e); } }, 60 * 1000);
+// Воронка «Посещения» (Фаза 40): задачи создаются кнопкой на вкладке «Посещения»
+// (с 28.09.2026 — не автоматически). Здесь только досинхронизация отметок с задачами.
+api.syncCheckinTasks();
+setInterval(() => { try { api.syncCheckinTasks(); } catch (e) { console.error(e); } }, 60 * 1000);
 
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url);

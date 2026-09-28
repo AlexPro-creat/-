@@ -803,3 +803,9 @@ th.sortable:hover { color: var(--text); }
   .cal-day-dot-wrap { flex-direction: column; align-items: flex-start; gap: 2px; }
   .cal-day-dot-wrap .cal-cnt { font-size: 9px; padding: 0 3px; line-height: 13px; border-left-width: 2px; }
 }
+
+/* 28.09.2026: узкие колонки «Продано в этом месяце» и «Долг» на «Клиентах» */
+th.col-narrow { white-space: normal; line-height: 1.2; padding-left: 6px; padding-right: 6px; width: 1%; }
+td.col-narrow { white-space: nowrap; padding-left: 6px; padding-right: 6px; width: 1%; }
+td.col-narrow .badge { padding-left: 6px; padding-right: 6px; }
+.geo-yes { color: var(--success); font-weight: 700; font-size: 16px; }

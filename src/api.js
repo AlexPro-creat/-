@@ -208,27 +208,33 @@ function isTaskOverdue(task) {
 // день уже есть в карточке клиента (например, после передеплоя), задача сразу
 // создаётся выполненной. Срок — до 20:00 того же дня (см. isTaskOverdue).
 const WEEKDAY_BY_INDEX = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
-function ensureDailyCheckinTasks() {
-  const today = bishkekToday();
-  const weekday = WEEKDAY_BY_INDEX[bishkekNow().getUTCDay()];
+// Фаза 40, правка 28.09.2026 («неудобно, когда задачи создаются сами — сделай
+// кнопку «создать задачи» и выбор агента»): автосоздание в 00:01 убрано. Задачи
+// создаются кнопкой на вкладке «Посещения» (POST /api/tasks/checkin-generate)
+// на выбранную дату и агента — по клиентам, у кого день визита = день недели
+// этой даты. Уже созданные задачи на ту же дату по тому же клиенту не дублируются.
+function createCheckinTasks(date, agentId, createdBy) {
+  const d = new Date(date + 'T00:00:00Z');
+  const weekday = WEEKDAY_BY_INDEX[d.getUTCDay()];
   const agentsById = {};
-  db.all('users').forEach((u) => { if (u.role === 'agent') agentsById[u.id] = u; });
-  const existing = new Set(db.all('tasks').filter((t) => t.taskType === 'checkin' && t.dueDate === today).map((t) => t.clientId));
+  db.all('users').forEach((u) => { if (u.role === 'agent' && (!agentId || u.id === agentId)) agentsById[u.id] = u; });
+  const existing = new Set(db.all('tasks').filter((t) => t.taskType === 'checkin' && t.dueDate === date).map((t) => t.clientId));
   let created = 0;
+  let skipped = 0;
   db.beginBatch();
   try {
     db.all('clients').forEach((c) => {
       if (c.closed || c.pendingApproval || !agentsById[c.ownerId]) return;
       if ((c.visitDay || '').trim().toLowerCase() !== weekday.toLowerCase()) return;
-      if (existing.has(c.id)) return;
-      const visit = (c.visits || []).find((v) => bishkekDate(new Date(v.at)) === today && v.agentId === c.ownerId && v.status !== 'nogps');
+      if (existing.has(c.id)) { skipped++; return; }
+      const visit = (c.visits || []).find((v) => bishkekDate(new Date(v.at)) === date && v.agentId === c.ownerId && v.status !== 'nogps');
       const nowIso = new Date().toISOString();
       db.insert('tasks', {
         clientId: c.id,
         taskType: 'checkin',
         title: `Посещение: ${c.name}`,
         description: '',
-        dueDate: today,
+        dueDate: date,
         visitTime: '',
         visitTimeTo: '',
         stage: visit ? 'done' : 'in_progress',
@@ -239,7 +245,7 @@ function ensureDailyCheckinTasks() {
         dateChangeRequest: null,
         attachments: [],
         assigneeId: c.ownerId,
-        createdBy: null,
+        createdBy: createdBy || null,
         createdAt: nowIso,
         updatedAt: nowIso
       });
@@ -248,22 +254,25 @@ function ensureDailyCheckinTasks() {
   } finally {
     db.endBatch();
   }
-  // Досинхронизация: если отметка появилась в карточке позже создания задачи
-  // (например, клиентов загрузили из файла после передеплоя) — закрываем задачу.
+  return { created, skipped, weekday };
+}
+// Досинхронизация (на старте и раз в минуту): если отметка появилась в карточке
+// клиента позже создания задачи (например, клиентов загрузили из файла после
+// передеплоя) — закрываем открытую задачу «Посещение» за этот день. Задачи сама
+// больше НЕ создаёт.
+function syncCheckinTasks() {
   db.beginBatch();
   try {
     const clientsById = {};
     db.all('clients').forEach((c) => { clientsById[c.id] = c; });
-    db.all('tasks').filter((t) => t.taskType === 'checkin' && t.dueDate === today && t.stage === 'in_progress').forEach((t) => {
+    db.all('tasks').filter((t) => t.taskType === 'checkin' && t.stage === 'in_progress').forEach((t) => {
       const c = clientsById[t.clientId];
-      const visit = c && (c.visits || []).find((v) => bishkekDate(new Date(v.at)) === today && v.agentId === t.assigneeId && v.status !== 'nogps');
+      const visit = c && (c.visits || []).find((v) => bishkekDate(new Date(v.at)) === t.dueDate && v.agentId === t.assigneeId && v.status !== 'nogps');
       if (visit) db.update('tasks', t.id, { stage: 'done', report: checkinReport(visit), checkinAt: visit.at, updatedAt: new Date().toISOString() });
     });
   } finally {
     db.endBatch();
   }
-  if (created) console.log(`Посещения на ${today} (${weekday}): создано задач — ${created}`);
-  return created;
 }
 function checkinReport(visit) {
   const t = new Date(visit.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bishkek' });
@@ -1620,6 +1629,18 @@ function register(router) {
   // запоминает координаты точки (client.geo); следующие сравниваются с ними —
   // ближе VISIT_RADIUS_M = «у точки», дальше = «далеко». Всё хранится в
   // карточке клиента (client.visits) и выгружается вместе с клиентами.
+  // Создание задач «Посещение» кнопкой (Фаза 40, правка 28.09.2026).
+  // Админ/супервайзер — на выбранного агента или на всех; агент — только себе.
+  router.post('/api/tasks/checkin-generate', requireAuth(async (req, res) => {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(body.date || '') ? body.date : bishkekToday();
+    let agentId = body.agentId ? Number(body.agentId) : null;
+    if (!isStaff(req.user)) agentId = req.user.id;
+    const r = createCheckinTasks(date, agentId, req.user.id);
+    sendJson(res, 200, { date, ...r });
+  }));
+
   router.post('/api/clients/:id/visit', requireAuth(async (req, res, params) => {
     const client = db.find('clients', params.id);
     if (!client) return sendJson(res, 404, { error: 'Клиент не найден' });
@@ -2579,4 +2600,4 @@ function register(router) {
   }));
 }
 
-module.exports = { ensureDailyCheckinTasks, register, migrateAgentRenames, migrateDocumentsStatus, migrateLegacyTaskStages, dedupeDuplicateAgentTasks, migrateClientDefaults, migrateUserDefaults, TASK_STAGES, TASK_TAGS, PAYMENT_METHODS, CONTRACT_STATUSES, sendJson, UPLOADS_DIR };
+module.exports = { syncCheckinTasks, register, migrateAgentRenames, migrateDocumentsStatus, migrateLegacyTaskStages, dedupeDuplicateAgentTasks, migrateClientDefaults, migrateUserDefaults, TASK_STAGES, TASK_TAGS, PAYMENT_METHODS, CONTRACT_STATUSES, sendJson, UPLOADS_DIR };
