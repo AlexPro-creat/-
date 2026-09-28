@@ -97,9 +97,22 @@ function isTaskActiveClient(t) {
 // на дашборде (см. case 'overdueTasksCount' в dashCardValue) — вынесено в
 // одну функцию, чтобы фильтр «Просроченные» на странице «Задачи» считал
 // ровно так же, а не по своей отдельной логике.
+// Фаза 40 (25.09.2026): срок любой задачи — до 20:00 (Бишкек) её дня; после
+// 20:00 активная задача этого дня уже «просрочена» (то же правило на сервере).
+const TASK_DEADLINE_HOUR = 20;
 function isTaskOverdue(t) {
-  const today = new Date().toISOString().slice(0, 10);
-  return !!(t.dueDate && t.dueDate < today && isTaskActiveClient(t));
+  if (!t.dueDate || !isTaskActiveClient(t)) return false;
+  const bk = new Date(Date.now() + 6 * 3600 * 1000);
+  const today = bk.toISOString().slice(0, 10);
+  return t.dueDate < today || (t.dueDate === today && bk.getUTCHours() >= TASK_DEADLINE_HOUR);
+}
+// Задачу «Посещение» открываем карточкой клиента (там кнопка отметки).
+function openTaskOrClient(t) {
+  if (t.taskType === 'checkin') {
+    const c = clientById(t.clientId);
+    if (c) return openClientModal(c);
+  }
+  return openTaskModal(t);
 }
 
 // ---------- Утилита запросов к API ----------
@@ -363,6 +376,7 @@ async function boot() {
   await loadAll();
   render();
   setupNotifications();
+  primeGeolocation();
 }
 
 // ---------- Рендер по вкладкам ----------
@@ -464,7 +478,7 @@ function dashCardValue(key, agentId, paymentMethod) {
   switch (key) {
     case 'clientsCount': return String(clientsF.length);
     case 'todayTasksCount': return String(tasksF.filter((t) => isTaskActiveClient(t) && t.dueDate === today).length);
-    case 'overdueTasksCount': return String(tasksF.filter((t) => isTaskActiveClient(t) && t.dueDate && t.dueDate < today).length);
+    case 'overdueTasksCount': return String(tasksF.filter(isTaskOverdue).length);
     case 'atRiskClientsCount': return String(clientsF.filter((c) => riskCount(c) > 0).length);
     case 'totalDebt': return fmtMoney(clientsF.reduce((s, c) => s + (c.debtAmount || 0), 0));
     default: return '';
@@ -1471,6 +1485,7 @@ async function openClientModal(client) {
 
   // Быстрое создание задачи по любой из 3 воронок прямо из карточки клиента.
   const taskButtonsHtml = isEdit ? `
+    ${(isOwner || isStaff()) ? visitBlockHtml(client) : ''}
     <div class="filter-bar" style="margin:8px 0">
       <span class="muted" style="font-size:13px">Создать задачу:</span>
       <button type="button" class="btn-secondary" id="quick-task-visit">Визит</button>
@@ -1659,6 +1674,7 @@ async function openClientModal(client) {
   if (quickTaskWaitlistBtn) quickTaskWaitlistBtn.addEventListener('click', () => { closeModal(); openTaskModal(null, 'waitlist', client.id); });
 
   if (isEdit) {
+    wireVisitBlock(client);
     wireAssortmentToggle(client.id);
     wireContactNotes(client.id);
     wireClosureBlock(client.id);
@@ -1958,6 +1974,7 @@ function renderTasks(content) {
         <button type="button" class="btn-secondary ${typeView === 'waitlist' ? 'active' : ''}" id="task-type-waitlist-btn">Лист ожидания</button>
         <button type="button" class="btn-secondary ${typeView === 'visit' ? 'active' : ''}" id="task-type-visit-btn">Визиты с супервайзером</button>
         <button type="button" class="btn-secondary ${typeView === 'agent' ? 'active' : ''}" id="task-type-agent-btn">Задачи агенту</button>
+        <button type="button" class="btn-secondary ${typeView === 'checkin' ? 'active' : ''}" id="task-type-checkin-btn">Посещения</button>
       </div>
       <div class="filter-bar">
         <input type="text" id="task-client-filter" placeholder="Поиск клиента по названию, телефону..." value="${escapeAttr(state.taskClientSearch || '')}" style="max-width:260px">
@@ -1986,6 +2003,9 @@ function renderTasks(content) {
         ${(state.waitlistTags || []).map((tag) => `<button type="button" class="tag-filter-btn waitlist-tag-filter-btn ${state.waitlistTagFilter.has(tag) ? 'active' : ''}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}
         ${state.waitlistTagFilter.size ? '<button type="button" class="link-btn" id="waitlist-tag-filter-reset">Сбросить</button>' : ''}
       </div>
+      ` : typeView === 'checkin' ? `
+      <div class="sub muted" style="margin-bottom:6px">Создаются автоматически каждый день в 00:01 на всех клиентов, у кого день визита — этот день недели. Закрываются кнопкой «📍 Отметить посещение». Срок — до 20:00.</div>
+      <div class="filter-bar"><label class="muted" style="margin:0">Дата: <input type="date" id="checkin-date" value="${escapeAttr(state.checkinDate || new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10))}"></label></div>
       ` : `
       <div class="sub muted" style="margin-bottom:6px">Задачи, не привязанные к клиенту — напоминания и поручения агенту напрямую (например, сдать отчёт, забрать образцы и т.п.).</div>
       `}
@@ -2056,6 +2076,9 @@ function renderTasks(content) {
   document.getElementById('task-type-sale-btn').addEventListener('click', () => { state.taskTypeView = 'sale'; render(); });
   document.getElementById('task-type-waitlist-btn').addEventListener('click', () => { state.taskTypeView = 'waitlist'; render(); });
   document.getElementById('task-type-agent-btn').addEventListener('click', () => { state.taskTypeView = 'agent'; render(); });
+  document.getElementById('task-type-checkin-btn').addEventListener('click', () => { state.taskTypeView = 'checkin'; render(); });
+  const checkinDateInput = document.getElementById('checkin-date');
+  if (checkinDateInput) checkinDateInput.addEventListener('change', (e) => { state.checkinDate = e.target.value; render(); });
   const taskBulkModeBtn = document.getElementById('task-bulk-mode-btn');
   if (taskBulkModeBtn) taskBulkModeBtn.addEventListener('click', () => { state.taskBulkMode = !state.taskBulkMode; state.taskBulkSelected = new Set(); render(); });
   const taskBulkDeleteBtn = document.getElementById('task-bulk-delete-btn');
@@ -2105,6 +2128,7 @@ function renderTasks(content) {
   if (typeView === 'sale') { renderSaleKanban(); return; }
   if (typeView === 'waitlist') { renderWaitlistKanban(); return; }
   if (typeView === 'agent') { renderAgentTasksKanban(); return; }
+  if (typeView === 'checkin') { renderCheckinKanban(); return; }
 
   const today = new Date().toISOString().slice(0, 10);
   const kanban = document.getElementById('kanban');
@@ -2310,6 +2334,51 @@ function renderAgentTasksKanban() {
         await loadAll();
         render();
       } catch (err) { alert(err.message); }
+    });
+    kanban.appendChild(col);
+  });
+}
+
+// ---------- Воронка «Посещения» (Фаза 40): автозадачи по дню визита ----------
+function renderCheckinKanban() {
+  const kanban = document.getElementById('kanban');
+  const date = state.checkinDate || new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+  const cols = [
+    { key: 'in_progress', label: 'Ждёт отметки' },
+    { key: 'done', label: 'Отмечено' },
+    { key: 'not_done', label: 'Не выполнена' }
+  ];
+  cols.forEach((stage) => {
+    let inStage = state.tasks.filter((t) => t.taskType === 'checkin' && t.dueDate === date && (stage.key === 'done' ? ['done', 'archived'].includes(t.stage) : t.stage === stage.key));
+    inStage = inStage.filter(matchesTaskListFilters);
+    const col = el(`
+      <div class="kanban-col" data-stage="${stage.key}">
+        <h3>${escapeHtml(stage.label)} <span class="col-sum">· ${inStage.length}</span></h3>
+        <div class="col-body"></div>
+      </div>
+    `);
+    const colBody = col.querySelector('.col-body');
+    inStage.forEach((t) => {
+      const client = clientById(t.clientId);
+      const overdue = isTaskOverdue(t);
+      const canCheck = client && t.stage === 'in_progress' && t.assigneeId === state.user.id;
+      const card = el(`
+        <div class="deal-card" data-id="${t.id}">
+          <div class="deal-title">${client ? escapeHtml(client.name) : escapeHtml(t.title)}</div>
+          <div class="deal-client">${client ? escapeHtml(client.address || '') : ''}</div>
+          <div class="deal-client">${agentTag(t.assigneeId)} · ${fmtDate(t.dueDate)} до 20:00 ${overdue ? '<span class="badge badge-overdue">просрочено</span>' : ''}${t.lateCheckin ? ' <span class="badge badge-amber">после 20:00</span>' : ''}</div>
+          ${t.report ? `<div class="muted" style="font-size:12px">${escapeHtml(t.report)}</div>` : ''}
+          ${canCheck ? '<button type="button" class="btn-primary checkin-card-btn" style="margin-top:6px">📍 Отметить посещение</button>' : ''}
+        </div>
+      `);
+      card.addEventListener('click', () => openTaskOrClient(t));
+      const btn = card.querySelector('.checkin-card-btn');
+      if (btn) btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const r = await checkInVisit(client, btn);
+        if (r) { await loadAll(); render(); }
+      });
+      colBody.appendChild(card);
     });
     kanban.appendChild(col);
   });
@@ -2843,6 +2912,152 @@ function wireSalesBrandReport(stats) {
   draw();
 }
 
+// ---------- Отметка посещения (Фаза 40, 25.09.2026) ----------
+// Агент у точки жмёт «📍 Отметить посещение» — браузер отдаёт координаты
+// (нужен https и разрешение на геолокацию), сервер ставит своё время и
+// сравнивает с координатами точки (client.geo, запоминаются первой отметкой).
+const VISIT_STATUS_LABELS = {
+  near: '✓ у точки',
+  first: '📌 первая отметка — координаты точки сохранены',
+  far: '⚠ далеко',
+  nogps: '⚠ без GPS',
+  lowacc: '⚠ слабый GPS — координаты точки не сохранены'
+};
+function visitStatusText(v) {
+  if (v.status === 'far') return `⚠ далеко, ${v.distance} м`;
+  if (v.status === 'near') return `✓ у точки${v.distance != null ? `, ${v.distance} м` : ''}`;
+  return VISIT_STATUS_LABELS[v.status] || v.status;
+}
+function fmtVisitTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+function getPosition() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve({ error: 'Геолокация не поддерживается этим браузером' });
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+      (e) => resolve({ error: e.code === 1 ? 'Нет разрешения на геолокацию — разрешите доступ к местоположению для сайта в настройках браузера' : 'Не удалось определить местоположение' }),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+  });
+}
+// Фаза 40, правка 25.09.2026 («сделай сразу без запроса, чтобы брал текущий GPS»):
+// одно нажатие — сразу берём текущие координаты и отмечаем, без окна комментария
+// и без подтверждений. Если GPS недоступен — отметка сохраняется «без GPS».
+// Итог показывается всплывающей плашкой (не окном, которое надо закрывать).
+// Разрешение на геолокацию браузер спрашивает сам один раз на устройстве — это
+// нельзя обойти с сайта; чтобы оно не всплывало у точки, у агента мы запрашиваем
+// его сразу при входе в приложение (primeGeolocation()).
+function showToast(text, kind) {
+  let box = document.getElementById('toast-box');
+  if (!box) { box = document.createElement('div'); box.id = 'toast-box'; document.body.appendChild(box); }
+  const t = document.createElement('div');
+  t.className = `toast ${kind ? 'toast-' + kind : ''}`;
+  t.textContent = text;
+  box.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+async function checkInVisit(client, btn) {
+  const oldText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Отмечаю…'; }
+  try {
+    const pos = await getPosition();
+    const res = await api('POST', `/api/clients/${client.id}/visit`, pos.error ? {} : { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy });
+    const idx = state.clients.findIndex((c) => c.id === client.id);
+    if (idx !== -1) state.clients[idx] = res.client;
+    const noGps = res.visit.status === 'nogps';
+    showToast(noGps
+      ? `${client.name}: GPS не получен — посещение НЕ засчитано. Включите геолокацию и нажмите ещё раз.`
+      : `${client.name}: ${visitStatusText(res.visit)}`, ['near', 'first'].includes(res.visit.status) ? 'ok' : 'warn');
+    return res;
+  } catch (e) {
+    showToast(e.message || 'Не удалось отметить посещение', 'warn');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = oldText; }
+  }
+}
+function primeGeolocation() {
+  if (!navigator.geolocation || state.user.role !== 'agent') return;
+  try { navigator.geolocation.getCurrentPosition(() => {}, () => {}, { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }); } catch (e) {}
+}
+function visitBlockHtml(client) {
+  const visits = (client.visits || []).slice(-5).reverse();
+  const geo = client.geo;
+  return `
+    <div class="visit-block">
+      <div class="filter-bar" style="margin:8px 0">
+        <button type="button" class="btn-primary" id="visit-checkin-btn">📍 Отметить посещение</button>
+        <span class="muted" style="font-size:12px">${geo ? `Координаты точки сохранены ${fmtVisitTime(geo.setAt)}${geo.setBy ? ` (${escapeHtml(geo.setBy)})` : ''} · <a class="maps-link" href="https://2gis.kg/geo/${geo.lng},${geo.lat}" target="_blank" rel="noopener">на карте</a>` : 'Координат точки ещё нет — их сохранит первая отметка у точки.'}</span>
+        ${geo && isStaff() ? '<button type="button" class="link-btn" id="visit-reset-geo">Сбросить координаты</button>' : ''}
+      </div>
+      ${visits.length ? `<div class="visit-list">${visits.map((v) => `<div class="visit-row"><span>${fmtVisitTime(v.at)} · ${escapeHtml(v.agentName || userName(v.agentId))}</span><span class="visit-st visit-${v.status}">${visitStatusText(v)}</span>${v.comment ? `<span class="muted">${escapeHtml(v.comment)}</span>` : ''}</div>`).join('')}</div>` : ''}
+    </div>`;
+}
+function wireVisitBlock(client) {
+  const btn = document.getElementById('visit-checkin-btn');
+  if (btn) btn.addEventListener('click', async () => {
+    const res = await checkInVisit(client, btn);
+    if (res) { closeModal(); await loadAll(); render(); openClientModal(res.client); }
+  });
+  const resetBtn = document.getElementById('visit-reset-geo');
+  if (resetBtn) resetBtn.addEventListener('click', async () => {
+    if (!confirm('Сбросить сохранённые координаты точки? Их заново сохранит следующая отметка посещения.')) return;
+    const res = await api('DELETE', `/api/clients/${client.id}/geo`);
+    const idx = state.clients.findIndex((c) => c.id === client.id);
+    if (idx !== -1) state.clients[idx] = res.client;
+    closeModal(); openClientModal(res.client);
+  });
+}
+
+// Отчёт «Посещения» (Отчёты, админ/супервайзер).
+function wireVisitsReport() {
+  const box = document.getElementById('visits-box');
+  if (!box) return;
+  const today = new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+  const agents = state.users.filter((u) => u.role === 'agent');
+  box.innerHTML = `
+    <div class="filter-bar">
+      <label class="muted" style="margin:0">с <input type="date" id="vr-from" value="${today}"></label>
+      <label class="muted" style="margin:0">по <input type="date" id="vr-to" value="${today}"></label>
+      <select id="vr-agent"><option value="">Все агенты</option>${agents.map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select>
+      <button type="button" class="btn-secondary" id="vr-csv">⬇ Выгрузить в Excel (CSV)</button>
+    </div>
+    <div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>Агент</th><th>Посещений</th><th>Точек</th><th>✓ у точки</th><th>📌 первая</th><th>⚠ далеко</th><th>⚠ без GPS</th><th>По дню визита</th><th>После 20:00</th><th>Первое / последнее</th></tr></thead><tbody id="vr-summary"></tbody></table></div>
+    <h3 style="margin:14px 0 6px">Отметки</h3>
+    <div class="table-wrap"><table><thead><tr><th>Дата</th><th>Время</th><th>Агент</th><th>Клиент</th><th>Статус</th><th>Комментарий</th><th>Где отметился</th></tr></thead><tbody id="vr-rows"></tbody></table></div>`;
+  let last = null;
+  const t = (iso) => iso ? new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—';
+  async function load() {
+    const qs = new URLSearchParams({ from: document.getElementById('vr-from').value, to: document.getElementById('vr-to').value });
+    const aid = document.getElementById('vr-agent').value;
+    if (aid) qs.set('agentId', aid);
+    last = await api('GET', `/api/reports/visits?${qs.toString()}`);
+    document.getElementById('vr-summary').innerHTML = last.summary.map((s) => `<tr>
+      <td>${escapeHtml(s.agentName)}</td><td>${s.visits}</td><td>${s.clients}</td><td>${s.near}</td><td>${s.first}</td>
+      <td>${s.far ? `<strong class="visit-far">${s.far}</strong>` : 0}</td><td>${s.nogps ? `<strong class="visit-far">${s.nogps}</strong>` : 0}</td>
+      <td>${s.planned ? `${s.plannedVisited} из ${s.planned}` : '—'}</td><td>${s.late ? `<strong class="visit-far">${s.late}</strong>` : 0}</td><td>${t(s.firstAt)} / ${t(s.lastAt)}</td></tr>`).join('');
+    document.getElementById('vr-rows').innerHTML = last.rows.map((r) => `<tr>
+      <td>${escapeHtml(r.date.split('-').reverse().join('.'))}</td><td>${escapeHtml(r.time)}</td><td>${escapeHtml(r.agentName)}</td>
+      <td>${escapeHtml(r.clientName)}${r.ownerName !== r.agentName ? ` <span class="muted">(клиент: ${escapeHtml(r.ownerName)})</span>` : ''}</td>
+      <td><span class="visit-st visit-${r.status}">${visitStatusText(r)}</span>${r.accuracy ? ` <span class="muted">±${r.accuracy} м</span>` : ''}</td>
+      <td>${escapeHtml(r.comment || '')}</td>
+      <td>${r.lat != null ? `<a class="maps-link" href="https://2gis.kg/geo/${r.lng},${r.lat}" target="_blank" rel="noopener">${r.status === 'far' ? '📍 где отметился' : 'карта'}</a>` : '—'}${r.status === 'far' && r.pointLat != null ? `<br><a class="maps-link" href="https://2gis.kg/geo/${r.pointLng},${r.pointLat}" target="_blank" rel="noopener">🏠 точка клиента</a>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">За выбранный период отметок нет.</td></tr>';
+  }
+  ['vr-from', 'vr-to', 'vr-agent'].forEach((id) => document.getElementById(id).addEventListener('change', load));
+  document.getElementById('vr-csv').addEventListener('click', () => {
+    if (!last) return;
+    const head = ['Дата', 'Время', 'Агент', 'Клиент', 'Адрес', 'Закреплён за', 'Статус', 'Расстояние, м', 'Точность GPS, м', 'Комментарий', 'Где отметился (карта)', 'Точка клиента (карта)'];
+    const lines = last.rows.map((r) => [r.date, r.time, r.agentName, r.clientName, r.clientAddress, r.ownerName, visitStatusText(r), r.distance ?? '', r.accuracy ?? '', r.comment || '', r.lat != null ? `https://2gis.kg/geo/${r.lng},${r.lat}` : '', r.pointLat != null ? `https://2gis.kg/geo/${r.pointLng},${r.pointLat}` : '']);
+    const csv = '﻿' + [head, ...lines].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = `posescheniya_${last.from}_${last.to}.csv`;
+    a.click();
+  });
+  load();
+}
+
 // ---------- Отчёты (админ/супервайзер) ----------
 
 async function renderReports(content) {
@@ -2865,6 +3080,12 @@ async function renderReports(content) {
           </div>
         `).join('')}
       </div>` : ''}
+
+      <div class="panel">
+        <h2>Посещения</h2>
+        <div class="chart-desc">Отметки агентов у точек («📍 Отметить посещение»). ✓ у точки — ближе 150 м к сохранённым координатам точки; 📌 первая — координаты точки сохранены этой отметкой; ⚠ далеко — дальше 150 м; ⚠ без GPS — геолокация была недоступна, такая отметка задачу НЕ закрывает. У отметок «далеко» есть две ссылки: где агент реально отметился и где точка клиента. «По дню визита» — сколько клиентов с днём визита на эти даты отмечены (как задачи «Посещения»); «После 20:00» — отметки позже срока.</div>
+        <div id="visits-box"></div>
+      </div>
 
       <div class="panel">
         <h2>Продажи по брендам и клиентам</h2>
@@ -2893,6 +3114,7 @@ async function renderReports(content) {
     </div>
   `));
   wireSalesBrandReport(stats);
+  wireVisitsReport();
 
   // Правка 02.09.2026: фильтр по бренду стал мультивыбором (можно отметить сразу
   // Kapous+EPICA+Studio и т.п.), а "Красители/оксиды" вынесен в отдельный
@@ -3254,7 +3476,8 @@ const CALENDAR_TASK_TYPES = [
   { key: 'visit', label: 'Визиты с супервайзером' },
   { key: 'sale', label: 'Воронка продаж' },
   { key: 'waitlist', label: 'Лист ожидания' },
-  { key: 'agent', label: 'Задачи агенту' }
+  { key: 'agent', label: 'Задачи агенту' },
+  { key: 'checkin', label: 'Посещения' }
 ];
 
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -3285,6 +3508,20 @@ function tasksOnDate(dateKey) {
 function calAgentShort(userId) {
   const n = userName(userId);
   return n && n !== '—' ? n.split(/\s+/)[0] : '';
+}
+// Цвет задачи в календаре (Фаза 40, 25.09.2026): зелёный — выполнена,
+// красный — не выполнена, синий — ожидается, жёлтый — просрочена (после 20:00 дня).
+function calTaskStatus(t) {
+  if (['done', 'archived', 'received'].includes(t.stage)) return 'done';
+  if (t.stage === 'not_done') return 'failed';
+  if (isTaskOverdue(t)) return 'overdue';
+  return 'pending';
+}
+const CAL_STATUS_LABELS = { done: 'выполнена', failed: 'не выполнена', pending: 'ожидается', overdue: 'просрочена' };
+function calStatusCounts(tasks) {
+  const n = { done: 0, failed: 0, pending: 0, overdue: 0 };
+  tasks.forEach((t) => { n[calTaskStatus(t)]++; });
+  return ['done', 'failed', 'pending', 'overdue'].filter((k) => n[k]).map((k) => `<span class="cal-cnt cal-st-${k}" title="${CAL_STATUS_LABELS[k]}">${n[k]}</span>`).join('');
 }
 function calChipLabel(t) {
   const c = clientById(t.clientId);
@@ -3325,6 +3562,7 @@ function renderCalendar(content) {
         ${cal.hiddenTypes.size || cal.agentId ? '<button type="button" class="link-btn" id="cal-type-filter-reset">Сбросить</button>' : ''}
       </div>
       ${state.user.role !== 'supervisor' ? '<div class="sub muted" style="margin-bottom:6px">🟣 — в этот день у супервайзера запланирована встреча с клиентом (день занят).</div>' : ''}
+      <div class="cal-legend"><span class="cal-cnt cal-st-done">выполнена</span><span class="cal-cnt cal-st-failed">не выполнена</span><span class="cal-cnt cal-st-pending">ожидается</span><span class="cal-cnt cal-st-overdue">просрочена</span></div>
       <div id="cal-title" class="cal-title"></div>
       <div id="cal-body"></div>
       <div id="print-route" class="print-only"></div>
@@ -3390,10 +3628,11 @@ function renderCalMonth() {
       <div class="cal-day-cell ${inMonth ? '' : 'cal-day-outside'} ${key === todayKey ? 'cal-day-today' : ''}">
         <div class="cal-day-num">${d.getDate()} ${supMeetings.length ? '<span class="cal-dot cal-dot-sup" title="Встреча супервайзера в этот день">●</span>' : ''}</div>
         <div class="cal-day-tasks">
-          ${dayTasks.slice(0, 3).map((t) => `<div class="cal-chip">${calChipLabel(t)}</div>`).join('')}
+          ${dayTasks.length ? `<div class="cal-counts">${calStatusCounts(dayTasks)}</div>` : ''}
+          ${dayTasks.slice(0, 3).map((t) => `<div class="cal-chip cal-st-${calTaskStatus(t)}">${calChipLabel(t)}</div>`).join('')}
           ${dayTasks.length > 3 ? `<div class="cal-more">+${dayTasks.length - 3}</div>` : ''}
         </div>
-        ${incomplete.length ? `<div class="cal-day-dot-wrap"><span class="cal-dot ${dotClass}"></span><span class="cal-dot-count">${incomplete.length}</span></div>` : ''}
+        ${dayTasks.length ? `<div class="cal-day-dot-wrap">${calStatusCounts(dayTasks)}</div>` : ''}
       </div>
     `);
     cell.addEventListener('click', () => { state.calendar.date = d; state.calendar.mode = 'day'; render(); });
@@ -3425,8 +3664,8 @@ function renderCalWeek() {
     if (!dayTasks.length) colBody.appendChild(el('<div class="muted" style="font-size:12px;padding:4px">—</div>'));
     dayTasks.forEach((t) => {
       const c = clientById(t.clientId);
-      const card = el(`<div class="cal-chip cal-chip-block">${calChipLabel(t)}<div class="muted" style="font-size:11px">${escapeHtml(stageLabel(t.stage))}</div></div>`);
-      card.addEventListener('click', () => openTaskModal(t));
+      const card = el(`<div class="cal-chip cal-chip-block cal-st-${calTaskStatus(t)}">${calChipLabel(t)}<div class="muted" style="font-size:11px">${CAL_STATUS_LABELS[calTaskStatus(t)]}</div></div>`);
+      card.addEventListener('click', () => openTaskOrClient(t));
       colBody.appendChild(card);
     });
     // Отдельный столбец/раздел встреч супервайзера — виден всем (агенты видят,
@@ -3474,13 +3713,13 @@ function renderCalDay() {
     dayTasks.forEach((t) => {
       const c = clientById(t.clientId);
       const row = el(`
-        <div class="history-row cal-day-row">
-          <div><strong>${escapeHtml(c ? c.name : t.title)}</strong> <span class="badge">${escapeHtml(stageLabel(t.stage))}</span></div>
+        <div class="history-row cal-day-row cal-row-${calTaskStatus(t)}">
+          <div><strong>${escapeHtml(c ? c.name : t.title)}</strong> <span class="badge cal-st-${calTaskStatus(t)}">${CAL_STATUS_LABELS[calTaskStatus(t)]}</span></div>
           <div class="muted">${agentTag(t.assigneeId)}</div>
           ${taskTagBadges(t) ? `<div class="card-tags">${taskTagBadges(t)}</div>` : ''}
         </div>
       `);
-      row.addEventListener('click', () => openTaskModal(t));
+      row.addEventListener('click', () => openTaskOrClient(t));
       list.appendChild(row);
     });
     body.appendChild(list);
@@ -3575,10 +3814,16 @@ function renderMyDay(content) {
         ${client ? `<div class="myday-row">${escapeHtml(client.address || 'адрес не указан')} ${mapsLink(client.address)}</div>` : ''}
         ${client && client.phone ? `<div class="myday-row">${telLink(client.phone, '📞 ' + client.phone)}</div>` : ''}
         <div class="myday-row muted">${escapeHtml(stageLabel(t.stage))}${t.report ? ' · ✓ отчёт' : ''}</div>
-        <button type="button" class="btn-secondary myday-open">Открыть задачу</button>
+        <div class="filter-bar" style="margin-top:6px">
+          ${client && !(t.taskType === 'checkin' && t.stage !== 'in_progress') ? '<button type="button" class="btn-primary myday-visit">📍 Отметить посещение</button>' : ''}
+          <button type="button" class="btn-secondary myday-open">${t.taskType === 'checkin' ? 'Карточка клиента' : 'Открыть задачу'}</button>
+        </div>
+        ${client && (client.visits || []).length ? `<div class="myday-row muted" style="font-size:12px">Последняя отметка: ${fmtVisitTime(client.visits[client.visits.length - 1].at)} · ${visitStatusText(client.visits[client.visits.length - 1])}</div>` : ''}
       </div>
     `);
-    card.querySelector('.myday-open').addEventListener('click', () => openTaskModal(t));
+    card.querySelector('.myday-open').addEventListener('click', () => openTaskOrClient(t));
+    const vBtn = card.querySelector('.myday-visit');
+    if (vBtn) vBtn.addEventListener('click', async () => { const r = await checkInVisit(client, vBtn); if (r) { await loadAll(); render(); } });
     list.appendChild(card);
   });
 }

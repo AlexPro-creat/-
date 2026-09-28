@@ -768,3 +768,38 @@ th.sortable:hover { color: var(--text); }
 .bm-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .bm-detail-h { font-weight: 600; margin-bottom: 6px; }
 @media (max-width: 720px) { .bm-detail-grid { grid-template-columns: 1fr; } }
+
+/* Фаза 40: отметки посещений */
+.visit-block { border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; margin: 8px 0; }
+.visit-list { margin: 4px 0 6px; }
+.visit-row { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12.5px; padding: 3px 0; border-top: 1px dashed var(--border); }
+.visit-st { font-weight: 600; }
+.visit-near, .visit-first { color: var(--success); }
+.visit-far, .visit-nogps, .visit-lowacc { color: var(--warning); }
+
+/* Фаза 40: всплывающие плашки (отметка посещения без окон) */
+#toast-box { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; width: min(92vw, 420px); }
+.toast { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+.toast-ok { border-color: var(--success); }
+.toast-warn { border-color: var(--warning); }
+
+/* Фаза 40: цвета задач в календаре — зелёный выполнена, красный не выполнена, синий ожидается, жёлтый просрочена */
+.cal-chip.cal-st-done, .cal-st-done { background: rgba(34, 197, 94, 0.18); border-left: 3px solid #22c55e; }
+.cal-chip.cal-st-failed, .cal-st-failed { background: rgba(239, 68, 68, 0.18); border-left: 3px solid #ef4444; }
+.cal-chip.cal-st-pending, .cal-st-pending { background: rgba(59, 130, 246, 0.18); border-left: 3px solid #3b82f6; }
+.cal-chip.cal-st-overdue, .cal-st-overdue { background: rgba(234, 179, 8, 0.2); border-left: 3px solid #eab308; }
+.cal-counts { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 3px; }
+.cal-cnt { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 4px; line-height: 18px; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.cal-legend .cal-cnt { font-weight: 400; }
+.cal-row-done { border-left: 3px solid #22c55e; padding-left: 8px; }
+.cal-row-failed { border-left: 3px solid #ef4444; padding-left: 8px; }
+.cal-row-pending { border-left: 3px solid #3b82f6; padding-left: 8px; }
+.cal-row-overdue { border-left: 3px solid #eab308; padding-left: 8px; }
+.cal-day-dot-wrap .cal-cnt { font-size: 10px; padding: 0 4px; }
+@media (max-width: 720px) { .cal-counts { display: none; } }
+.cal-day-cell { min-width: 0; }
+@media (max-width: 720px) {
+  .cal-day-dot-wrap { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .cal-day-dot-wrap .cal-cnt { font-size: 9px; padding: 0 3px; line-height: 13px; border-left-width: 2px; }
+}

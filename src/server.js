@@ -104,6 +104,11 @@ api.migrateClientDefaults();
 api.migrateUserDefaults();
 api.migrateDocumentsStatus();
 
+// Воронка «Посещения» (Фаза 40): задачи на сегодня по дню визита клиентов —
+// при старте и затем раз в минуту (идемпотентно; новый день подхватывается в 00:01).
+api.ensureDailyCheckinTasks();
+setInterval(() => { try { api.ensureDailyCheckinTasks(); } catch (e) { console.error(e); } }, 60 * 1000);
+
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url);
   const pathname = decodeURIComponent(parsed.pathname);

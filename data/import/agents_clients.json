@@ -7574,5 +7574,82 @@
     "contact_name": null,
     "contract_status": "неизвестно",
     "note_from_import": "Добавлен 25.09.2026 из среза продаж Татьяны 01–25.09.26"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Аптека Сан Лайт ТМ 1/15",
+    "visit_day": "",
+    "point_type": "Другое",
+    "address": "ул. Тоголок Молдо 1/15",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 28.09.2026 из среза продаж Альбины 01–28.09.26"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Клиника профессора  Асымбековой",
+    "visit_day": "",
+    "point_type": "Медицинский центр/клиника",
+    "address": "мкр.Джал,29, ул. Тыналиева,18",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 28.09.2026 из среза продаж Альбины 01–28.09.26"
+  },
+  {
+    "agent": "Альбина",
+    "name": "МЦ Юнона",
+    "visit_day": "",
+    "point_type": "Медицинский центр/клиника",
+    "address": "м-н Асанбай 8/2",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 28.09.2026 из среза продаж Альбины 01–28.09.26"
+  },
+  {
+    "agent": "Альбина",
+    "name": "ОсОО Джоли Интернейшнл Прискул",
+    "visit_day": "",
+    "point_type": "Другое",
+    "address": "",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 28.09.2026 из среза продаж Альбины 01–28.09.26"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Cosma Trend (Аида)",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "ул. Боконбаева, 166/Белинка",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 28.09.2026 из среза продаж Альбины 01–28.09.26"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Жанель",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "ул. Поваринская 21ориентир магазин 1000 мелочей",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 28.09.2026 из среза продаж Альбины 01–28.09.26"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Стом клиника Alif Dent",
+    "visit_day": "",
+    "point_type": "Стоматология",
+    "address": "мкр Джал-29,14/2",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 28.09.2026 из среза продаж Альбины 01–28.09.26"
   }
 ]
