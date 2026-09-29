@@ -7651,5 +7651,38 @@
     "contact_name": null,
     "contract_status": "неизвестно",
     "note_from_import": "Добавлен 28.09.2026 из среза продаж Альбины 01–28.09.26"
+  },
+  {
+    "agent": "Бегимай",
+    "name": "professional_shop_osh Усенбеков М",
+    "visit_day": "",
+    "point_type": "Магазин",
+    "address": "",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 29.09.2026 из среза продаж Бегимай 01–29.09.26"
+  },
+  {
+    "agent": "Бегимай",
+    "name": "Салон красоты Вива Виктория",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "ул.Шопокова,123",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 29.09.2026 из среза продаж Бегимай 01–29.09.26"
+  },
+  {
+    "agent": "Бегимай",
+    "name": "Салон красоты Нур 1",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "пр. Чуй/М. Гвардия",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 29.09.2026 из среза продаж Бегимай 01–29.09.26"
   }
 ]

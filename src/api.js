@@ -57,7 +57,10 @@ function agentSalesFact(agentName) {
 const VISIT_RADIUS_M = 150;               // «у точки», если ближе
 const VISIT_FIRST_MAX_ACCURACY_M = 200;   // первую отметку с худшей точностью GPS не берём за координаты точки
 const VISIT_REPEAT_MIN = 10;              // повторная отметка того же агента у той же точки — не чаще
-const VISITS_KEEP = 300;                  // сколько последних посещений хранить в карточке
+const VISITS_KEEP = 300;
+// Отметки, которые НЕ засчитываются как посещение (не закрывают задачу):
+// без GPS и те, чьи координаты супервайзер сбросил как ошибочные.
+const VISIT_NOT_COUNTED = ['nogps', 'reset'];                  // сколько последних посещений хранить в карточке
 function haversineM(lat1, lng1, lat2, lng2) {
   const R = 6371000;
   const toRad = (x) => x * Math.PI / 180;
@@ -227,7 +230,7 @@ function createCheckinTasks(date, agentId, createdBy) {
       if (c.closed || c.pendingApproval || !agentsById[c.ownerId]) return;
       if ((c.visitDay || '').trim().toLowerCase() !== weekday.toLowerCase()) return;
       if (existing.has(c.id)) { skipped++; return; }
-      const visit = (c.visits || []).find((v) => bishkekDate(new Date(v.at)) === date && v.agentId === c.ownerId && v.status !== 'nogps');
+      const visit = (c.visits || []).find((v) => bishkekDate(new Date(v.at)) === date && v.agentId === c.ownerId && !VISIT_NOT_COUNTED.includes(v.status));
       const nowIso = new Date().toISOString();
       db.insert('tasks', {
         clientId: c.id,
@@ -267,7 +270,7 @@ function syncCheckinTasks() {
     db.all('clients').forEach((c) => { clientsById[c.id] = c; });
     db.all('tasks').filter((t) => t.taskType === 'checkin' && t.stage === 'in_progress').forEach((t) => {
       const c = clientsById[t.clientId];
-      const visit = c && (c.visits || []).find((v) => bishkekDate(new Date(v.at)) === t.dueDate && v.agentId === t.assigneeId && v.status !== 'nogps');
+      const visit = c && (c.visits || []).find((v) => bishkekDate(new Date(v.at)) === t.dueDate && v.agentId === t.assigneeId && !VISIT_NOT_COUNTED.includes(v.status));
       if (visit) db.update('tasks', t.id, { stage: 'done', report: checkinReport(visit), checkinAt: visit.at, updatedAt: new Date().toISOString() });
     });
   } finally {
@@ -276,7 +279,7 @@ function syncCheckinTasks() {
 }
 function checkinReport(visit) {
   const t = new Date(visit.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bishkek' });
-  const st = { near: `у точки${visit.distance != null ? `, ${visit.distance} м` : ''}`, first: 'первая отметка — координаты точки сохранены', far: `далеко от точки, ${visit.distance} м`, nogps: 'без GPS', lowacc: 'слабый GPS' }[visit.status] || visit.status;
+  const st = { near: `у точки${visit.distance != null ? `, ${visit.distance} м` : ''}`, first: 'первая отметка — координаты точки сохранены', reset: 'координаты сброшены — не засчитано', far: `далеко от точки, ${visit.distance} м`, nogps: 'без GPS', lowacc: 'слабый GPS' }[visit.status] || visit.status;
   return `Отметка посещения ${t} — ${st}${visit.comment ? `. ${visit.comment}` : ''}`;
 }
 
@@ -1574,9 +1577,10 @@ function register(router) {
     db.all('clients').forEach((c) => { clientsById[c.id] = c; });
     const usersById = {};
     db.all('users').forEach((u) => { usersById[u.id] = u; });
-    // Задачи «Посещение» (Фаза 40) не выгружаем — они создаются заново каждый день
-    // по дню визита, а отметки хранятся в карточках клиентов (выгрузка клиентов).
-    const tasks = db.all('tasks').filter((t) => t.taskType !== 'checkin').map((t) => {
+    // Задачи «Посещение» (Фаза 40) выгружаются вместе с остальными — с 28.09.2026
+    // они создаются кнопкой, а не автоматически, поэтому должны переживать деплой
+    // (жалоба пользователя «задачи по посещению не перенеслись с выгрузкой»).
+    const tasks = db.all('tasks').map((t) => {
       const client = clientsById[t.clientId];
       const assignee = usersById[t.assigneeId];
       const creator = usersById[t.createdBy];
@@ -1590,6 +1594,8 @@ function register(router) {
         dueDate: t.dueDate,
         visitTime: t.visitTime || '',
         visitTimeTo: t.visitTimeTo || '',
+        checkinAt: t.checkinAt || null,
+        lateCheckin: !!t.lateCheckin,
         stage: t.stage,
         tags: t.tags || [],
         comment: t.comment || '',
@@ -1653,7 +1659,7 @@ function register(router) {
     const accuracy = Number.isFinite(Number(body.accuracy)) ? Math.round(Number(body.accuracy)) : null;
     const now = new Date();
     const visits = client.visits || [];
-    const recent = visits.slice().reverse().find((v) => v.agentId === req.user.id && v.status !== 'nogps');
+    const recent = visits.slice().reverse().find((v) => v.agentId === req.user.id && !VISIT_NOT_COUNTED.includes(v.status));
     if (recent && now - new Date(recent.at) < VISIT_REPEAT_MIN * 60 * 1000) {
       return sendJson(res, 429, { error: `Посещение уже отмечено в ${new Date(recent.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bishkek' })}` });
     }
@@ -1702,8 +1708,24 @@ function register(router) {
   router.delete('/api/clients/:id/geo', requireStaff(async (req, res, params) => {
     const client = db.find('clients', params.id);
     if (!client) return sendJson(res, 404, { error: 'Клиент не найден' });
-    const updated = db.update('clients', client.id, { geo: null });
-    sendJson(res, 200, { client: withFreshCurrentMonth([updated])[0] });
+    // Правка 28.09.2026 («при обнулении координат задача не возвращается в
+    // «Ждёт отметки»»): отметка, которой были сохранены сброшенные координаты,
+    // считается ошибочной — помечается 'reset' (остаётся в журнале/отчёте, но
+    // не засчитывается), а закрытые ею задачи «Посещение» возвращаются в
+    // «Ждёт отметки», чтобы агент отметился у точки заново.
+    const geo = client.geo;
+    let reopened = 0;
+    let visits = client.visits || [];
+    if (geo) {
+      const badAt = geo.setAt;
+      visits = visits.map((v) => (v.at === badAt && v.status === 'first' ? { ...v, status: 'reset', resetAt: new Date().toISOString(), resetBy: req.user.name } : v));
+      db.all('tasks').filter((t) => t.taskType === 'checkin' && t.clientId === client.id && t.checkinAt === badAt && t.stage === 'done').forEach((t) => {
+        db.update('tasks', t.id, { stage: 'in_progress', report: '', checkinAt: null, lateCheckin: false, updatedAt: new Date().toISOString() });
+        reopened++;
+      });
+    }
+    const updated = db.update('clients', client.id, { geo: null, visits });
+    sendJson(res, 200, { client: withFreshCurrentMonth([updated])[0], reopened });
   }));
 
   // Отчёт супервайзера «Посещения»: from/to (YYYY-MM-DD, по времени Бишкека), agentId.
@@ -1754,7 +1776,7 @@ function register(router) {
     const summary = agents.map((a) => {
       const mine = rows.filter((r) => r.agentId === a.id);
       const plan = planned[a.id] || new Set();
-      const visitedKeys = new Set(mine.map((r) => `${r.date}|${r.clientId}`));
+      const visitedKeys = new Set(mine.filter((r) => !VISIT_NOT_COUNTED.includes(r.status)).map((r) => `${r.date}|${r.clientId}`));
       const plannedVisited = [...plan].filter((k) => visitedKeys.has(k)).length;
       const lateCount = mine.filter((r) => r.lateHour).length;
       const times = mine.map((r) => r.at).sort();
@@ -2168,6 +2190,7 @@ function register(router) {
       })
     );
 
+    const existingCheckin = new Set(db.all('tasks').filter((t) => t.taskType === 'checkin').map((t) => `${t.clientId}|${t.dueDate}`));
     let imported = 0, skippedDuplicate = 0;
     const unresolved = [];
     incoming.forEach((t) => {
@@ -2183,6 +2206,9 @@ function register(router) {
       const assigneeId = assignee ? assignee.id : (client ? client.ownerId : null);
       const key = [client ? norm(client.name) : `agent:${t.title}`, t.title, t.dueDate, t.createdAt].join('||');
       if (existingKeys.has(key)) { skippedDuplicate++; return; }
+      // «Посещение» — одна задача на клиента в день: не задваиваем с уже
+      // созданной кнопкой на ту же дату.
+      if (t.taskType === 'checkin' && client && existingCheckin.has(`${client.id}|${t.dueDate}`)) { skippedDuplicate++; return; }
       const creator = t.createdByName ? usersByName[norm(t.createdByName)] : null;
       // Файл резервной выгрузки может быть сделан ДО обновления кода и содержать
       // уже отменённые значения stage ("call"/"meeting"/"deal"/"fail"/"waiting"/
@@ -2191,7 +2217,7 @@ function register(router) {
       // TASK_STAGES/WAITLIST_STAGES), т.к. миграция при старте сервера применяется
       // только к уже хранящимся записям, а не к тем, что приходят через импорт
       // уже после старта (см. normalizeLegacyTaskStage выше — Фаза 22, 08.09.2026).
-      const taskType = t.taskType === 'sale' ? 'sale' : (t.taskType === 'waitlist' ? 'waitlist' : (isAgentTask ? 'agent' : 'visit'));
+      const taskType = t.taskType === 'sale' ? 'sale' : (t.taskType === 'waitlist' ? 'waitlist' : (t.taskType === 'checkin' ? 'checkin' : (isAgentTask ? 'agent' : 'visit')));
       const legacyNorm = normalizeLegacyTaskStage({
         taskType, stage: t.stage || 'in_progress', tags: t.tags, report: t.report, explanation: t.explanation
       });
@@ -2212,12 +2238,17 @@ function register(router) {
         attachments: [],
         assigneeId,
         createdBy: creator ? creator.id : req.user.id,
+        checkinAt: t.checkinAt || null,
+        lateCheckin: !!t.lateCheckin,
         createdAt: t.createdAt || new Date().toISOString(),
         updatedAt: t.updatedAt || new Date().toISOString()
       });
       existingKeys.add(key);
+      if (taskType === 'checkin' && client) existingCheckin.add(`${client.id}|${t.dueDate}`);
       imported++;
     });
+    // Отметки из карточек клиентов закрывают загруженные открытые «Посещения».
+    syncCheckinTasks();
 
     sendJson(res, 200, { imported, skippedDuplicate, unresolvedCount: unresolved.length, unresolved });
   }));

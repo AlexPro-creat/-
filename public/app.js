@@ -2961,7 +2961,8 @@ const VISIT_STATUS_LABELS = {
   first: '📌 первая отметка — координаты точки сохранены',
   far: '⚠ далеко',
   nogps: '⚠ без GPS',
-  lowacc: '⚠ слабый GPS — координаты точки не сохранены'
+  lowacc: '⚠ слабый GPS — координаты точки не сохранены',
+  reset: '✕ координаты сброшены — не засчитано'
 };
 function visitStatusText(v) {
   if (v.status === 'far') return `⚠ далеко, ${v.distance} м`;
@@ -3042,8 +3043,10 @@ function wireVisitBlock(client) {
   });
   const resetBtn = document.getElementById('visit-reset-geo');
   if (resetBtn) resetBtn.addEventListener('click', async () => {
-    if (!confirm('Сбросить сохранённые координаты точки? Их заново сохранит следующая отметка посещения.')) return;
+    if (!confirm('Сбросить сохранённые координаты точки?\n\nОтметка, которой они были сохранены, не будет засчитана, а её задача «Посещение» вернётся в «Ждёт отметки». Координаты заново сохранит следующая отметка у точки.')) return;
     const res = await api('DELETE', `/api/clients/${client.id}/geo`);
+    showToast(res.reopened ? `Координаты сброшены, задач возвращено в «Ждёт отметки»: ${res.reopened}` : 'Координаты сброшены', 'ok');
+    await loadAll();
     const idx = state.clients.findIndex((c) => c.id === client.id);
     if (idx !== -1) state.clients[idx] = res.client;
     closeModal(); openClientModal(res.client);

@@ -809,3 +809,4 @@ th.col-narrow { white-space: normal; line-height: 1.2; padding-left: 6px; paddin
 td.col-narrow { white-space: nowrap; padding-left: 6px; padding-right: 6px; width: 1%; }
 td.col-narrow .badge { padding-left: 6px; padding-right: 6px; }
 .geo-yes { color: var(--success); font-weight: 700; font-size: 16px; }
+.visit-reset { color: var(--danger); text-decoration: line-through; }
