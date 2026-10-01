@@ -17,7 +17,8 @@ const auth = require('./auth');
 const agentSales = require('./agentSales');
 
 const IMPORT_DIR = path.join(__dirname, '..', 'data', 'import');
-const MONTH_ORDER = ['февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август'];
+// 01.10.2026: сентябрь закрыт и добавлен в историю, окно сдвинуто (7 месяцев: март–сентябрь).
+const MONTH_ORDER = ['март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь'];
 
 function loadJson(name) {
   const p = path.join(IMPORT_DIR, name);

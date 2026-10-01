@@ -1015,8 +1015,8 @@ async function renderDashboard(content) {
           </tbody>
         </table>
       </div>
-      ${useMonths && months.includes('август')
-        ? '<div class="muted" style="margin-top:6px;font-size:12px">За август маржа показана как 0 — в присланных файлах продаж за август нет данных о себестоимости (есть только количество и сумма).</div>'
+      ${useMonths && (months.includes('август') || months.includes('сентябрь'))
+        ? '<div class="muted" style="margin-top:6px;font-size:12px">За август и сентябрь маржа показана как 0 — в присланных файлах продаж за эти месяцы нет данных о себестоимости (есть только количество и сумма).</div>'
         : '<div class="muted" style="margin-top:6px;font-size:12px">Маржа считается из тех же файлов продаж (себестоимость/стоимость построчно).</div>'}
     ` : '<div class="empty-state">Нет данных о продажах за выбранный период.</div>';
   }
@@ -1996,7 +1996,7 @@ function renderTasks(content) {
       </div>
       <div class="filter-bar">
         <input type="text" id="task-client-filter" placeholder="Поиск клиента по названию, телефону..." value="${escapeAttr(state.taskClientSearch || '')}" style="max-width:260px">
-        ${isStaff() ? `<select id="task-filter-ownerId">
+        ${isStaff() && typeView !== 'checkin' ? `<select id="task-filter-ownerId">
           <option value="">Агент: все</option>
           ${state.users.filter((u) => u.role === 'agent').map((u) => `<option value="${u.id}" ${String(state.taskFilterOwnerId) === String(u.id) ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
         </select>` : ''}
@@ -2024,8 +2024,9 @@ function renderTasks(content) {
       ` : typeView === 'checkin' ? `
       <div class="sub muted" style="margin-bottom:6px">Кнопка «Создать задачи» ставит «Посещение» на выбранную дату всем клиентам агента, у кого день визита — день недели этой даты (повторно не дублирует). Закрываются кнопкой «📍 Отметить посещение». Срок — до 20:00.</div>
       <div class="filter-bar">
-        <label class="muted" style="margin:0">Дата: <input type="date" id="checkin-date" value="${escapeAttr(state.checkinDate || new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10))}"></label>
-        ${isStaff() ? `<select id="checkin-gen-agent"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((u) => `<option value="${u.id}" ${String(state.checkinGenAgent || '') === String(u.id) ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}</select>` : ''}
+        <label class="muted" style="margin:0">с <input type="date" id="checkin-date" value="${escapeAttr(state.checkinDate || new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10))}"></label>
+        <label class="muted" style="margin:0">по <input type="date" id="checkin-date-to" value="${escapeAttr(state.checkinDateTo || state.checkinDate || new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10))}"></label>
+        ${isStaff() ? `<select id="checkin-gen-agent" title="Фильтр доски и агент для создания задач"><option value="">Все агенты</option>${state.users.filter((u) => u.role === 'agent').map((u) => `<option value="${u.id}" ${String(state.taskFilterOwnerId || '') === String(u.id) ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}</select>` : ''}
         <button type="button" class="btn-primary" id="checkin-generate-btn">+ Создать задачи на посещения</button>
       </div>
       ` : `
@@ -2100,21 +2101,38 @@ function renderTasks(content) {
   document.getElementById('task-type-agent-btn').addEventListener('click', () => { state.taskTypeView = 'agent'; render(); });
   document.getElementById('task-type-checkin-btn').addEventListener('click', () => { state.taskTypeView = 'checkin'; render(); });
   const checkinDateInput = document.getElementById('checkin-date');
-  if (checkinDateInput) checkinDateInput.addEventListener('change', (e) => { state.checkinDate = e.target.value; render(); });
+  // 29.09.2026: период «с — по» вместо одного дня (и для доски, и для создания задач).
+  if (checkinDateInput) checkinDateInput.addEventListener('change', (e) => {
+    state.checkinDate = e.target.value;
+    if (!state.checkinDateTo || state.checkinDateTo < state.checkinDate) state.checkinDateTo = state.checkinDate;
+    render();
+  });
+  const checkinDateToInput = document.getElementById('checkin-date-to');
+  if (checkinDateToInput) checkinDateToInput.addEventListener('change', (e) => {
+    if (!state.checkinDate) state.checkinDate = document.getElementById('checkin-date').value;
+    state.checkinDateTo = e.target.value;
+    if (!state.checkinDate || state.checkinDate > state.checkinDateTo) state.checkinDate = state.checkinDateTo;
+    render();
+  });
   const checkinGenAgent = document.getElementById('checkin-gen-agent');
-  if (checkinGenAgent) checkinGenAgent.addEventListener('change', (e) => { state.checkinGenAgent = e.target.value; });
+  // 29.09.2026: на «Посещениях» один выбор агента — он и фильтрует доску, и
+  // задаёт агента для «Создать задачи» (жалоба «фильтр по агентам не работает»:
+  // раньше этот список влиял только на создание, а доску фильтровал другой).
+  if (checkinGenAgent) checkinGenAgent.addEventListener('change', (e) => { state.taskFilterOwnerId = e.target.value; render(); });
   const checkinGenBtn = document.getElementById('checkin-generate-btn');
   if (checkinGenBtn) checkinGenBtn.addEventListener('click', async () => {
-    const date = document.getElementById('checkin-date').value;
+    const dateFrom = document.getElementById('checkin-date').value;
+    const dateTo = document.getElementById('checkin-date-to').value || dateFrom;
     const agentSel = document.getElementById('checkin-gen-agent');
     const agentId = agentSel ? agentSel.value : '';
     const who = agentSel ? (agentId ? agentSel.options[agentSel.selectedIndex].text : 'всех агентов') : 'себя';
-    if (!confirm(`Создать задачи «Посещение» на ${date.split('-').reverse().join('.')} для: ${who}?`)) return;
+    const fmt = (d) => d.split('-').reverse().join('.');
+    if (!confirm(`Создать задачи «Посещение» ${dateFrom === dateTo ? 'на ' + fmt(dateFrom) : `с ${fmt(dateFrom)} по ${fmt(dateTo)}`} для: ${who}?`)) return;
     checkinGenBtn.disabled = true;
     try {
-      const r = await api('POST', '/api/tasks/checkin-generate', { date, agentId: agentId || null });
-      state.checkinDate = date;
-      showToast(`${r.weekday}: создано задач — ${r.created}${r.skipped ? `, уже были — ${r.skipped}` : ''}`, r.created ? 'ok' : 'warn');
+      const r = await api('POST', '/api/tasks/checkin-generate', { dateFrom, dateTo, agentId: agentId || null });
+      state.checkinDate = dateFrom; state.checkinDateTo = dateTo;
+      showToast(`Создано задач — ${r.created}${r.skipped ? `, уже были — ${r.skipped}` : ''} (${r.days} дн.)`, r.created ? 'ok' : 'warn');
       await loadAll();
       render();
     } catch (e) { showToast(e.message, 'warn'); checkinGenBtn.disabled = false; }
@@ -2382,15 +2400,17 @@ function renderAgentTasksKanban() {
 // ---------- Воронка «Посещения» (Фаза 40): автозадачи по дню визита ----------
 function renderCheckinKanban() {
   const kanban = document.getElementById('kanban');
-  const date = state.checkinDate || new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+  const dateFrom = state.checkinDate || new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+  const dateTo = state.checkinDateTo && state.checkinDateTo >= dateFrom ? state.checkinDateTo : dateFrom;
   const cols = [
     { key: 'in_progress', label: 'Ждёт отметки' },
     { key: 'done', label: 'Отмечено' },
     { key: 'not_done', label: 'Не выполнена' }
   ];
   cols.forEach((stage) => {
-    let inStage = state.tasks.filter((t) => t.taskType === 'checkin' && t.dueDate === date && (stage.key === 'done' ? ['done', 'archived'].includes(t.stage) : t.stage === stage.key));
+    let inStage = state.tasks.filter((t) => t.taskType === 'checkin' && t.dueDate >= dateFrom && t.dueDate <= dateTo && (stage.key === 'done' ? ['done', 'archived'].includes(t.stage) : t.stage === stage.key));
     inStage = inStage.filter(matchesTaskListFilters);
+    inStage.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || '') || a.assigneeId - b.assigneeId);
     const col = el(`
       <div class="kanban-col" data-stage="${stage.key}">
         <h3>${escapeHtml(stage.label)} <span class="col-sum">· ${inStage.length}</span></h3>

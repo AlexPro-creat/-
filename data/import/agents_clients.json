@@ -7684,5 +7684,137 @@
     "contact_name": null,
     "contract_status": "неизвестно",
     "note_from_import": "Добавлен 29.09.2026 из среза продаж Бегимай 01–29.09.26"
+  },
+  {
+    "agent": "Батаева",
+    "name": "Бьюти зон",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "ул. Шамшинская 51",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Батаева",
+    "name": "кара Балта Жасмин",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Батаева",
+    "name": "Мед центр Осса",
+    "visit_day": "",
+    "point_type": "Медицинский центр/клиника",
+    "address": "ул. Карла Маркса 12",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Батаева",
+    "name": "Салон красоты Гламур",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "ул.К.Маркса,7",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Батаева",
+    "name": "Салон красоты Скарлет",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Батаева",
+    "name": "Салон красоты Элита (Кант)",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Salta beauty (Арчи)",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "ул. Боконбаева, 166/Белинка",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Альбина",
+    "name": "Салон красоты Идеал (3мкр)",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "3 мкр",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Лаборатория Аква Лаб",
+    "visit_day": "",
+    "point_type": "Медицинский центр/клиника",
+    "address": "ул. Юнусалиева,26",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Первая детская стоматология",
+    "visit_day": "",
+    "point_type": "Стоматология",
+    "address": "ул.Байтик Баатыра,17/1",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Aynur Перизат",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "Бета Сторис 2, 3эт",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
+  },
+  {
+    "agent": "Нагима",
+    "name": "Салон Фари",
+    "visit_day": "",
+    "point_type": "Салон красоты",
+    "address": "ул. Койбагарова 75/4",
+    "phone": "",
+    "contact_name": null,
+    "contract_status": "неизвестно",
+    "note_from_import": "Добавлен 01.10.2026 из продаж за сентябрь 2026"
   }
 ]

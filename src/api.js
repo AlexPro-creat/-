@@ -40,7 +40,8 @@ const IMPORT_DIR = path.join(__dirname, '..', 'data', 'import');
 //    регулярного ассортимента, не раньше;
 // 2) передвинуть CURRENT_MONTH_DATA_STALE_FROM на 1-е число месяца, СЛЕДУЮЩЕГО
 //    за новым последним месяцем (сейчас: сентябрь 2026 → '2026-10-01', уже сделано).
-const CURRENT_MONTH_DATA_STALE_FROM = new Date('2026-10-01T00:00:00');
+// 01.10.2026: текущий месяц — октябрь (сентябрь закрыт и ушёл в историю).
+const CURRENT_MONTH_DATA_STALE_FROM = new Date('2026-11-01T00:00:00');
 function isCurrentMonthDataFresh() {
   return new Date() < CURRENT_MONTH_DATA_STALE_FROM;
 }
@@ -1640,11 +1641,18 @@ function register(router) {
   router.post('/api/tasks/checkin-generate', requireAuth(async (req, res) => {
     let body;
     try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(body.date || '') ? body.date : bishkekToday();
+    // 29.09.2026: период dateFrom–dateTo (до 31 дня); старый параметр date — один день.
+    const isDate = (x) => /^\d{4}-\d{2}-\d{2}$/.test(x || '');
+    const dateFrom = isDate(body.dateFrom) ? body.dateFrom : (isDate(body.date) ? body.date : bishkekToday());
+    const dateTo = isDate(body.dateTo) && body.dateTo >= dateFrom ? body.dateTo : dateFrom;
     let agentId = body.agentId ? Number(body.agentId) : null;
     if (!isStaff(req.user)) agentId = req.user.id;
-    const r = createCheckinTasks(date, agentId, req.user.id);
-    sendJson(res, 200, { date, ...r });
+    let created = 0, skipped = 0, days = 0;
+    for (let d = new Date(dateFrom + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= dateTo && days < 31; d.setUTCDate(d.getUTCDate() + 1)) {
+      const r = createCheckinTasks(d.toISOString().slice(0, 10), agentId, req.user.id);
+      created += r.created; skipped += r.skipped; days++;
+    }
+    sendJson(res, 200, { dateFrom, dateTo, days, created, skipped });
   }));
 
   router.post('/api/clients/:id/visit', requireAuth(async (req, res, params) => {
