@@ -1,14 +1,17 @@
 {
   "name": "cosmetics-crm-tasks",
-  "version": "2.0.0",
-  "description": "Задачник по клиентам для торговых агентов дистрибьютора косметики: карточки контрагентов, задачи-визиты (воронка), регулярный ассортимент, вложения. Работает без npm install — только встроенные модули Node.js.",
+  "version": "2.1.0",
+  "description": "Задачник по клиентам для торговых агентов дистрибьютора косметики. Ядро работает на встроенных модулях Node.js; для привязки WhatsApp (Фаза 43) нужны пакеты из dependencies — на Render Build Command: npm install.",
   "main": "src/server.js",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "start": "node src/server.js"
   },
   "license": "UNLICENSED",
-  "dependencies": {}
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "qrcode": "^1.5.4"
+  }
 }

@@ -8,6 +8,7 @@ const api = require('./api');
 const db = require('./db');
 const auth = require('./auth');
 const { runImport } = require('./import');
+const whatsapp = require('./whatsapp');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -108,6 +109,10 @@ api.migrateDocumentsStatus();
 // (с 28.09.2026 — не автоматически). Здесь только досинхронизация отметок с задачами.
 api.syncCheckinTasks();
 setInterval(() => { try { api.syncCheckinTasks(); } catch (e) { console.error(e); } }, 60 * 1000);
+
+// WhatsApp (Фаза 43): читаем сохранённую переписку и переподключаем агентов,
+// которые уже сканировали QR. Без установленной библиотеки — просто пишет в лог.
+whatsapp.init(db);
 
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url);

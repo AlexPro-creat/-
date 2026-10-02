@@ -384,6 +384,7 @@ async function boot() {
 function render() {
   const content = document.getElementById('content');
   content.innerHTML = '';
+  if (state.view !== 'whatsapp') stopWaPolling();
   if (state.view === 'dashboard') return renderDashboard(content);
   if (state.view === 'clients') return renderClients(content);
   if (state.view === 'tasks') return renderTasks(content);
@@ -392,6 +393,7 @@ function render() {
   if (state.view === 'myday') return renderMyDay(content);
   if (state.view === 'reports') return renderReports(content);
   if (state.view === 'team') return renderTeam(content);
+  if (state.view === 'whatsapp') return renderWhatsapp(content);
 }
 
 // ---------- Ссылки: позвонить / открыть карту ----------
@@ -1520,6 +1522,7 @@ async function openClientModal(client) {
   // Быстрое создание задачи по любой из 3 воронок прямо из карточки клиента.
   const taskButtonsHtml = isEdit ? `
     ${(isOwner || isStaff()) ? visitBlockHtml(client) : ''}
+    ${(isOwner || isStaff()) ? '<div id="wa-client-box" class="wa-client-box"></div>' : ''}
     <div class="filter-bar" style="margin:8px 0">
       <span class="muted" style="font-size:13px">Создать задачу:</span>
       <button type="button" class="btn-secondary" id="quick-task-visit">Визит</button>
@@ -1709,6 +1712,7 @@ async function openClientModal(client) {
 
   if (isEdit) {
     wireVisitBlock(client);
+    loadClientWhatsapp(client);
     wireAssortmentToggle(client.id);
     wireContactNotes(client.id);
     wireClosureBlock(client.id);
@@ -4080,6 +4084,231 @@ function wireSwipeToClose(modalEl, onClose) {
 }
 
 // ---------- Экранирование ----------
+
+// ---------- WhatsApp (Фаза 43, 02.10.2026) ----------
+// Вкладка «WhatsApp»: подключение номеров агентов по QR и чаты, которые не удалось
+// сопоставить с клиентом по телефону. CRM только читает переписку.
+let waPollTimer = null;
+function stopWaPolling() { if (waPollTimer) { clearInterval(waPollTimer); waPollTimer = null; } }
+
+const WA_STATUS_TEXT = {
+  connected: '🟢 Подключён',
+  qr: '🟡 Ждёт сканирования QR',
+  connecting: '🟡 Подключается…',
+  off: '⚪ Не подключён',
+  error: '🔴 Ошибка'
+};
+
+function waTime(isoOrSec) {
+  if (!isoOrSec) return '—';
+  const d = typeof isoOrSec === 'number' ? new Date(isoOrSec * 1000) : new Date(isoOrSec);
+  return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function waBubblesHtml(messages, opts) {
+  opts = opts || {};
+  if (!messages.length) return '<p class="muted">Сообщений пока нет.</p>';
+  let lastDay = '';
+  return messages.map((m) => {
+    const d = new Date(m.t * 1000);
+    const day = d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
+    const sep = day !== lastDay ? `<div class="wa-day">${day}</div>` : '';
+    lastDay = day;
+    const who = m.me ? (opts.showAgent ? escapeHtml(userName(m.a)) : 'Агент') : escapeHtml(m.n || 'Клиент');
+    return `${sep}<div class="wa-msg ${m.me ? 'wa-out' : 'wa-in'}"><div class="wa-meta">${who} · ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div>${waBodyHtml(m)}</div>`;
+  }).join('');
+}
+
+// Тело сообщения: текст или вложение (фото / голосовое / видео / документ).
+function waBodyHtml(m) {
+  const text = (t) => (t ? `<div class="wa-text">${escapeHtml(t)}</div>` : '');
+  if (!m.ext) return text(m.x);
+  const url = `/api/whatsapp/media/${m.a}/${encodeURIComponent(m.id)}`;
+  const caption = String(m.x || '').replace(/^\[[^\]]+\]\s*/, '');
+  if (!m.hm) {
+    const why = m.sz && m.sz > 15 * 1024 * 1024 ? 'файл больше 15 МБ — не сохраняется' : 'файл загружается или WhatsApp его уже не отдаёт';
+    return text(m.x) + `<div class="wa-nofile">${why}</div>`;
+  }
+  if (m.ty === 'image') return `<a href="${url}" target="_blank" rel="noopener"><img class="wa-img" src="${url}" alt="Фото"></a>` + text(caption);
+  if (m.ty === 'audio') return `<div class="wa-audio"><span>${m.x.startsWith('[Голос') ? '🎤' : '🎵'}${m.sec ? ' ' + Math.floor(m.sec / 60) + ':' + String(m.sec % 60).padStart(2, '0') : ''}</span><audio controls preload="none" src="${url}"></audio></div><a class="wa-dl" href="${url}" download>скачать</a>`;
+  if (m.ty === 'video') return `<video class="wa-img" controls preload="none" src="${url}"></video>` + text(caption);
+  return `<a class="wa-doc" href="${url}" target="_blank" rel="noopener">📄 ${escapeHtml(m.fn || 'Документ')}</a>` + (m.sz ? ` <span class="wa-nofile">${m.sz >= 1048576 ? (m.sz / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(m.sz / 1024)) + ' КБ'}</span>` : '');
+}
+
+function renderWhatsapp(content) {
+  content.appendChild(el(`
+    <div>
+      <div class="toolbar"><h2 style="margin:0">WhatsApp</h2></div>
+      <p class="muted" style="margin-top:0">CRM подключается к номеру агента как «связанное устройство» и только читает личные чаты — ничего не отправляет. Переписка попадает в карточку клиента по номеру телефона. Чтобы подключить: нажмите «Подключить», затем на телефоне агента WhatsApp → Настройки → Связанные устройства → Привязать устройство и наведите камеру на QR на этом экране.</p>
+      <div id="wa-lib-note"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Агент</th><th>Статус</th><th>Номер</th><th>Сообщений</th><th>Последнее</th><th></th></tr></thead>
+        <tbody id="wa-agents"><tr><td colspan="6" class="muted">Загрузка…</td></tr></tbody>
+      </table></div>
+      <div id="wa-qr-box"></div>
+      <h3 style="margin:18px 0 6px">Не сопоставленные чаты <span class="muted" id="wa-unm-count"></span></h3>
+      <p class="muted" style="margin-top:0">Номера, которых нет в карточках клиентов. Привяжите номер к клиенту — и вся переписка с ним появится в карточке. Личные и посторонние чаты можно просто не трогать.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Номер</th><th>Имя в WhatsApp</th><th>Агент</th><th>Сообщ.</th><th>Последнее сообщение</th><th></th></tr></thead>
+        <tbody id="wa-unmatched"><tr><td colspan="6" class="muted">Загрузка…</td></tr></tbody>
+      </table></div>
+    </div>`));
+
+  let qrAgentId = null; // для какого агента показываем QR
+  let unmatchedLoadedAt = 0;
+
+  async function loadStatus() {
+    let data;
+    try { data = await api('GET', '/api/whatsapp/status'); } catch (e) { return; }
+    if (state.view !== 'whatsapp') return stopWaPolling();
+    const note = document.getElementById('wa-lib-note');
+    if (note) note.innerHTML = data.lib.ok ? '' : `<p class="error">${escapeHtml(data.lib.error || 'Модуль WhatsApp не установлен на сервере.')}</p>`;
+    const tbody = document.getElementById('wa-agents');
+    if (!tbody) return;
+    tbody.innerHTML = data.agents.map((a) => `
+      <tr>
+        <td>${escapeHtml(a.name)}</td>
+        <td>${WA_STATUS_TEXT[a.status] || a.status}${a.note ? `<div class="muted" style="font-size:12px">${escapeHtml(a.note)}</div>` : ''}</td>
+        <td>${a.phone ? '+' + escapeHtml(a.phone) : '—'}</td>
+        <td>${a.msgCount || 0}</td>
+        <td>${waTime(a.lastAt)}</td>
+        <td style="white-space:nowrap">
+          ${a.status === 'off' || a.status === 'error' ? `<button type="button" class="btn-primary wa-connect" data-id="${a.id}">${a.linked ? 'Переподключить' : 'Подключить'}</button>` : ''}
+          ${a.status === 'qr' ? `<button type="button" class="btn-secondary wa-showqr" data-id="${a.id}">Показать QR</button>` : ''}
+          ${a.status === 'connected' || a.status === 'qr' || a.status === 'connecting' || a.linked ? `<button type="button" class="link-btn wa-disconnect" data-id="${a.id}">Отключить</button>` : ''}
+        </td>
+      </tr>`).join('') || '<tr><td colspan="6" class="muted">Агентов нет</td></tr>';
+
+    // QR выбранного агента
+    const box = document.getElementById('wa-qr-box');
+    const qa = data.agents.find((a) => a.id === qrAgentId);
+    if (box) {
+      if (qa && qa.status === 'qr' && qa.qr) {
+        box.innerHTML = `<div class="wa-qr"><img src="${qa.qr}" alt="QR"><div><b>${escapeHtml(qa.name)}</b>: на телефоне откройте WhatsApp → ⋮ / Настройки → <b>Связанные устройства</b> → <b>Привязать устройство</b> и наведите камеру на этот код.<br><span class="muted">Код обновляется каждые ~20 секунд — страница подхватит новый сама.</span></div></div>`;
+      } else if (qa && qa.status === 'connected') {
+        box.innerHTML = `<p class="wa-ok">✅ ${escapeHtml(qa.name)}: WhatsApp подключён. Переписка начнёт появляться в карточках клиентов.</p>`;
+        qrAgentId = null;
+      } else if (qa && (qa.status === 'connecting')) {
+        box.innerHTML = '<p class="muted">Подключаюсь… QR появится через несколько секунд.</p>';
+      } else if (!qa) {
+        box.innerHTML = '';
+      }
+    }
+
+    tbody.querySelectorAll('.wa-connect').forEach((b) => b.addEventListener('click', async () => {
+      b.disabled = true;
+      qrAgentId = Number(b.dataset.id);
+      try { await api('POST', `/api/whatsapp/${b.dataset.id}/connect`); } catch (e) { alert(e.message); }
+      loadStatus();
+    }));
+    tbody.querySelectorAll('.wa-showqr').forEach((b) => b.addEventListener('click', () => { qrAgentId = Number(b.dataset.id); loadStatus(); }));
+    tbody.querySelectorAll('.wa-disconnect').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('Отключить WhatsApp этого агента от CRM?\n\nCRM отвяжется от номера (на телефоне устройство пропадёт из «Связанных устройств»). Уже сохранённая переписка останется в карточках. Подключить заново можно в любой момент через QR.')) return;
+      try { await api('POST', `/api/whatsapp/${b.dataset.id}/disconnect`, { logout: true }); } catch (e) { alert(e.message); }
+      if (qrAgentId === Number(b.dataset.id)) qrAgentId = null;
+      loadStatus();
+    }));
+
+    if (Date.now() - unmatchedLoadedAt > 30000) loadUnmatched();
+  }
+
+  async function loadUnmatched() {
+    unmatchedLoadedAt = Date.now();
+    let data;
+    try { data = await api('GET', '/api/whatsapp/unmatched'); } catch (e) { return; }
+    const tbody = document.getElementById('wa-unmatched');
+    if (!tbody) return;
+    const cnt = document.getElementById('wa-unm-count');
+    if (cnt) cnt.textContent = data.chats.length ? `(${data.chats.length})` : '';
+    tbody.innerHTML = data.chats.map((c, i) => `
+      <tr>
+        <td style="white-space:nowrap">${escapeHtml(c.display)}</td>
+        <td>${escapeHtml(c.name || '—')}</td>
+        <td>${escapeHtml(userName(c.agentId))}</td>
+        <td>${c.count}</td>
+        <td><span class="muted" style="font-size:12px">${waTime(c.lastAt)}</span><br>${escapeHtml(c.lastText)}</td>
+        <td style="white-space:nowrap"><button type="button" class="btn-secondary wa-open" data-i="${i}">Открыть</button> <button type="button" class="btn-primary wa-link" data-i="${i}">Привязать</button></td>
+      </tr>`).join('') || '<tr><td colspan="6" class="muted">Все чаты сопоставлены с клиентами (или переписки ещё нет).</td></tr>';
+    tbody.querySelectorAll('.wa-open').forEach((b) => b.addEventListener('click', () => openWaChat(data.chats[Number(b.dataset.i)])));
+    tbody.querySelectorAll('.wa-link').forEach((b) => b.addEventListener('click', () => openWaLink(data.chats[Number(b.dataset.i)], () => { unmatchedLoadedAt = 0; loadUnmatched(); })));
+  }
+
+  stopWaPolling();
+  loadStatus();
+  waPollTimer = setInterval(() => {
+    if (state.view !== 'whatsapp') return stopWaPolling();
+    loadStatus();
+  }, 3000);
+}
+
+async function openWaChat(chat) {
+  const data = await api('GET', `/api/whatsapp/chat?agentId=${chat.agentId}&key=${encodeURIComponent(chat.key)}`);
+  openModal(`
+    <h2>${escapeHtml(chat.name || chat.display)}</h2>
+    <p class="muted" style="margin-top:0">${escapeHtml(chat.display)} · номер агента: ${escapeHtml(userName(chat.agentId))}</p>
+    <div class="wa-feed">${waBubblesHtml(data.messages)}</div>
+    <div class="modal-actions"><button type="button" class="btn-primary" id="wa-chat-link">Привязать к клиенту</button><button type="button" class="btn-secondary" id="cancel-modal">Закрыть</button></div>`);
+  const feed = document.querySelector('.wa-feed');
+  if (feed) feed.scrollTop = feed.scrollHeight;
+  document.getElementById('wa-chat-link').addEventListener('click', () => openWaLink(chat, () => { if (state.view === 'whatsapp') render(); }));
+}
+
+function openWaLink(chat, onDone) {
+  // Агент видит только своих клиентов (state.clients уже отфильтрован сервером);
+  // админу сначала предлагаем клиентов агента, с чьего номера идёт переписка.
+  const own = state.clients.filter((c) => c.ownerId === chat.agentId);
+  const others = state.clients.filter((c) => c.ownerId !== chat.agentId);
+  const opt = (c) => `<option value="${escapeAttr(c.name)} — ${escapeAttr(userName(c.ownerId))} #${c.id}"></option>`;
+  openModal(`
+    <h2>Привязать чат к клиенту</h2>
+    <p class="muted" style="margin-top:0">${escapeHtml(chat.display)}${chat.name ? ' · ' + escapeHtml(chat.name) : ''}</p>
+    <form id="wa-link-form">
+      <label>Клиент (начните вводить название)</label>
+      <input id="wa-link-input" list="wa-link-list" required autocomplete="off" placeholder="Название точки">
+      <datalist id="wa-link-list">${own.map(opt).join('')}${others.map(opt).join('')}</datalist>
+      <p class="muted" style="font-size:12px">${chat.key.startsWith('lid:') ? 'WhatsApp скрыл номер этого собеседника — привязка запомнится по его внутреннему идентификатору.' : 'Номер добавится к клиенту как дополнительный номер WhatsApp (поле «Телефон» не меняется).'}</p>
+      <div class="modal-actions"><button type="submit" class="btn-primary">Привязать</button><button type="button" class="btn-secondary" id="cancel-modal">Отмена</button></div>
+    </form>`, async () => {
+    const v = document.getElementById('wa-link-input').value;
+    const m = v.match(/#(\d+)\s*$/);
+    if (!m) throw new Error('Выберите клиента из списка подсказок');
+    await api('POST', '/api/whatsapp/link', { clientId: Number(m[1]), key: chat.key });
+    closeModal();
+    showToast('Чат привязан к клиенту', 'ok');
+    await loadAll();
+    if (onDone) onDone();
+  });
+}
+
+// Блок «WhatsApp» в карточке клиента: подгружается после открытия карточки.
+async function loadClientWhatsapp(client) {
+  const box = document.getElementById('wa-client-box');
+  if (!box) return;
+  let data;
+  try { data = await api('GET', `/api/clients/${client.id}/whatsapp`); } catch (e) { box.innerHTML = ''; return; }
+  if (!document.getElementById('wa-client-box')) return;
+  const manual = data.keys.filter((k) => k.manual);
+  const manualHtml = manual.length ? `<div class="muted" style="font-size:12px;margin:4px 0">Привязанные номера WhatsApp: ${manual.map((k) => `${escapeHtml(k.display)} <button type="button" class="link-btn wa-unlink" data-key="${escapeAttr(k.key)}" title="Отвязать">✕</button>`).join(', ')}</div>` : '';
+  if (!data.messages.length) {
+    box.innerHTML = `<details class="wa-details"><summary>💬 WhatsApp — переписки нет</summary><p class="muted" style="font-size:12px">${data.keys.length ? 'С номерами этого клиента переписки в подключённых WhatsApp пока нет.' : 'В карточке нет номера телефона — переписку не к чему привязать. Добавьте телефон или привяжите чат во вкладке WhatsApp.'}</p>${manualHtml}</details>`;
+  } else {
+    const shown = data.messages.slice(-60);
+    const last = data.messages[data.messages.length - 1];
+    box.innerHTML = `<details class="wa-details" open><summary>💬 WhatsApp — ${data.messages.length} сообщ., последнее ${waTime(last.t)}</summary>
+      ${manualHtml}
+      ${data.messages.length > shown.length ? `<p class="muted" style="font-size:12px">Показаны последние ${shown.length}. <button type="button" class="link-btn" id="wa-show-all">Показать все</button></p>` : ''}
+      <div class="wa-feed" id="wa-client-feed">${waBubblesHtml(shown, { showAgent: true })}</div></details>`;
+    const feed = document.getElementById('wa-client-feed');
+    if (feed) { feed.scrollTop = feed.scrollHeight; feed.querySelectorAll('img').forEach((i) => i.addEventListener('load', () => { feed.scrollTop = feed.scrollHeight; }, { once: true })); }
+    const all = document.getElementById('wa-show-all');
+    if (all) all.addEventListener('click', () => { feed.innerHTML = waBubblesHtml(data.messages, { showAgent: true }); all.parentElement.remove(); feed.scrollTop = feed.scrollHeight; });
+  }
+  box.querySelectorAll('.wa-unlink').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('Отвязать этот номер WhatsApp от клиента?')) return;
+    await api('POST', '/api/whatsapp/unlink', { clientId: client.id, key: b.dataset.key });
+    loadClientWhatsapp(client);
+  }));
+}
 
 function escapeHtml(str) {
   if (str === undefined || str === null) return '';

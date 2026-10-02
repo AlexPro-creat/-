@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const url = require('url');
 const db = require('./db');
 const auth = require('./auth');
 const { parseMultipart } = require('./multipart');
@@ -8,6 +9,7 @@ const { parseTableFile } = require('./fileTable');
 const { looksLikeConsignmentLedger, parseConsignmentLedger } = require('./debtLedger');
 const googleSheets = require('./googleSheets');
 const { normalizePhone, MONTH_ORDER } = require('./import');
+const whatsapp = require('./whatsapp');
 const IMPORT_DIR = path.join(__dirname, '..', 'data', 'import');
 
 // ---- Правка 01.09.2026: "протухание" данных за текущий месяц ----
@@ -1834,6 +1836,8 @@ function register(router) {
       masters: c.masters || [],
       isOffRoute: !!c.isOffRoute,
       closed: !!c.closed,
+      // Фаза 43: ручные привязки номеров WhatsApp к клиенту
+      waPhones: c.waPhones || [],
       // Отметки посещений (Фаза 40): координаты точки и журнал посещений
       // хранятся В КАРТОЧКЕ клиента и переносятся этой же выгрузкой (решение
       // пользователя 25.09.2026 — «в клиенты, чтобы грузить вместе с базой»).
@@ -1888,7 +1892,7 @@ function register(router) {
       'phone', 'address', 'contactName', 'pointType', 'visitDay', 'contractStatus',
       'paymentMethod', 'socialContact', 'bestCallTime', 'decisionMakerName', 'specialRequests',
       'orderWindow', 'discountTerms', 'salesPlan', 'routeNumber', 'notes', 'contactNotes',
-      'masters', 'isOffRoute', 'closed', 'geo'
+      'masters', 'isOffRoute', 'closed', 'geo', 'waPhones'
     ];
     // Журнал посещений (Фаза 40) — agentId пересчитываем по имени агента;
     // при повторной загрузке не задваиваем (ключ — время + агент).
@@ -2639,6 +2643,116 @@ function register(router) {
     }
 
     sendJson(res, 200, payload);
+  }));
+
+  // ---------- WhatsApp (Фаза 43, 02.10.2026) ----------
+  // Подключение номера агента по QR, чтение переписки, привязка к клиентам.
+  // Админ/супервайзер видят всех агентов и всю переписку; агент — только свой номер.
+  function waCanManage(user, agentId) {
+    return isStaff(user) || user.id === Number(agentId);
+  }
+  function waAgentFilter(user) {
+    return isStaff(user) ? null : user.id;
+  }
+
+  router.get('/api/whatsapp/status', requireAuth(async (req, res) => {
+    await whatsapp.loadLib();
+    const agents = db.all('users')
+      .filter((u) => u.role === 'agent' && (isStaff(req.user) || u.id === req.user.id))
+      .map((u) => Object.assign({ id: u.id, name: u.name }, whatsapp.statusOf(u.id)));
+    sendJson(res, 200, { lib: whatsapp.libStatus(), agents });
+  }));
+
+  router.post('/api/whatsapp/:id/connect', requireAuth(async (req, res, params) => {
+    const agent = db.find('users', params.id);
+    if (!agent || agent.role !== 'agent') return sendJson(res, 404, { error: 'Агент не найден' });
+    if (!waCanManage(req.user, agent.id)) return sendJson(res, 403, { error: 'Недостаточно прав' });
+    await whatsapp.connect(agent.id);
+    sendJson(res, 200, Object.assign({ id: agent.id, name: agent.name }, whatsapp.statusOf(agent.id)));
+  }));
+
+  router.post('/api/whatsapp/:id/disconnect', requireAuth(async (req, res, params) => {
+    const agent = db.find('users', params.id);
+    if (!agent || agent.role !== 'agent') return sendJson(res, 404, { error: 'Агент не найден' });
+    if (!waCanManage(req.user, agent.id)) return sendJson(res, 403, { error: 'Недостаточно прав' });
+    const body = await readBody(req).catch(() => ({}));
+    await whatsapp.disconnect(agent.id, body.logout !== false);
+    sendJson(res, 200, Object.assign({ id: agent.id, name: agent.name }, whatsapp.statusOf(agent.id)));
+  }));
+
+  router.get('/api/whatsapp/unmatched', requireAuth(async (req, res) => {
+    sendJson(res, 200, { chats: whatsapp.unmatchedChats(waAgentFilter(req.user)) });
+  }));
+
+  router.get('/api/whatsapp/summary', requireAuth(async (req, res) => {
+    sendJson(res, 200, { clients: whatsapp.clientSummary(waAgentFilter(req.user)) });
+  }));
+
+  router.get('/api/whatsapp/chat', requireAuth(async (req, res) => {
+    const q = url.parse(req.url, true).query;
+    const agentId = Number(q.agentId);
+    if (!waCanManage(req.user, agentId)) return sendJson(res, 403, { error: 'Недостаточно прав' });
+    sendJson(res, 200, { messages: whatsapp.withMediaFlags(whatsapp.chatMessages(agentId, String(q.key || ''))) });
+  }));
+
+  router.get('/api/clients/:id/whatsapp', requireAuth(async (req, res, params) => {
+    const client = db.find('clients', params.id);
+    if (!client) return sendJson(res, 404, { error: 'Клиент не найден' });
+    if (req.user.role === 'agent' && client.ownerId !== req.user.id) return sendJson(res, 403, { error: 'Недостаточно прав' });
+    const r = whatsapp.messagesForClient(client, waAgentFilter(req.user));
+    sendJson(res, 200, {
+      keys: r.keys.map((k) => ({ key: k, display: whatsapp.displayKey(k), manual: (client.waPhones || []).includes(k) })),
+      messages: whatsapp.withMediaFlags(r.messages)
+    });
+  }));
+
+  // Файл вложения (фото/голосовое/документ/видео). Агент — только своего номера.
+  router.get('/api/whatsapp/media/:agentId/:msgId', requireAuth(async (req, res, params) => {
+    if (!waCanManage(req.user, params.agentId)) return sendJson(res, 403, { error: 'Недостаточно прав' });
+    const m = whatsapp.mediaForMessage(params.agentId, params.msgId);
+    if (!m) return sendJson(res, 404, { error: 'Файл не найден' });
+    const stat = fs.statSync(m.file);
+    const headers = {
+      'Content-Type': m.mime,
+      'Cache-Control': 'private, max-age=86400',
+      'Accept-Ranges': 'bytes',
+      'Content-Disposition': 'inline; filename*=UTF-8\'\'' + encodeURIComponent(m.name)
+    };
+    // Range — чтобы аудио/видео можно было перематывать (и для Safari)
+    const range = req.headers.range && /bytes=(\d*)-(\d*)/.exec(req.headers.range);
+    if (range) {
+      const start = range[1] ? Number(range[1]) : 0;
+      const end = range[2] ? Math.min(Number(range[2]), stat.size - 1) : stat.size - 1;
+      res.writeHead(206, Object.assign(headers, { 'Content-Range': `bytes ${start}-${end}/${stat.size}`, 'Content-Length': end - start + 1 }));
+      fs.createReadStream(m.file, { start, end }).pipe(res);
+      return;
+    }
+    res.writeHead(200, Object.assign(headers, { 'Content-Length': stat.size }));
+    fs.createReadStream(m.file).pipe(res);
+  }));
+
+  // Ручная привязка номера (или скрытого номера «lid:…») к клиенту.
+  router.post('/api/whatsapp/link', requireAuth(async (req, res) => {
+    const body = await readBody(req);
+    const client = db.find('clients', body.clientId);
+    if (!client) return sendJson(res, 404, { error: 'Клиент не найден' });
+    if (req.user.role === 'agent' && client.ownerId !== req.user.id) return sendJson(res, 403, { error: 'Можно привязывать только к своим клиентам' });
+    let key = String(body.key || '').trim();
+    if (!key.startsWith('lid:')) key = whatsapp.phoneKey(key);
+    if (!key) return sendJson(res, 400, { error: 'Не указан номер' });
+    const list = (client.waPhones || []).slice();
+    if (!list.includes(key)) list.push(key);
+    const updated = db.update('clients', client.id, { waPhones: list });
+    sendJson(res, 200, { client: updated });
+  }));
+
+  router.post('/api/whatsapp/unlink', requireAuth(async (req, res) => {
+    const body = await readBody(req);
+    const client = db.find('clients', body.clientId);
+    if (!client) return sendJson(res, 404, { error: 'Клиент не найден' });
+    if (req.user.role === 'agent' && client.ownerId !== req.user.id) return sendJson(res, 403, { error: 'Недостаточно прав' });
+    const updated = db.update('clients', client.id, { waPhones: (client.waPhones || []).filter((k) => k !== body.key) });
+    sendJson(res, 200, { client: updated });
   }));
 }
 

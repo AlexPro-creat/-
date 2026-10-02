@@ -849,3 +849,26 @@ th.col-contact { font-size: 12px; }
 .brand-matrix .bm-cell { min-width: 0; width: auto; }
 .brand-matrix th.sticky-col { z-index: 2; }
 .brand-matrix td.sticky-col { white-space: normal; min-width: 150px; max-width: 200px; font-size: 13px; line-height: 1.25; }
+
+/* ---------- WhatsApp (Фаза 43) ---------- */
+.wa-client-box:empty { display: none; }
+.wa-details { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; margin: 8px 0; }
+.wa-details > summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.wa-feed { max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 8px 4px; background: #0b141a; border-radius: 8px; margin-top: 6px; }
+.wa-day { align-self: center; font-size: 11px; color: #8696a0; background: #182229; border-radius: 6px; padding: 2px 8px; margin: 4px 0; }
+.wa-msg { max-width: 80%; padding: 5px 9px; border-radius: 8px; font-size: 14px; line-height: 1.35; box-shadow: 0 1px 0.5px rgba(0,0,0,.3); color: #e9edef; }
+.wa-in { align-self: flex-start; background: #202c33; }
+.wa-out { align-self: flex-end; background: #005c4b; }
+.wa-meta { font-size: 11px; color: #8696a0; margin-bottom: 2px; }
+.wa-text { white-space: pre-wrap; word-break: break-word; }
+.wa-qr { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 12px 0; background: #fff; color: #111; }
+.wa-qr img { width: 260px; height: 260px; image-rendering: pixelated; }
+.wa-qr > div { flex: 1; min-width: 220px; }
+.wa-ok { color: var(--success); font-weight: 600; }
+
+.wa-img { display: block; max-width: 260px; max-height: 320px; border-radius: 6px; margin: 2px 0; }
+.wa-audio { display: flex; align-items: center; gap: 6px; }
+.wa-audio audio { height: 34px; max-width: 230px; }
+.wa-dl { font-size: 11px; color: #8696a0; }
+.wa-doc { color: #53bdeb; text-decoration: none; font-weight: 600; }
+.wa-nofile { font-size: 11px; color: #8696a0; font-style: italic; }
