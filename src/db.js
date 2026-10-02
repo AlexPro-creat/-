@@ -5,8 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const DB_FILE = path.join(DATA_DIR, 'db.json');
+// Фаза 42 (01.10.2026): база — на постоянном диске Render (/var/data), см. src/paths.js.
+const { PERSIST_DIR: DATA_DIR, DB_FILE } = require('./paths');
 
 function emptyState() {
   return {

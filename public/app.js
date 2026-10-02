@@ -1061,10 +1061,24 @@ const VISIT_DAYS = ['Понедельник', 'Вторник', 'Среда', '�
 
 function riskCount(c) { return (c.regularAssortment || []).filter((p) => p.atRisk).length; }
 
+// 01.10.2026: столбец скидки — не шире 3 символов. «-10%» → «10%», «без скидок» → «0»,
+// пусто → «—», любой другой текст — первые 3 символа (полный текст — при наведении).
+function shortDiscount(v) {
+  const t = (v || '').trim();
+  if (!t) return '<span class="muted">—</span>';
+  const m = t.match(/(\d{1,2})\s*%/);
+  if (m) return `${m[1]}%`;
+  if (/без\s*скид/i.test(t)) return '0';
+  return escapeHtml(t.slice(0, 3));
+}
 function filteredClients() {
   const f = state.clientFilters;
   let list = state.clients.filter((c) => {
-    if (c.closed && !(isStaff() && f.showClosed)) return false;
+    // 01.10.2026 (жалоба «фильтр закрытые не работает»): раньше галочка лишь
+    // ДОБАВЛЯЛА закрытые точки к ~700 открытым — найти их в общем списке было
+    // невозможно. Теперь галочка показывает ТОЛЬКО закрытые точки.
+    if (isStaff() && f.showClosed) { if (!c.closed) return false; }
+    else if (c.closed) return false;
     if (f.visitDay && c.visitDay !== f.visitDay) return false;
     if (f.pointType && (c.pointType || '') !== f.pointType) return false;
     if (f.paymentMethod && (c.paymentMethod || '') !== f.paymentMethod) return false;
@@ -1127,8 +1141,8 @@ function daysOverdueText(c) {
 }
 
 function exportClientsCsv(list) {
-  const headers = ['Название', 'Телефон', 'Адрес', 'Контактное лицо', 'Тип точки', 'Маршрут №', 'План', 'Продано', 'Долг', 'Недопродано', 'День визита', 'Ответственный'];
-  const rows = list.map((c) => [c.name, c.phone || '', c.address || '', c.contactName || '', c.pointType || '', c.routeNumber != null ? c.routeNumber : '', c.salesPlan || 0, c.currentMonthRevenue || 0, c.debtAmount || 0, riskCount(c), c.visitDay || '', userName(c.ownerId)]);
+  const headers = ['Название', 'Телефон', 'Адрес', 'Контактное лицо', 'Тип точки', 'Маршрут №', 'План', 'Продано', 'Долг', 'Особые условия (скидка)', 'Недопродано', 'День визита', 'Ответственный'];
+  const rows = list.map((c) => [c.name, c.phone || '', c.address || '', c.contactName || '', c.pointType || '', c.routeNumber != null ? c.routeNumber : '', c.salesPlan || 0, c.currentMonthRevenue || 0, c.debtAmount || 0, c.discountTerms || '', riskCount(c), c.visitDay || '', userName(c.ownerId)]);
   const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -1188,7 +1202,7 @@ function renderClients(content) {
           <option value="">Агент: все</option>
           ${state.users.filter((u) => u.role === 'agent').map((u) => `<option value="${u.id}" ${String(f.ownerId) === String(u.id) ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
         </select>` : ''}
-        ${isStaff() ? `<label class="filter-check"><input type="checkbox" id="filter-showClosed" ${f.showClosed ? 'checked' : ''}> Показать закрытые</label>` : ''}
+        ${isStaff() ? `<label class="filter-check" title="Показать только закрытые точки"><input type="checkbox" id="filter-showClosed" ${f.showClosed ? 'checked' : ''}> Закрытые (${state.clients.filter((c) => c.closed).length})</label>` : ''}
         ${filtersActive ? '<button type="button" class="link-btn" id="filter-reset">Сбросить</button>' : ''}
       </div>
       ${bulk ? `<div class="filter-bar" id="bulk-bar">
@@ -1199,17 +1213,18 @@ function renderClients(content) {
         </select>
         <button type="button" class="btn-secondary" id="bulk-reassign-btn">Применить</button>
       </div>` : ''}
-      <div class="table-wrap">
-        <table>
+      <div class="table-wrap table-wrap-fit">
+        <table class="clients-table">
           <thead><tr>
             ${bulk ? '<th></th>' : ''}
             <th class="sticky-col">Название</th>
             <th class="sortable col-narrow" data-sort="sales">Продано<br>в этом месяце${sortArrow('sales')}</th>
             <th class="sortable col-narrow" data-sort="debt">Долг${sortArrow('debt')}</th>
+            <th class="col-cond" title="Скидка / особые условия (полный текст — при наведении на ячейку)">%</th>
             <th>Номер телефона</th>
             <th>Адрес</th>
             <th class="col-narrow sortable" data-sort="geo" title="Координаты точки сохранены (первая отметка посещения)">Коорд.${sortArrow('geo')}</th>
-            <th>Контактное лицо</th>
+            <th class="col-contact">Контактное лицо</th>
             <th>Тип точки</th>
             <th class="sortable" data-sort="route">Маршрут №${sortArrow('route')}</th>
             <th>План</th>
@@ -1285,7 +1300,7 @@ function renderClients(content) {
   const tbody = document.getElementById('clients-tbody');
   const list = filteredClients();
   if (!list.length) {
-    tbody.appendChild(el(`<tr><td colspan="${bulk ? 12 : 11}"><div class="empty-state">${state.clients.length ? 'Ничего не найдено по выбранным фильтрам.' : 'Пока нет клиентов. Добавьте первого.'}</div></td></tr>`));
+    tbody.appendChild(el(`<tr><td colspan="${bulk ? 13 : 12}"><div class="empty-state">${state.clients.length ? 'Ничего не найдено по выбранным фильтрам.' : 'Пока нет клиентов. Добавьте первого.'}</div></td></tr>`));
     return;
   }
   list.forEach((c) => {
@@ -1295,7 +1310,7 @@ function renderClients(content) {
       <tr class="${c.closed ? 'row-closed' : ''}">
         ${bulk ? `<td><input type="checkbox" class="bulk-check" data-id="${c.id}" ${state.clientBulkSelected.has(c.id) ? 'checked' : ''}></td>` : ''}
         <td class="sticky-col open-client" title="Двойной клик — открыть карточку">
-          <strong>${escapeHtml(c.name)}</strong>
+          <strong class="name-2l" title="${escapeAttr(c.name)}">${escapeHtml(c.name)}</strong>
           ${c.closed ? '<span class="badge badge-offroute">закрыта</span>' : ''}
           ${c.closureRequested ? '<span class="badge badge-pending">на закрытие</span>' : ''}
           ${c.pendingApproval ? '<span class="badge badge-pending">на согласовании</span>' : ''}
@@ -1303,10 +1318,11 @@ function renderClients(content) {
         </td>
         <td class="col-narrow">${c.currentMonthRevenue ? fmtMoney(c.currentMonthRevenue) : '—'}</td>
         <td class="col-narrow">${c.debtAmount ? `<span class="badge ${c.debtOverdue ? 'badge-overdue' : 'badge-pay'}" title="${escapeAttr([overdueDays, debtAsOfLabel(c) ? 'на ' + debtAsOfLabel(c) : ''].filter(Boolean).join(', '))}">${fmtMoney(c.debtAmount)}</span>` : '—'}</td>
-        <td>${telLink(c.phone)}</td>
-        <td>${escapeHtml(c.address || '—')} ${mapsLink(c.address, c.geo)}</td>
+        <td class="col-cond" title="${escapeAttr(c.discountTerms || '')}">${shortDiscount(c.discountTerms)}</td>
+        <td class="col-phone">${telLink(c.phone)}</td>
+        <td class="col-addr">${escapeHtml(c.address || '—')} ${mapsLink(c.address, c.geo)}</td>
         <td class="col-narrow">${c.geo ? `<span class="geo-yes" title="Координаты сохранены ${escapeAttr(fmtVisitTime(c.geo.setAt))}${c.geo.setBy ? ' (' + escapeAttr(c.geo.setBy) + ')' : ''}">✓</span>` : '<span class="muted">—</span>'}</td>
-        <td>${escapeHtml(c.contactName || '—')}</td>
+        <td class="col-contact">${escapeHtml(c.contactName || '—')}</td>
         <td>${escapeHtml(c.pointType || '—')}</td>
         <td>${c.routeNumber != null ? escapeHtml(String(c.routeNumber)) : '—'}</td>
         <td>${c.salesPlan ? fmtMoney(c.salesPlan) : '—'}</td>

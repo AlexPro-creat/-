@@ -21,7 +21,10 @@ const IMPORT_DIR = path.join(__dirname, '..', 'data', 'import');
 const MONTH_ORDER = ['март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь'];
 
 function loadJson(name) {
-  const p = path.join(IMPORT_DIR, name);
+  // Фаза 42: долги, загруженные через панель «Команда», лежат на постоянном
+  // диске (import-overrides/debts.json) и важнее файла из проекта.
+  const override = path.join(require('./paths').OVERRIDES_DIR, name);
+  const p = name === 'debts.json' && fs.existsSync(override) ? override : path.join(IMPORT_DIR, name);
   if (!fs.existsSync(p)) return null;
   try {
     return JSON.parse(fs.readFileSync(p, 'utf8'));

@@ -653,7 +653,8 @@ const CLIENT_ADMIN_ONLY_FIELDS = ['ownerId'];
 // Поля, которые может редактировать и назначенный агент
 const CLIENT_AGENT_EDITABLE_FIELDS = ['notes'];
 
-const UPLOADS_DIR = path.join(__dirname, '..', 'data', 'uploads');
+// Фаза 42: вложения, база и загруженные через панель долги — на постоянном диске (src/paths.js).
+const { UPLOADS_DIR, DB_FILE, OVERRIDES_DIR } = require('./paths');
 
 function sendJson(res, status, data) {
   const body = JSON.stringify(data);
@@ -867,7 +868,7 @@ function register(router) {
   // Резервная копия одной кнопкой: db.json + все вложения одним zip-файлом.
   router.get('/api/backup', requireAdmin(async (req, res) => {
     const entries = [];
-    const dbPath = path.join(__dirname, '..', 'data', 'db.json');
+    const dbPath = DB_FILE;
     if (fs.existsSync(dbPath)) entries.push({ name: 'db.json', data: fs.readFileSync(dbPath) });
 
     function walk(dir, prefix) {
@@ -2046,8 +2047,10 @@ function register(router) {
   function applyDebtsSnapshot(res, debts) {
     if (!debts.length) return sendJson(res, 400, { error: 'Не нашёл ни одной строки с именем клиента и долгом' });
     try {
-      fs.mkdirSync(IMPORT_DIR, { recursive: true });
-      fs.writeFileSync(path.join(IMPORT_DIR, 'debts.json'), JSON.stringify(debts, null, 2), 'utf8');
+      // Фаза 42: пишем на постоянный диск — загруженные долги переживают деплой
+      // (import.js берёт import-overrides/debts.json раньше файла из проекта).
+      fs.mkdirSync(OVERRIDES_DIR, { recursive: true });
+      fs.writeFileSync(path.join(OVERRIDES_DIR, 'debts.json'), JSON.stringify(debts, null, 2), 'utf8');
     } catch (e) {
       return sendJson(res, 500, { error: `Файл разобрал, но не смог сохранить на диск: ${e.message}` });
     }

@@ -159,7 +159,7 @@ button {
 #logout-btn { background: var(--surface-2); padding: 7px 12px; color: var(--text); border: 1px solid var(--border); }
 #logout-btn:hover { background: var(--border); }
 
-main#content { padding: 20px; max-width: 1200px; margin: 0 auto; }
+main#content { padding: 20px; max-width: none; margin: 0; } /* 01.10.2026: на всю ширину экрана (было 1200px по центру) */
 
 /* ---- Карточки / сетка дашборда ---- */
 
@@ -287,7 +287,7 @@ th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--bo
 th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
 tr:last-child td { border-bottom: none; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
-.table-wrap table { border: none; border-radius: 0; }
+.table-wrap table { border: none; border-radius: 0; overflow: visible; } /* 01.10.2026: overflow:hidden у таблицы ломал закрепление колонки «Название» */
 
 /* Закреплённая первая колонка (Название) — не уезжает при горизонтальном скролле */
 .sticky-col {
@@ -810,3 +810,42 @@ td.col-narrow { white-space: nowrap; padding-left: 6px; padding-right: 6px; widt
 td.col-narrow .badge { padding-left: 6px; padding-right: 6px; }
 .geo-yes { color: var(--success); font-weight: 700; font-size: 16px; }
 .visit-reset { color: var(--danger); text-decoration: line-through; }
+th.col-cond, td.col-cond { max-width: 4ch; width: 4ch; font-size: 13px; padding-left: 4px; padding-right: 4px; white-space: nowrap; overflow: hidden; text-align: center; }
+
+th.col-cond { white-space: nowrap; font-size: 12px; }
+
+/* 01.10.2026: закреплённая «Название» на «Клиентах» — фиксированная ширина, узкое «Контактное лицо» */
+th.sticky-col { z-index: 2; }
+.table-wrap td.sticky-col, .table-wrap th.sticky-col { min-width: 130px; max-width: 150px; width: 150px; }
+/* 01.10.2026: название клиента — максимум в две строки, полное — при наведении */
+.name-2l { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 1.25; }
+th.col-contact, td.col-contact { max-width: 110px; width: 110px; font-size: 13px; padding-left: 6px; padding-right: 6px; }
+td.col-contact { overflow-wrap: anywhere; }
+th.col-contact { font-size: 12px; }
+
+/* 01.10.2026: «Клиенты» — пустые отступы между столбцами не более ~3 мм:
+   по 5px с каждой стороны ячейки (≈ 10–11px между содержимым соседних столбцов),
+   таблица не растягивается на всю ширину (иначе браузер раздаёт лишнее место в зазоры). */
+.table-wrap table.clients-table { width: auto; }
+.clients-table th, .clients-table td,
+.clients-table th.col-narrow, .clients-table td.col-narrow,
+.clients-table th.col-cond, .clients-table td.col-cond,
+.clients-table th.col-contact, .clients-table td.col-contact { padding-left: 5px; padding-right: 5px; }
+.clients-table td { max-width: 260px; }
+.clients-table th.col-narrow, .clients-table td.col-narrow { width: auto; }
+.clients-table th.col-narrow { max-width: 80px; }
+.clients-table th, .clients-table th.sortable { white-space: normal; width: 1px; }
+.clients-table td { white-space: nowrap; }
+.clients-table td.sticky-col, .clients-table td.col-contact { white-space: normal; }
+.clients-table td.col-addr { white-space: normal; min-width: 200px; max-width: 260px; }
+/* 01.10.2026: «Клиенты» — два номера телефона в две строки (адрес ближе к телефону);
+   рамка таблицы по ширине столбцов, а не на весь экран (только на «Клиентах»). */
+.clients-table td.col-phone { white-space: normal; max-width: 120px; }
+.table-wrap.table-wrap-fit { width: fit-content; max-width: 100%; }
+/* 01.10.2026: «По брендам» — клиент закреплён слева, бренды плотнее, рамка по ширине столбцов */
+.table-wrap.brand-matrix-wrap { width: fit-content; max-width: 100%; }
+.table-wrap table.brand-matrix { width: auto; }
+.brand-matrix th, .brand-matrix td { padding-left: 5px; padding-right: 5px; }
+.brand-matrix .bm-cell { min-width: 0; width: auto; }
+.brand-matrix th.sticky-col { z-index: 2; }
+.brand-matrix td.sticky-col { white-space: normal; min-width: 150px; max-width: 200px; font-size: 13px; line-height: 1.25; }

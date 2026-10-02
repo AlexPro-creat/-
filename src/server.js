@@ -11,7 +11,7 @@ const { runImport } = require('./import');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
-const UPLOADS_DIR = path.join(__dirname, '..', 'data', 'uploads');
+const { UPLOADS_DIR, PERSIST_DIR } = require('./paths');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -135,4 +135,5 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`CRM запущена: http://localhost:${PORT}`);
+  console.log(`Данные (база и вложения) хранятся в: ${PERSIST_DIR}`);
 });
